@@ -1,40 +1,75 @@
+from __future__ import annotations
+
 import os
+from dataclasses import dataclass
+from typing import Any
+
 import requests
-import json
 
 
-class HAClient:
-    def __init__(self):
+@dataclass(frozen=True)
+class HomeAssistantSnapshot:
+    battery_soc_percent: float | None
+    pv_power_kw: float | None
+    grid_price: float | None
+    household_load_kw: float | None
+
+
+class HomeAssistantClient:
+    def __init__(self) -> None:
         self.base_url = "http://supervisor/core/api"
         self.token = os.environ.get("SUPERVISOR_TOKEN")
-
         if not self.token:
-            raise Exception("Missing SUPERVISOR_TOKEN (HA add-on environment)")
+            raise RuntimeError("Missing SUPERVISOR_TOKEN")
 
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
 
-    def _get(self, entity_id: str):
+    def get_state(self, entity_id: str) -> Any:
+        if not entity_id:
+            return None
+
         url = f"{self.base_url}/states/{entity_id}"
-        r = requests.get(url, headers=self.headers, timeout=10)
+        response = requests.get(url, headers=self.headers, timeout=10)
 
-        if r.status_code != 200:
+        if response.status_code != 200:
+            print(f"[HA ERROR] entity={entity_id} status={response.status_code} body={response.text}")
             return None
 
-        return r.json().get("state")
+        return response.json().get("state")
 
-    def _f(self, v):
+    @staticmethod
+    def _float_or_none(value: Any) -> float | None:
         try:
-            return float(v)
-        except:
+            if value in (None, "", "unknown", "unavailable"):
+                return None
+            return float(value)
+        except (TypeError, ValueError):
             return None
 
-    def get_state_snapshot(self, config: dict):
-        return {
-            "battery_soc_percent": self._f(self._get(config["battery_soc_entity"])),
-            "pv_power_kw": self._f(self._get(config["pv_power_entity"])),
-            "grid_price": self._f(self._get(config["grid_price_entity"])),
-            "household_load_kw": self._f(self._get(config["household_load_entity"])),
-        }
+    def read_snapshot(self, config: Any) -> HomeAssistantSnapshot:
+        return HomeAssistantSnapshot(
+            battery_soc_percent=self._float_or_none(
+                self.get_state(config.battery_soc_entity)
+            ),
+            pv_power_kw=self._float_or_none(
+                self.get_state(config.pv_power_entity)
+            ),
+            grid_price=self._float_or_none(
+                self.get_state(config.grid_price_entity)
+            ),
+            household_load_kw=self._float_or_none(
+                self.get_state(config.household_load_entity)
+            ),
+        )
+
+
+def snapshot_as_dict(snapshot: HomeAssistantSnapshot) -> dict[str, float | None]:
+    return {
+        "battery_soc_percent": snapshot.battery_soc_percent,
+        "pv_power_kw": snapshot.pv_power_kw,
+        "grid_price": snapshot.grid_price,
+        "household_load_kw": snapshot.household_load_kw,
+    }
