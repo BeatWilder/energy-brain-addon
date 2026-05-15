@@ -70,7 +70,8 @@ def build_plan(snapshot: EnergySnapshot, battery: BatteryConfig | None, horizon_
     for index in range(horizon_steps):
         setpoint_kw, reason = _choose_setpoint(snapshot, battery, soc)
         next_soc = simulate_next_soc(soc, setpoint_kw, battery)
-        if not _within_bounds(next_soc, battery):
+        reserve = max(battery.reserve_percent, battery.soc_min_percent)
+        if not _within_bounds(next_soc, battery) or (setpoint_kw < 0 and next_soc < reserve):
             setpoint_kw = 0.0
             reason = "bounded_no_action"
             next_soc = soc
@@ -115,6 +116,10 @@ def validate_inputs(snapshot: EnergySnapshot, battery: BatteryConfig | None) -> 
     ):
         if value is None:
             errors.append(f"missing_{field_name}")
+    if snapshot.pv_power_kw is not None and snapshot.pv_power_kw < 0:
+        errors.append("invalid_negative_pv_power_kw")
+    if snapshot.household_load_kw is not None and snapshot.household_load_kw < 0:
+        errors.append("invalid_negative_household_load_kw")
     if errors or battery is None or snapshot.battery_soc_percent is None:
         return errors
     if not _within_bounds(snapshot.battery_soc_percent, battery):
