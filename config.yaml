@@ -1,56 +1,62 @@
 name: Energy Brain EMS
-slug: energy_brain_ems
-description: Deterministic, physics-aware Energy Management System for Home Assistant.
+slug: energy_brain
+description: Deterministic, physics-aware Energy Management System for Home Assistant
 version: "0.1.0"
-url: "https://github.com/local/energy-brain"
+
 arch:
   - amd64
   - aarch64
+
 startup: services
 boot: auto
 init: false
-hassio_api: true
-homeassistant_api: true
-host_network: false
-map:
-  - addon_config:rw
+
 options:
   mode: observer
   cycle_seconds: 900
   horizon_steps: 96
+
   battery_soc_entity: ""
   pv_power_entity: ""
   grid_price_entity: ""
   household_load_entity: ""
-  battery_capacity_kwh: null
-  soc_min_percent: null
-  soc_max_percent: null
-  reserve_percent: null
-  max_charge_kw: null
-  max_discharge_kw: null
+
+  battery_capacity_kwh: 10.0
+  soc_min_percent: 10.0
+  soc_max_percent: 95.0
+  reserve_percent: 20.0
+
+  max_charge_kw: 5.0
+  max_discharge_kw: 5.0
+
   charge_efficiency: 0.95
   discharge_efficiency: 0.95
-  command_entity: ""
-  command_service: ""
+
   command_service_domain: ""
+  command_service: ""
   command_value_field: ""
+
 schema:
   mode: list(observer|shadow|active)
   cycle_seconds: int(60,3600)
   horizon_steps: int(1,192)
+
   battery_soc_entity: str
   pv_power_entity: str
   grid_price_entity: str
   household_load_entity: str
-  battery_capacity_kwh: float?
-  soc_min_percent: float?
-  soc_max_percent: float?
-  reserve_percent: float?
-  max_charge_kw: float?
-  max_discharge_kw: float?
-  charge_efficiency: float(0,1)
-  discharge_efficiency: float(0,1)
-  command_entity: str
-  command_service: str
+
+  battery_capacity_kwh: float
+  soc_min_percent: float
+  soc_max_percent: float
+  reserve_percent: float
+
+  max_charge_kw: float
+  max_discharge_kw: float
+
+  charge_efficiency: float
+  discharge_efficiency: float
+
   command_service_domain: str
+  command_service: str
   command_value_field: str
