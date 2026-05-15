@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 import logging
 import time
 from dataclasses import asdict
@@ -50,3 +52,13 @@ def _json_log(event: str, payload: dict) -> str:
 
 if __name__ == "__main__":
     main()
+
+
+def write_cycle_history(state: dict) -> None:
+    path = Path("/data/energy_brain_cycles.jsonl")
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        **state,
+    }
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, separators=(",", ":")) + "\n")
