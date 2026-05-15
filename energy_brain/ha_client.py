@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -21,7 +23,6 @@ class HomeAssistantClient:
         self.token = os.environ.get("SUPERVISOR_TOKEN")
         if not self.token:
             raise RuntimeError("Missing SUPERVISOR_TOKEN")
-
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
@@ -30,15 +31,11 @@ class HomeAssistantClient:
     def get_state(self, entity_id: str) -> Any:
         if not entity_id:
             return None
-
-        url = f"{self.base_url}/states/{entity_id}"
-        response = requests.get(url, headers=self.headers, timeout=10)
-
-        if response.status_code != 200:
-            print(f"[HA ERROR] entity={entity_id} status={response.status_code} body={response.text}")
+        r = requests.get(f"{self.base_url}/states/{entity_id}", headers=self.headers, timeout=10)
+        if r.status_code != 200:
+            print(f"[HA ERROR] {entity_id}: {r.status_code} {r.text}")
             return None
-
-        return response.json().get("state")
+        return r.json().get("state")
 
     @staticmethod
     def _float_or_none(value: Any) -> float | None:
@@ -50,30 +47,32 @@ class HomeAssistantClient:
             return None
 
     @staticmethod
-    def _cfg(config: Any, *names: str) -> Any:
-        for name in names:
-            if hasattr(config, name):
-                return getattr(config, name)
-        if isinstance(config, dict):
-            for name in names:
-                if name in config:
-                    return config[name]
-        return ""
+    def _options() -> dict[str, Any]:
+        path = Path("/data/options.json")
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text())
+        except Exception as exc:
+            print(f"[CONFIG ERROR] failed to read /data/options.json: {exc}")
+            return {}
+
+    @staticmethod
+    def _cfg(config: Any, name: str) -> str:
+        if hasattr(config, name):
+            value = getattr(config, name)
+            if value:
+                return str(value)
+        if isinstance(config, dict) and config.get(name):
+            return str(config[name])
+        return str(HomeAssistantClient._options().get(name, ""))
 
     def read_snapshot(self, config: Any) -> HomeAssistantSnapshot:
         return HomeAssistantSnapshot(
-            battery_soc_percent=self._float_or_none(
-                self.get_state(self._cfg(config, "battery_soc_entity", "battery_soc_entity_id"))
-            ),
-            pv_power_kw=self._float_or_none(
-                self.get_state(self._cfg(config, "pv_power_entity", "pv_power_entity_id"))
-            ),
-            grid_price=self._float_or_none(
-                self.get_state(self._cfg(config, "grid_price_entity", "grid_price_entity_id"))
-            ),
-            household_load_kw=self._float_or_none(
-                self.get_state(self._cfg(config, "household_load_entity", "household_load_entity_id"))
-            ),
+            battery_soc_percent=self._float_or_none(self.get_state(self._cfg(config, "battery_soc_entity"))),
+            pv_power_kw=self._float_or_none(self.get_state(self._cfg(config, "pv_power_entity"))),
+            grid_price=self._float_or_none(self.get_state(self._cfg(config, "grid_price_entity"))),
+            household_load_kw=self._float_or_none(self.get_state(self._cfg(config, "household_load_entity"))),
         )
 
 
