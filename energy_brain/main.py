@@ -26,6 +26,8 @@ def main() -> None:
         started = time.time()
         state = run_cycle(config, client)
         LOGGER.info(_json_log("cycle", state))
+        write_cycle_history(state)
+        LOGGER.info(_json_log("history_written", {"path": "/data/energy_brain_cycles.jsonl"}))
         elapsed = time.time() - started
         time.sleep(max(1.0, config.cycle_seconds - elapsed))
 
@@ -49,6 +51,16 @@ def run_cycle(config, client: HomeAssistantClient) -> dict:
 def _json_log(event: str, payload: dict) -> str:
     return json.dumps({"event": event, **payload}, sort_keys=True, separators=(",", ":"))
 
+
+
+def write_cycle_history(state: dict) -> None:
+    path = Path("/data/energy_brain_cycles.jsonl")
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        **state,
+    }
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, separators=(",", ":")) + "\n")
 
 if __name__ == "__main__":
     main()
