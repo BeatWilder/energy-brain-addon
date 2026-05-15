@@ -49,19 +49,30 @@ class HomeAssistantClient:
         except (TypeError, ValueError):
             return None
 
+    @staticmethod
+    def _cfg(config: Any, *names: str) -> Any:
+        for name in names:
+            if hasattr(config, name):
+                return getattr(config, name)
+        if isinstance(config, dict):
+            for name in names:
+                if name in config:
+                    return config[name]
+        return ""
+
     def read_snapshot(self, config: Any) -> HomeAssistantSnapshot:
         return HomeAssistantSnapshot(
             battery_soc_percent=self._float_or_none(
-                self.get_state(config.battery_soc_entity)
+                self.get_state(self._cfg(config, "battery_soc_entity", "battery_soc_entity_id"))
             ),
             pv_power_kw=self._float_or_none(
-                self.get_state(config.pv_power_entity)
+                self.get_state(self._cfg(config, "pv_power_entity", "pv_power_entity_id"))
             ),
             grid_price=self._float_or_none(
-                self.get_state(config.grid_price_entity)
+                self.get_state(self._cfg(config, "grid_price_entity", "grid_price_entity_id"))
             ),
             household_load_kw=self._float_or_none(
-                self.get_state(config.household_load_entity)
+                self.get_state(self._cfg(config, "household_load_entity", "household_load_entity_id"))
             ),
         )
 
