@@ -67,12 +67,25 @@ class HomeAssistantClient:
             return str(config[name])
         return str(HomeAssistantClient._options().get(name, ""))
 
+    @staticmethod
+    def _power_kw(value: Any) -> float | None:
+        power = HomeAssistantClient._float_or_none(value)
+        if power is None:
+            return None
+
+        # AlphaESS power sensors are often W, while planner expects kW.
+        # Safe heuristic: normal home power above 50 is almost certainly W.
+        if abs(power) > 50:
+            return power / 1000.0
+
+        return power
+
     def read_snapshot(self, config: Any) -> HomeAssistantSnapshot:
         return HomeAssistantSnapshot(
             battery_soc_percent=self._float_or_none(self.get_state(self._cfg(config, "battery_soc_entity"))),
-            pv_power_kw=self._float_or_none(self.get_state(self._cfg(config, "pv_power_entity"))),
+            pv_power_kw=self._power_kw(self.get_state(self._cfg(config, "pv_power_entity"))),
             grid_price=self._float_or_none(self.get_state(self._cfg(config, "grid_price_entity"))),
-            household_load_kw=self._float_or_none(self.get_state(self._cfg(config, "household_load_entity"))),
+            household_load_kw=self._power_kw(self.get_state(self._cfg(config, "household_load_entity"))),
         )
 
 
