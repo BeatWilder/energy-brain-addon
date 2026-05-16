@@ -2802,3 +2802,394 @@ def render_tesla_cockpit_html(summary: dict[str, object]) -> str:
     if "eb-plus-cross-flow-final-marker" in rendered:
         return rendered
     return _eb_replace_first_flow_final(rendered, flow_html)
+
+# Energy Brain route-wide final plus-shaped energy flow.
+_eb_prev_render_tesla_plus_route_final = render_tesla_cockpit_html
+_eb_prev_render_dashboard_plus_route_final = render_dashboard_html
+
+
+def _eb_pf_num_final(value: object, fallback: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return fallback
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _eb_pf_kw_final(value: object) -> str:
+    return f"{_eb_pf_num_final(value):.1f} kW"
+
+
+def _eb_pf_pct_final(value: object) -> str:
+    return f"{_eb_pf_num_final(value):.0f}%"
+
+
+def _eb_pf_dict_get_final(data: object, key: str, fallback: object = 0.0) -> object:
+    if isinstance(data, dict):
+        return data.get(key, fallback)
+    return fallback
+
+
+def _eb_pf_flow_from_summary_final(summary: object) -> tuple[float, float, float, float, float]:
+    if not isinstance(summary, dict):
+        return 0.0, 0.0, 0.0, 0.0, 0.0
+
+    flow = summary.get("energy_flow")
+    battery_card = summary.get("battery_soc_card")
+
+    if isinstance(flow, dict):
+        pv = _eb_pf_num_final(flow.get("pv_kw"))
+        load = _eb_pf_num_final(flow.get("load_kw"))
+        battery = _eb_pf_num_final(flow.get("battery_kw"))
+        grid = _eb_pf_num_final(flow.get("grid_kw"))
+    else:
+        snapshot = summary.get("snapshot")
+        pv = _eb_pf_num_final(_eb_pf_dict_get_final(snapshot, "pv_power_kw"))
+        load = _eb_pf_num_final(_eb_pf_dict_get_final(snapshot, "household_load_kw"))
+        controller = summary.get("controller")
+        battery = _eb_pf_num_final(_eb_pf_dict_get_final(controller, "setpoint_kw"))
+        grid = load - pv - battery
+
+    soc = _eb_pf_num_final(_eb_pf_dict_get_final(battery_card, "soc_percent"))
+    if soc <= 0.0:
+        snapshot = summary.get("snapshot")
+        soc = _eb_pf_num_final(_eb_pf_dict_get_final(snapshot, "battery_soc_percent"))
+
+    return pv, load, battery, grid, soc
+
+
+def _eb_pf_css_final() -> str:
+    return """
+<style id="eb-plus-flow-final-css">
+  .eb-plus-flow-final {
+    margin: 18px 0 24px;
+    padding: 18px 14px 22px;
+    border: 2px solid rgba(54, 211, 153, 0.36);
+    border-radius: 28px;
+    background:
+      radial-gradient(circle at 50% 48%, rgba(103, 167, 255, 0.20), transparent 16rem),
+      rgba(10, 16, 23, 0.90);
+  }
+
+  .eb-plus-flow-final-badge {
+    display: inline-block;
+    margin-bottom: 12px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(54, 211, 153, 0.48);
+    color: #bdf7dc;
+    background: rgba(54, 211, 153, 0.10);
+    font-weight: 900;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+  }
+
+  .eb-flow-summary-final {
+    width: min(100%, 680px);
+    margin: 0 auto 22px;
+    padding: 18px 20px;
+    border: 1px solid rgba(148, 163, 184, 0.30);
+    border-radius: 22px;
+    background: rgba(15, 23, 31, 0.90);
+  }
+
+  .eb-flow-summary-final strong {
+    display: block;
+    color: #e8eef6;
+    font-size: clamp(1.22rem, 5vw, 1.95rem);
+    line-height: 1.28;
+    letter-spacing: -0.035em;
+  }
+
+  .eb-flow-summary-final span {
+    display: block;
+    margin-top: 10px;
+    color: #9aa6b2;
+    font-size: clamp(0.95rem, 3.6vw, 1.18rem);
+  }
+
+  .eb-flow-cross-final {
+    position: relative;
+    width: min(100%, 700px);
+    height: clamp(430px, 82vw, 590px);
+    margin: 0 auto;
+  }
+
+  .eb-flow-lines-final {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 12px rgba(103, 167, 255, 0.30));
+  }
+
+  .eb-flow-line-final {
+    fill: none;
+    stroke-width: 1.45;
+    stroke-linecap: round;
+    stroke-dasharray: 3.4 2.4;
+    opacity: 0.96;
+  }
+
+  .eb-flow-line-sun-final { stroke: #f59e0b; }
+  .eb-flow-line-grid-final { stroke: #a855f7; }
+  .eb-flow-line-home-final { stroke: #2dd4bf; }
+  .eb-flow-line-battery-final { stroke: #36d399; }
+
+  .eb-flow-dot-sun-final { fill: #f59e0b; }
+  .eb-flow-dot-grid-final { fill: #a855f7; }
+  .eb-flow-dot-home-final { fill: #2dd4bf; }
+  .eb-flow-dot-battery-final { fill: #36d399; }
+
+  .eb-flow-hub-final {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translate(-50%, -50%);
+    border-radius: 999px;
+    background: #dbeafe;
+    box-shadow: 0 0 30px rgba(147, 197, 253, 0.75);
+    z-index: 3;
+  }
+
+  .eb-flow-node-final {
+    position: absolute;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    width: clamp(108px, 25vw, 154px);
+    height: clamp(108px, 25vw, 154px);
+    border-radius: 999px;
+    background: rgba(8, 13, 19, 0.94);
+    color: #e8eef6;
+    box-shadow: 0 18px 48px rgba(0,0,0,0.30);
+  }
+
+  .eb-flow-node-final strong {
+    font-size: clamp(1.12rem, 4.4vw, 1.72rem);
+    line-height: 1;
+  }
+
+  .eb-flow-node-final small {
+    color: #9aa6b2;
+    font-size: clamp(0.70rem, 2.8vw, 0.88rem);
+  }
+
+  .eb-node-title-final {
+    color: #cbd5e1;
+    font-weight: 900;
+    font-size: clamp(0.82rem, 3.1vw, 1.02rem);
+  }
+
+  .eb-flow-sun-final {
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    border: 3px solid #f59e0b;
+  }
+
+  .eb-flow-grid-final {
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 3px solid #a855f7;
+  }
+
+  .eb-flow-home-final {
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 3px solid #2dd4bf;
+  }
+
+  .eb-flow-battery-final {
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    border: 3px solid #36d399;
+  }
+
+  .eb-flow-metrics-final {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: min(100%, 700px);
+    margin: 20px auto 0;
+  }
+
+  .eb-flow-metrics-final article {
+    padding: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.20);
+    border-radius: 20px;
+    background: rgba(15, 23, 31, 0.88);
+  }
+
+  .eb-flow-metrics-final span {
+    display: block;
+    color: #9aa6b2;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 850;
+    font-size: 0.78rem;
+  }
+
+  .eb-flow-metrics-final strong {
+    display: block;
+    margin-top: 8px;
+    color: #e8eef6;
+    font-size: clamp(1.3rem, 5vw, 2rem);
+  }
+
+  .eb-flow-metrics-final small {
+    display: block;
+    margin-top: 4px;
+    color: #9aa6b2;
+    font-size: 0.92rem;
+  }
+
+  @media (max-width: 520px) {
+    .eb-flow-cross-final { height: 430px; }
+    .eb-flow-node-final { width: 108px; height: 108px; }
+  }
+</style>
+"""
+
+
+def _eb_pf_html_final(summary: object) -> str:
+    pv, load, battery, grid, soc = _eb_pf_flow_from_summary_final(summary)
+
+    if abs(grid) < 0.05:
+        grid_text = "bijna stil"
+    elif grid > 0:
+        grid_text = "import"
+    else:
+        grid_text = "teruglevering"
+
+    if abs(battery) < 0.05:
+        battery_text = "batterij stil"
+    elif battery > 0:
+        battery_text = "batterij laadt"
+    else:
+        battery_text = "batterij helpt"
+
+    if pv >= load and abs(grid) < 0.15:
+        sentence = f"Huis gebruikt {_eb_pf_kw_final(load)}. Zon levert {_eb_pf_kw_final(pv)}. Net is bijna stil."
+    elif pv >= load:
+        sentence = f"Huis gebruikt {_eb_pf_kw_final(load)}. Zon levert {_eb_pf_kw_final(pv)}. Net: {_eb_pf_kw_final(abs(grid))} {grid_text}."
+    else:
+        sentence = f"Huis gebruikt {_eb_pf_kw_final(load)}. Zon levert {_eb_pf_kw_final(pv)}. Net vult {_eb_pf_kw_final(abs(grid))} bij."
+
+    return f"""
+<section class="eb-plus-flow-final" aria-label="Energy Flow Overview">
+  <div class="eb-plus-flow-final-live-marker" hidden>EB_PLUS_FLOW_FINAL_VISIBLE</div>
+  <span class="eb-plus-flow-final-badge">Plus-flow actief</span>
+
+  <article class="eb-flow-summary-final">
+    <strong>{sentence}</strong>
+    <span>Batterij nu {_eb_pf_pct_final(soc)} - {battery_text}</span>
+  </article>
+
+  <div class="eb-flow-cross-final">
+    <div class="eb-flow-node-final eb-flow-sun-final">
+      <span class="eb-node-title-final">Zon</span>
+      <strong>{_eb_pf_kw_final(pv)}</strong>
+    </div>
+
+    <div class="eb-flow-node-final eb-flow-grid-final">
+      <span class="eb-node-title-final">Net</span>
+      <strong>{_eb_pf_kw_final(abs(grid))}</strong>
+      <small>{grid_text}</small>
+    </div>
+
+    <div class="eb-flow-node-final eb-flow-home-final">
+      <span class="eb-node-title-final">Huis</span>
+      <strong>{_eb_pf_kw_final(load)}</strong>
+    </div>
+
+    <div class="eb-flow-node-final eb-flow-battery-final">
+      <span class="eb-node-title-final">Batterij</span>
+      <strong>{_eb_pf_pct_final(soc)}</strong>
+      <small>{_eb_pf_kw_final(abs(battery))}</small>
+    </div>
+
+    <div class="eb-flow-hub-final"></div>
+
+    <svg class="eb-flow-lines-final" viewBox="0 0 100 100" aria-hidden="true">
+      <path class="eb-flow-line-final eb-flow-line-sun-final" d="M50 18 C50 32 50 38 50 50"/>
+      <path class="eb-flow-line-final eb-flow-line-grid-final" d="M18 50 C32 50 38 50 50 50"/>
+      <path class="eb-flow-line-final eb-flow-line-home-final" d="M50 50 C62 50 68 50 82 50"/>
+      <path class="eb-flow-line-final eb-flow-line-battery-final" d="M50 50 C50 62 50 68 50 82"/>
+      <circle class="eb-flow-dot-sun-final" cx="50" cy="30" r="1.8"/>
+      <circle class="eb-flow-dot-grid-final" cx="30" cy="50" r="1.8"/>
+      <circle class="eb-flow-dot-home-final" cx="70" cy="50" r="1.8"/>
+      <circle class="eb-flow-dot-battery-final" cx="50" cy="70" r="1.8"/>
+    </svg>
+  </div>
+
+  <div class="eb-flow-metrics-final">
+    <article><span>Zon</span><strong>{_eb_pf_kw_final(pv)}</strong><small>naar huis of batterij</small></article>
+    <article><span>Huis</span><strong>{_eb_pf_kw_final(load)}</strong><small>actueel verbruik</small></article>
+    <article><span>Batterij</span><strong>{_eb_pf_pct_final(soc)}</strong><small>{battery_text}</small></article>
+    <article><span>Net</span><strong>{_eb_pf_kw_final(abs(grid))}</strong><small>{grid_text}</small></article>
+  </div>
+</section>
+"""
+
+
+def _eb_pf_replace_final(rendered: str, summary: object) -> str:
+    if "EB_PLUS_FLOW_FINAL_VISIBLE" in rendered:
+        return rendered
+
+    block = _eb_pf_css_final() + _eb_pf_html_final(summary)
+
+    starts = [
+        '<section class="eb-plus-flow-final"',
+        '<section class="eb-plus-cross-flow-final"',
+        '<section class="eb-plus-cross-flow-v3"',
+        '<section class="eb-plus-cross-flow-v2"',
+        '<section class="eb-plus-flow"',
+        '<section class="flow" aria-label="Energy Flow Overview"',
+    ]
+
+    for needle in starts:
+        start = rendered.find(needle)
+        if start == -1:
+            continue
+
+        candidates = [
+            rendered.find("\n<section", start + len(needle)),
+            rendered.find("\n<article", start + len(needle)),
+            rendered.find("\n<div class=\"tabs\"", start + len(needle)),
+        ]
+        candidates = [pos for pos in candidates if pos != -1]
+        end = min(candidates) if candidates else -1
+
+        if end == -1:
+            return rendered[:start] + block + rendered[start:]
+
+        return rendered[:start] + block + rendered[end:]
+
+    body = rendered.find("<body")
+    if body == -1:
+        return block + rendered
+
+    body_end = rendered.find(">", body)
+    if body_end == -1:
+        return block + rendered
+
+    return rendered[:body_end + 1] + block + rendered[body_end + 1:]
+
+
+def render_tesla_cockpit_html(summary: dict[str, object]) -> str:
+    rendered = _eb_prev_render_tesla_plus_route_final(summary)
+    return _eb_pf_replace_final(rendered, summary)
+
+
+def render_dashboard_html(summary: dict[str, object]) -> str:
+    rendered = _eb_prev_render_dashboard_plus_route_final(summary)
+    return _eb_pf_replace_final(rendered, summary)
