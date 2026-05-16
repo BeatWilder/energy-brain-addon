@@ -151,7 +151,10 @@ def _choose_setpoint(snapshot: EnergySnapshot, battery: BatteryConfig, soc_perce
         return min(pv_surplus_kw, battery.max_charge_kw), "charge_from_pv_surplus"
     if snapshot.grid_price < 0 and soc_percent < battery.soc_max_percent:  # type: ignore[operator]
         return battery.max_charge_kw, "charge_on_negative_price"
-    if snapshot.grid_price > 0 and soc_percent > reserve and snapshot.household_load_kw > snapshot.pv_power_kw:  # type: ignore[operator]
+    if snapshot.grid_price > 0 and snapshot.household_load_kw > snapshot.pv_power_kw:  # type: ignore[operator]
+        if soc_percent <= reserve:
+            return 0.0, "reserve_hold"
+
         load_deficit_kw = snapshot.household_load_kw - snapshot.pv_power_kw
         available_percent = max(0.0, soc_percent - reserve)
         available_kwh = (available_percent / 100.0) * battery.capacity_kwh
