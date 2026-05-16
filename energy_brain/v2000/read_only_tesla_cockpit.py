@@ -546,7 +546,7 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
         path_id = f"pf-path-{idx}"
         d = path_map.get(direction, "M 230 280 C 300 280, 455 280, 530 280")
         active = bool(edge.get("active"))
-        cls = "pf-edge active" if active else "pf-edge idle"
+        cls = f"pf-edge pf-edge-{direction} active" if active else f"pf-edge pf-edge-{direction} idle"
         paths.append(f'<path id="{path_id}" class="{cls}" d="{d}" />')
         if active:
             dots.append(
@@ -585,33 +585,37 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     <g class="pf-node pf-sun pf-node-round">
       <circle cx="380" cy="92" r="74"/>
       <text x="380" y="74">Zon</text>
+      <rect class="pf-value-pill pf-sun-pill" x="318" y="85" width="124" height="38" rx="19"/>
       <text x="380" y="104">{_pf_kw(snap.get("pv_kw", 0.0))}</text>
     </g>
 
     <g class="pf-node pf-grid">
       <rect x="80" y="225" width="150" height="110" rx="30"/>
       <text x="155" y="262">Net</text>
+      <rect class="pf-value-pill pf-grid-pill" x="95" y="280" width="120" height="36" rx="18"/>
       <text x="155" y="298">{_pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0)))}</text>
     </g>
 
     <g class="pf-node pf-home">
       <rect x="530" y="225" width="150" height="110" rx="30"/>
       <text x="605" y="262">Huis</text>
+      <rect class="pf-value-pill pf-home-pill" x="545" y="280" width="120" height="36" rx="18"/>
       <text x="605" y="298">{_pf_kw(snap.get("load_kw", 0.0))}</text>
     </g>
 
     <g class="pf-node pf-battery">
       <rect x="295" y="388" width="170" height="112" rx="32"/>
       <text x="380" y="428">Batterij</text>
+      <rect class="pf-value-pill pf-battery-pill" x="306" y="446" width="148" height="38" rx="19"/>
       <text x="380" y="464">{_esc(node_soc)}% nu</text>
     </g>
   </svg>
 
   <div class="powerflow-summary-grid">
-    <div><span>Zon</span><strong>{_pf_kw(snap.get("pv_kw", 0.0))}</strong><small>naar huis of batterij</small></div>
-    <div><span>Huis</span><strong>{_pf_kw(snap.get("load_kw", 0.0))}</strong><small>actueel verbruik</small></div>
-    <div><span>Batterij</span><strong>{_esc(plain["battery_badge"])}</strong><small>{_esc(plain["soc"])}</small></div>
-    <div><span>Net</span><strong>{_esc(plain["grid_badge"])}</strong><small>import of teruglevering</small></div>
+    <div class="pf-summary-source pf-summary-sun"><span>Zon</span><strong>{_pf_kw(snap.get("pv_kw", 0.0))}</strong><small>naar huis of batterij</small></div>
+    <div class="pf-summary-source pf-summary-home"><span>Huis</span><strong>{_pf_kw(snap.get("load_kw", 0.0))}</strong><small>actueel verbruik</small></div>
+    <div class="pf-summary-source pf-summary-battery"><span>Batterij</span><strong>{_esc(plain["battery_badge"])}</strong><small>{_esc(plain["soc"])}</small></div>
+    <div class="pf-summary-source pf-summary-grid"><span>Net</span><strong>{_esc(plain["grid_badge"])}</strong><small>import of teruglevering</small></div>
   </div>
 
   <p class="powerflow-explain">{_esc(powerflow_explanation(snap, edge_list))}</p>
@@ -866,7 +870,19 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .human-card ul {{ margin: 12px 0 0; padding-left: 18px; color: #d9e6ef; }}
     .human-card li + li {{ margin-top: 7px; }}
     .human-card strong {{ display: block; margin-top: 12px; font-size: 1.05rem; line-height: 1.34; }}
-    .powerflow-panel {{ grid-column: 1 / -1; overflow: hidden; position: relative; }}
+    .powerflow-panel {{
+      --pf-sun: #ffd166;
+      --pf-sun-bg: rgba(255,209,102,.13);
+      --pf-home: #55c7ff;
+      --pf-home-bg: rgba(85,199,255,.13);
+      --pf-battery: #64e38b;
+      --pf-battery-bg: rgba(100,227,139,.13);
+      --pf-grid: #ff9f43;
+      --pf-grid-bg: rgba(255,159,67,.13);
+      grid-column: 1 / -1;
+      overflow: hidden;
+      position: relative;
+    }}
     .powerflow-head {{ display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:10px; }}
     .powerflow-head h2 {{ margin:3px 0 7px; font-size:1.25rem; }}
     .powerflow-head p {{ margin:0; color:var(--muted); }}
@@ -894,6 +910,24 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .powerflow-svg.ha-flow {{ height:clamp(420px, 68vw, 560px); }}
     .compact-powerflow .pf-node circle,
     .compact-powerflow .pf-node rect {{ filter: drop-shadow(0 12px 22px rgba(0,0,0,.22)); }}
+    .pf-node.pf-sun circle {{ stroke:var(--pf-sun); fill:linear-gradient(135deg, var(--pf-sun-bg), rgba(16,28,38,.94)); filter:drop-shadow(0 0 22px rgba(255,209,102,.23)); }}
+    .pf-node.pf-home rect {{ stroke:var(--pf-home); fill:rgba(20,43,58,.94); filter:drop-shadow(0 0 22px rgba(85,199,255,.20)); }}
+    .pf-node.pf-battery rect {{ stroke:var(--pf-battery); fill:rgba(18,48,35,.94); filter:drop-shadow(0 0 22px rgba(100,227,139,.20)); }}
+    .pf-node.pf-grid rect {{ stroke:var(--pf-grid); fill:rgba(55,37,20,.94); filter:drop-shadow(0 0 22px rgba(255,159,67,.20)); }}
+    .pf-node .pf-value-pill {{ fill:rgba(7,13,18,.72); stroke-width:1.8; filter:none; }}
+    .pf-node .pf-sun-pill {{ stroke:var(--pf-sun); }}
+    .pf-node .pf-home-pill {{ stroke:var(--pf-home); }}
+    .pf-node .pf-battery-pill {{ stroke:var(--pf-battery); }}
+    .pf-node .pf-grid-pill {{ stroke:var(--pf-grid); }}
+    .pf-node.pf-sun text + text {{ fill:var(--pf-sun); }}
+    .pf-node.pf-home text + text {{ fill:var(--pf-home); }}
+    .pf-node.pf-battery text + text {{ fill:var(--pf-battery); }}
+    .pf-node.pf-grid text + text {{ fill:var(--pf-grid); }}
+    .pf-edge-zon_naar_huis.active,
+    .pf-edge-zon_naar_batterij.active {{ stroke:var(--pf-sun); }}
+    .pf-edge-batterij_naar_huis.active {{ stroke:var(--pf-battery); }}
+    .pf-edge-net_import.active,
+    .pf-edge-net_export.active {{ stroke:var(--pf-grid); }}
     .compact-powerflow .pf-edge {{ stroke-width:7; stroke-dasharray:10 13; opacity:.92; }}
     .pf-backbone {{ fill:none; stroke:rgba(130,150,165,.22); stroke-width:4; stroke-linecap:round; }}
     .pf-junction {{ fill:#f7fbff; opacity:.85; filter:drop-shadow(0 0 10px rgba(255,255,255,.55)); }}
@@ -903,6 +937,12 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .powerflow-summary-grid span {{ display:block; color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; }}
     .powerflow-summary-grid strong {{ display:block; margin-top:4px; color:#edf7fb; font-size:1rem; line-height:1.25; }}
     .powerflow-summary-grid small {{ display:block; margin-top:5px; color:var(--muted); line-height:1.3; }}
+    .powerflow-summary-grid .pf-summary-source {{ border-color:var(--pf-source); background:linear-gradient(135deg, var(--pf-source-bg), rgba(255,255,255,.025)); }}
+    .powerflow-summary-grid .pf-summary-source strong {{ color:var(--pf-source); border:1px solid var(--pf-source); border-radius:999px; display:inline-block; padding:4px 9px; }}
+    .pf-summary-sun {{ --pf-source:var(--pf-sun); --pf-source-bg:var(--pf-sun-bg); }}
+    .pf-summary-home {{ --pf-source:var(--pf-home); --pf-source-bg:var(--pf-home-bg); }}
+    .pf-summary-battery {{ --pf-source:var(--pf-battery); --pf-source-bg:var(--pf-battery-bg); }}
+    .pf-summary-grid {{ --pf-source:var(--pf-grid); --pf-source-bg:var(--pf-grid-bg); }}
     @media (max-width: 900px) {{ .powerflow-summary-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
     @media (max-width: 620px) {{
       .compact-powerflow {{ padding:18px; }}
