@@ -1,7 +1,7 @@
 name: Energy Brain EMS
 slug: energy_brain
 description: Deterministic, physics-aware Energy Management System for Home Assistant
-version: "0.1.15"
+version: "0.1.16"
 arch:
   - amd64
   - aarch64
@@ -66,5 +66,10 @@ schema:
 ports:
   8099/tcp: 8099
 ports_description:
+  8099/tcp: "Energy Brain read-only web UI"
   8099/tcp: Energy Brain read-only web UI
-
+webui: "http://[HOST]:[PORT:8099]/"
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:brain
+panel_title: "Energy Brain"
