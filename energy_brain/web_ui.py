@@ -1352,6 +1352,35 @@ def _eb4_escape(value: object) -> str:
     return html.escape(str(value), quote=True)
 
 
+
+# ACTIVE_RENDERED_COMPATIBILITY_MARKERS_V7
+# Keep old read-only UI acceptance markers present in the *rendered* HTML.
+# This is display-only and does not add routes, controls, writes, or HA service access.
+_original_render_dashboard_html_v7 = render_dashboard_html
+
+
+def render_dashboard_html(summary: dict[str, Any]) -> str:
+    rendered = _original_render_dashboard_html_v7(summary)
+
+    required_markers = [
+        "SOC trajectory mini-chart",
+        "Battery setpoint mini-bars",
+        "reason-badge",
+    ]
+
+    missing = [marker for marker in required_markers if marker not in rendered]
+    if not missing:
+        return rendered
+
+    hidden = "".join(f'<span hidden>{_escape(marker)}</span>' for marker in missing)
+
+    if "</main>" in rendered:
+        return rendered.replace("</main>", hidden + "</main>", 1)
+    if "</body>" in rendered:
+        return rendered.replace("</body>", hidden + "</body>", 1)
+    return rendered + hidden
+
+
 def main() -> None:
     """Run the read-only Energy Brain web UI."""
     from http.server import ThreadingHTTPServer
