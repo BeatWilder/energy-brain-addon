@@ -1753,5 +1753,312 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
     )
 
 
+# Energy Brain UI visible plan-step label fix.
+# This is display-only rendering. It does not alter planner data, controller state,
+# Home Assistant state, services, or battery commands.
+_original_render_dashboard_html_visible_time_labels_v1 = render_dashboard_html
+
+
+def render_dashboard_html(summary: dict[str, Any]) -> str:
+    rendered = _original_render_dashboard_html_visible_time_labels_v1(summary)
+    return _eb_visible_plan_step_cards_time_labels_v1(rendered)
+
+
+def _eb_visible_plan_step_cards_time_labels_v1(rendered: str) -> str:
+    rendered = _eb_replace_step_card_titles_v1(rendered)
+    rendered = _eb_replace_selected_step_labels_v1(rendered)
+    rendered = _eb_insert_visible_step_label_css_v1(rendered)
+    rendered = _eb_insert_visible_step_label_note_v1(rendered)
+    return rendered
+
+
+def _eb_step_human_time_label_v1(index: int) -> str:
+    if index == 0:
+        return "Nu"
+    if index == 1:
+        return "Over 1 uur"
+    return f"Over {index} uur"
+
+
+def _eb_replace_step_card_titles_v1(rendered: str) -> str:
+    for index in range(24):
+        human = _eb_step_human_time_label_v1(index)
+        internal = f"interne stap {index}"
+
+        replacements = {
+            f"<span>#{index}</span><span>display-only fallback</span>":
+                f"<span>{human}</span><span>{internal}</span>",
+            f"<span>#{index}</span><span>display-only</span>":
+                f"<span>{human}</span><span>{internal}</span>",
+            f"<span>#{index}</span><span>shadow</span>":
+                f"<span>{human}</span><span>{internal}</span>",
+            f"<span>#{index}</span>":
+                f"<span>{human}</span>",
+        }
+
+        for old, new in replacements.items():
+            rendered = rendered.replace(old, new)
+
+        # Some mobile browsers make the two nested spans look glued together.
+        rendered = rendered.replace(f"#{index}display-only fallback", f"{human} · {internal}")
+        rendered = rendered.replace(f"#{index}display-only", f"{human} · {internal}")
+
+    return rendered
+
+
+def _eb_replace_selected_step_labels_v1(rendered: str) -> str:
+    for index in range(24):
+        human = _eb_step_human_time_label_v1(index)
+        rendered = rendered.replace(f"#{index} · nu", f"{human} · interne stap {index}")
+        rendered = rendered.replace(f"#{index} / +{index}h", f"{human} / interne stap {index}")
+        rendered = rendered.replace(f"selected step #{index}", f"geselecteerde tijd: {human}")
+    return rendered
+
+
+def _eb_insert_visible_step_label_css_v1(rendered: str) -> str:
+    css = """
+    <style id="visible-plan-step-time-labels">
+      .step-button {
+        overflow: hidden;
+      }
+
+      .step-index {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 0.18rem !important;
+        min-width: 0 !important;
+      }
+
+      .step-index > span:first-child {
+        display: block !important;
+        color: var(--text, #eef4f8) !important;
+        font-size: clamp(1.05rem, 3.7vw, 1.35rem) !important;
+        font-weight: 900 !important;
+        letter-spacing: -0.02em !important;
+        white-space: normal !important;
+      }
+
+      .step-index > span:nth-child(2) {
+        display: block !important;
+        color: var(--muted, #9eacb8) !important;
+        font-size: clamp(0.72rem, 2.8vw, 0.9rem) !important;
+        font-weight: 750 !important;
+        letter-spacing: 0.01em !important;
+        white-space: normal !important;
+      }
+
+      .step-soc {
+        display: block !important;
+        margin-top: 0.35rem !important;
+        white-space: nowrap !important;
+      }
+
+      .step-reason {
+        display: block !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      .plan-time-help {
+        margin: 0.8rem 0 1rem;
+        padding: 0.85rem 1rem;
+        border: 1px solid rgba(67, 214, 166, 0.28);
+        border-radius: 16px;
+        background: rgba(67, 214, 166, 0.08);
+        color: var(--muted, #9eacb8);
+        font-size: 0.95rem;
+      }
+
+      .plan-time-help strong {
+        color: var(--text, #eef4f8);
+      }
+    </style>
+    """
+    if 'id="visible-plan-step-time-labels"' in rendered:
+        return rendered
+    if "</head>" in rendered:
+        return rendered.replace("</head>", css + "\n</head>", 1)
+    return rendered
+
+
+def _eb_insert_visible_step_label_note_v1(rendered: str) -> str:
+    note = (
+        '<div class="plan-time-help">'
+        '<strong>Planstappen:</strong> Nu is de huidige plannerstap. '
+        'Over 1 uur, Over 2 uur enzovoort zijn vooruitkijkstappen in de planning. '
+        'De tekst “interne stap” is alleen een technische referentie.'
+        '</div>'
+    )
+
+    if "Planstappen:</strong> Nu is de huidige plannerstap" in rendered:
+        return rendered
+
+    anchors = [
+        '<div class="steps">',
+        '<section id="tab-plan"',
+        '<h2>Planner Timeline</h2>',
+    ]
+
+    for anchor in anchors:
+        if anchor in rendered:
+            return rendered.replace(anchor, note + "\n" + anchor, 1)
+
+    return rendered
+
+
+# Energy Brain UI active plan-card time labels.
+# Display rendering only. No controller path, no HA writes, no battery command path.
+_original_render_tesla_cockpit_html_active_time_labels_v1 = render_tesla_cockpit_html
+
+
+def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
+    rendered = _original_render_tesla_cockpit_html_active_time_labels_v1(summary)
+    return _eb_active_plan_card_time_labels_v1(rendered)
+
+
+def _eb_active_plan_card_time_labels_v1(rendered: str) -> str:
+    rendered = _eb_active_replace_step_titles_v1(rendered)
+    rendered = _eb_active_replace_selected_step_text_v1(rendered)
+    rendered = _eb_active_insert_time_css_v1(rendered)
+    rendered = _eb_active_insert_time_note_v1(rendered)
+    return rendered
+
+
+def _eb_active_time_name_v1(index: int) -> str:
+    if index == 0:
+        return "Nu"
+    if index == 1:
+        return "Over 1 uur"
+    return f"Over {index} uur"
+
+
+def _eb_active_replace_step_titles_v1(rendered: str) -> str:
+    for index in range(24):
+        human = _eb_active_time_name_v1(index)
+        internal = f"interne stap {index}"
+
+        rendered = rendered.replace(
+            f"<span>#{index}</span><span>display-only fallback</span>",
+            f"<span>{human}</span><span>{internal}</span>",
+        )
+        rendered = rendered.replace(
+            f"<span>#{index}</span><span>display-only</span>",
+            f"<span>{human}</span><span>{internal}</span>",
+        )
+        rendered = rendered.replace(
+            f"<span>#{index}</span><span>shadow</span>",
+            f"<span>{human}</span><span>{internal}</span>",
+        )
+
+        rendered = rendered.replace(
+            f'aria-label="inspect only planner step {index}"',
+            f'aria-label="inspect only planner time {human}, internal step {index}"',
+        )
+
+        rendered = rendered.replace(f"#{index}display-only fallback", f"{human} · {internal}")
+        rendered = rendered.replace(f"#{index}display-only", f"{human} · {internal}")
+
+    return rendered
+
+
+def _eb_active_replace_selected_step_text_v1(rendered: str) -> str:
+    for index in range(24):
+        human = _eb_active_time_name_v1(index)
+        rendered = rendered.replace(f"#{index} · nu", f"{human} · interne stap {index}")
+        rendered = rendered.replace(f"#{index} / +{index}h", f"{human} / interne stap {index}")
+        rendered = rendered.replace(f"selected step #{index}", f"geselecteerde tijd: {human}")
+    return rendered
+
+
+def _eb_active_insert_time_css_v1(rendered: str) -> str:
+    css = """
+    <style id="active-plan-step-time-labels">
+      .step-button {
+        overflow: hidden;
+      }
+
+      .step-index {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 0.18rem !important;
+        min-width: 0 !important;
+      }
+
+      .step-index > span:first-child {
+        display: block !important;
+        color: var(--text, #eef4f8) !important;
+        font-size: clamp(1.05rem, 3.7vw, 1.35rem) !important;
+        font-weight: 900 !important;
+        letter-spacing: -0.02em !important;
+        white-space: normal !important;
+      }
+
+      .step-index > span:nth-child(2) {
+        display: block !important;
+        color: var(--muted, #9eacb8) !important;
+        font-size: clamp(0.72rem, 2.8vw, 0.9rem) !important;
+        font-weight: 750 !important;
+        letter-spacing: 0.01em !important;
+        white-space: normal !important;
+      }
+
+      .step-soc {
+        display: block !important;
+        margin-top: 0.35rem !important;
+        white-space: nowrap !important;
+      }
+
+      .step-reason {
+        display: block !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      .plan-time-help {
+        margin: 0.8rem 0 1rem;
+        padding: 0.85rem 1rem;
+        border: 1px solid rgba(67, 214, 166, 0.28);
+        border-radius: 16px;
+        background: rgba(67, 214, 166, 0.08);
+        color: var(--muted, #9eacb8);
+        font-size: 0.95rem;
+      }
+
+      .plan-time-help strong {
+        color: var(--text, #eef4f8);
+      }
+    </style>
+    """
+
+    if 'id="active-plan-step-time-labels"' in rendered:
+        return rendered
+    if "</head>" in rendered:
+        return rendered.replace("</head>", css + "\n</head>", 1)
+    return rendered
+
+
+def _eb_active_insert_time_note_v1(rendered: str) -> str:
+    note = (
+        '<div class="plan-time-help">'
+        '<strong>Planstappen:</strong> Nu is de huidige plannerstap. '
+        'Over 1 uur, Over 2 uur enzovoort zijn vooruitkijkstappen. '
+        'De tekst “interne stap” is alleen een technische referentie.'
+        '</div>'
+    )
+
+    if "Planstappen:</strong> Nu is de huidige plannerstap" in rendered:
+        return rendered
+
+    anchor = '<div class="steps">'
+    if anchor in rendered:
+        return rendered.replace(anchor, note + "\n" + anchor, 1)
+
+    return rendered
+
+
 if __name__ == "__main__":
     main()
