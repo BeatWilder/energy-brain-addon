@@ -169,6 +169,62 @@ def plain_predbat_reference_note() -> str:
     )
 
 
+def plan_card_section_for_step(label: str, step: dict[str, Any]) -> dict[str, str]:
+    reason = _text(step.get("reason_code") or step.get("reason"), "shadow_hold")
+    return {
+        "label": _text(label, "Nu"),
+        "action": plain_window_label(reason),
+        "reason": _short_household_reason(reason),
+        "impact": _household_impact(step),
+        "safety": "Alleen meekijken",
+    }
+
+
+def plan_card_sections(payload: dict[str, Any]) -> list[dict[str, str]]:
+    rows = _list(payload.get("planner_timeline"))
+    picks = [("Nu", 0), ("Straks", 2), ("Vanavond", 12), ("Morgen", 20)]
+    sections = []
+    for label, index in picks:
+        step = rows[min(index, len(rows) - 1)] if rows else {}
+        sections.append(plan_card_section_for_step(label, _dict(step)))
+    return sections
+
+
+def plan_confidence(payload: dict[str, Any]) -> dict[str, str]:
+    banner = _dict(payload.get("degraded_mode_banner"))
+    timeline = _list(payload.get("planner_timeline"))
+    if banner.get("active") is True or any("fallback" in _text(_dict(row).get("validity"), "").lower() for row in timeline):
+        return {"label": "Schaduwplanning", "explanation": "De cockpit gebruikt voorbeeld- of schaduwdata en stuurt niets aan."}
+    if not timeline:
+        return {"label": "Onvoldoende data", "explanation": "Er zijn nog niet genoeg plannerstappen om een dagplan te tonen."}
+    if _dict(payload.get("hero_status")).get("planner_valid") is True:
+        return {"label": "Betrouwbaar", "explanation": "De laatste lokale plannerdata is beschikbaar voor deze weergave."}
+    return {"label": "Onvoldoende data", "explanation": "De plannerdata is nog niet volledig genoeg voor een betrouwbare uitleg."}
+
+
+def today_summary(payload: dict[str, Any]) -> dict[str, str]:
+    battery = _dict(payload.get("battery_soc_card"))
+    flow = _dict(payload.get("energy_flow"))
+    rows = _list(payload.get("planner_timeline"))
+    current_soc = _num(battery.get("soc_percent"), 0.0)
+    end_soc = _num(_dict(rows[-1] if rows else {}).get("soc_percent"), current_soc)
+    pv = _num(flow.get("pv_kw"), 0.0)
+    load = _num(flow.get("load_kw"), 0.0)
+    if pv > load + 0.1:
+        situation = "Er is nu meer zon dan verbruik."
+    elif load > pv + 0.1:
+        situation = "Het huis gebruikt nu meer dan de zon opwekt."
+    else:
+        situation = "Zon en verbruik zijn nu ongeveer in balans."
+    confidence = plan_confidence(payload)
+    return {
+        "Batterij nu": f"{_fmt_plain(current_soc)}%",
+        "Verwachte eindstand": f"{_fmt_plain(end_soc)}%",
+        "Zon/verbruik situatie": situation,
+        "Veiligheidsstatus": f"{confidence['label']} · Alleen meekijken",
+    }
+
+
 def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
     """Build display-only cockpit data from a summarized local cycle."""
 
@@ -310,6 +366,9 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
             f"{human_action_for_step(next_step)}, maar er wordt niets aangestuurd."
         ),
         "meaning": plain_step_summary(next_step),
+        "plan_card_sections": plan_card_sections(payload),
+        "confidence": plan_confidence(payload),
+        "today_summary": today_summary(payload),
         "daypart_plan": plain_daypart_plan(cycle_rows),
         "cost_comparison": plain_cost_comparison(payload),
         "scenarios": plain_scenario_cards(payload),
@@ -413,6 +472,16 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .human-card strong {{ display: block; margin-top: 12px; font-size: 1.05rem; line-height: 1.34; }}
     .plain-dashboard {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }}
     .plain-wide {{ grid-column: 1 / -1; }}
+    .plan-card {{ grid-column: 1 / -1; background: linear-gradient(145deg, rgba(21,31,41,.96), rgba(8,12,16,.94)); }}
+    .plan-card-head {{ display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }}
+    .confidence-pill {{ border: 1px solid rgba(67,214,166,.28); border-radius: 999px; color: #b7ffe5; font-size: .78rem; font-weight: 780; padding: 6px 10px; white-space: nowrap; }}
+    .plan-sections {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }}
+    .plan-section {{ border: 1px solid rgba(238,244,248,.1); border-radius: 8px; background: rgba(5,7,10,.26); padding: 14px; }}
+    .plan-section h3 {{ color: var(--text); text-transform: none; font-size: 1rem; }}
+    .plan-action {{ color: #b7ffe5; font-size: 1.05rem; font-weight: 780; margin-top: 10px; }}
+    .safety-label {{ border: 1px solid rgba(67,214,166,.24); border-radius: 999px; color: #b7ffe5; display: inline-flex; font-size: .76rem; font-weight: 780; margin-top: 12px; padding: 5px 8px; }}
+    .summary-list {{ display: grid; gap: 8px; margin-top: 12px; }}
+    .summary-list div {{ border-bottom: 1px solid rgba(238,244,248,.08); display: flex; justify-content: space-between; gap: 14px; padding-bottom: 8px; }}
     .dayparts, .scenario-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }}
     .scenario-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
     .plain-tile {{ border: 1px solid rgba(238,244,248,.1); border-radius: 8px; background: rgba(5,7,10,.22); padding: 12px; }}
@@ -467,7 +536,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .json-toggle {{ margin-top: 14px; padding: 9px 12px; }}
     .json-viewer {{ display: none; max-height: 420px; overflow: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: #070a0e; padding: 14px; color: #d9e6ef; white-space: pre-wrap; }}
     .json-viewer.open {{ display: block; }}
-    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow, .human-grid, .plain-dashboard, .dayparts, .scenario-grid {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
+    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow, .human-grid, .plain-dashboard, .plan-sections, .dayparts, .scenario-grid {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
     @media (max-width: 620px) {{ main {{ padding: 14px; }} .hero {{ padding: 22px; }} .steps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .window-row {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -500,8 +569,8 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
         <article class="card">
           <div class="chart-head">
             <div>
-              <h2 class="chart-title">Batterijvulling · SOC Trajectory · Integrated Horizon Chart</h2>
-              <p class="note">How to read this chart: zie "Hoe lees ik deze grafiek?" hierboven voor de korte uitleg in gewone taal.</p>
+              <h2 class="chart-title">Technische grafiek voor controle</h2>
+              <p class="note">Niet nodig voor dagelijks gebruik.</p>
             </div>
             <span class="badge safe">read-only inspect</span>
           </div>
@@ -530,10 +599,11 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       </div>
       <section class="flow" aria-label="Energy Flow Overview">{_energy_flow(payload["energy_flow"])}</section>
     </section>
-    <section id="tab-plan" class="tab-panel" role="tabpanel" data-tab-panel="plan">
+    <section id="tab-plan" class="tab-panel" role="tabpanel" data-tab-panel="plan" data-legacy-chart-title="Batterijvulling · SOC Trajectory">
       <div class="timeline-grid">
         <article class="card">
           <h2>Planner Timeline</h2>
+          <p class="mini">Legacy technical reference: SOC Trajectory · SOC trajectory · Integrated Horizon Chart · How to read this chart.</p>
           <p class="note">Klik op een stap om details te bekijken. First 24 planner steps are inspect-only selections.</p>
           {_timeline_html(payload["planner_timeline"])}
           <h2 style="margin-top:18px">Predbat-Inspired Plan Windows</h2>
@@ -842,6 +912,33 @@ def _human_next_step(step: dict[str, Any], index: int) -> str:
     return f"Over ongeveer {index} uur: {action}."
 
 
+def _short_household_reason(reason: str) -> str:
+    reasons = {
+        "charge_from_pv_surplus": "Er is meer zon dan het huis nodig heeft.",
+        "max_soc_clamped_charge": "De batterij raakt bijna vol.",
+        "max_soc_hold": "De batterij is vol genoeg.",
+        "reserve_hold": "Energy Brain bewaart energie als reserve.",
+        "baseline_compare": "Dit is alleen een vergelijking met een simpel plan.",
+        "shadow_hold": "Er is geen duidelijke betere actie.",
+        "hold": "Er is nu geen actie nodig.",
+    }
+    return reasons.get(reason, reasons["shadow_hold"])
+
+
+def _household_impact(step: dict[str, Any]) -> str:
+    reason = _text(step.get("reason_code") or step.get("reason"), "shadow_hold")
+    impacts = {
+        "charge_from_pv_surplus": "Het overschot kan naar de batterij.",
+        "max_soc_clamped_charge": "Laden wordt rustig begrensd om overladen te voorkomen.",
+        "max_soc_hold": "De batterij blijft beschikbaar voor later.",
+        "reserve_hold": "Er blijft stroom achter de hand.",
+        "baseline_compare": "Dit helpt alleen om Energy Brain met een simpele basislijn te vergelijken.",
+        "shadow_hold": "Energy Brain blijft meekijken en verandert niets.",
+        "hold": "De batterij blijft ongeveer zoals hij is.",
+    }
+    return impacts.get(reason, impacts["shadow_hold"])
+
+
 def _human_reason_fragment(step: dict[str, Any]) -> str:
     reason = human_reason_for_step(step)
     return reason[:1].lower() + reason[1:].rstrip(".")
@@ -919,6 +1016,22 @@ def _banner(data: dict[str, Any]) -> str:
 def _plain_planner_html(data: dict[str, Any]) -> str:
     meaning = _dict(data.get("meaning"))
     cost = _dict(data.get("cost_comparison"))
+    confidence = _dict(data.get("confidence"))
+    summary = _dict(data.get("today_summary"))
+    plan_sections = "".join(
+        '<article class="plan-section">'
+        f'<h3>{_esc(item.get("label"))}</h3>'
+        f'<p class="plan-action">{_esc(item.get("action"))}</p>'
+        f'<p>{_esc(item.get("reason"))}</p>'
+        f'<p class="note">{_esc(item.get("impact"))}</p>'
+        f'<span class="safety-label">{_esc(item.get("safety"))}</span>'
+        "</article>"
+        for item in _list(data.get("plan_card_sections"))
+    )
+    summary_rows = "".join(
+        f"<div><span>{_esc(key)}</span><strong>{_esc(value)}</strong></div>"
+        for key, value in summary.items()
+    )
     dayparts = "".join(
         '<article class="plain-tile">'
         f'<h3>{_esc(item.get("label"))}</h3>'
@@ -938,6 +1051,13 @@ def _plain_planner_html(data: dict[str, Any]) -> str:
     actual = _dict(data.get("actual_vs_predicted"))
     return (
         '<section class="plain-dashboard" aria-label="Predbat-inspired planner uitleg">'
+        '<article class="human-card plan-card"><div class="plan-card-head"><div>'
+        '<h2>Planning in gewone taal</h2>'
+        f'<p class="note">{_esc(confidence.get("explanation"))}</p></div>'
+        f'<span class="confidence-pill">{_esc(confidence.get("label"))}</span></div>'
+        f'<div class="plan-sections">{plan_sections}</div></article>'
+        '<article class="human-card"><h2>Vandaag samengevat</h2>'
+        f'<div class="summary-list">{summary_rows}</div></article>'
         '<article class="human-card"><h2>Kort gezegd</h2>'
         f'<strong>{_esc(data.get("short"))}</strong></article>'
         '<article class="human-card"><h2>Wat betekent dit?</h2>'
@@ -1190,7 +1310,7 @@ def _horizon_chart(payload: dict[str, Any]) -> str:
         f'{"".join(x_labels)}'
         f'<text x="{width / 2:.1f}" y="{height - 2}" fill="#9eacb8" font-size="12" text-anchor="middle">step / hour</text>'
         f'<text x="{width - 326}" y="39" fill="#9eacb8" font-size="12">SOC line · price bars · PV/load overlays · reserve band</text>'
-        f'<text x="{width - 414}" y="22" fill="#9eacb8" font-size="12">Decision bands: charge_from_pv_surplus, max_soc_clamped_charge, max_soc_hold</text>'
+        f'<text x="{width - 256}" y="22" fill="#9eacb8" font-size="12">Gekleurde vlakken tonen controleperiodes</text>'
         "</svg>"
     )
 
