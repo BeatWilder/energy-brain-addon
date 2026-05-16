@@ -856,6 +856,20 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .safety-label {{ border: 1px solid rgba(67,214,166,.24); border-radius: 999px; color: #b7ffe5; display: inline-flex; font-size: .76rem; font-weight: 780; margin-top: 12px; padding: 5px 8px; }}
     .summary-list {{ display: grid; gap: 8px; margin-top: 12px; }}
     .summary-list div {{ border-bottom: 1px solid rgba(238,244,248,.08); display: flex; justify-content: space-between; gap: 14px; padding-bottom: 8px; }}
+    .forecast-overview {{ display:grid; gap:14px; }}
+    .forecast-hero {{ border:1px solid rgba(122,186,255,.18); background:linear-gradient(135deg, rgba(54,116,181,.16), rgba(255,255,255,.035)); border-radius:22px; padding:18px; }}
+    .forecast-hero h2 {{ margin:0 0 8px; }}
+    .forecast-hero p {{ margin:0; color:var(--muted); line-height:1.5; }}
+    .forecast-cards {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }}
+    .forecast-card-human {{ border:1px solid var(--line); border-radius:18px; padding:14px; background:rgba(255,255,255,.04); }}
+    .forecast-card-human span {{ display:block; color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; }}
+    .forecast-card-human strong {{ display:block; margin-top:6px; font-size:1.08rem; color:#edf7fb; }}
+    .forecast-card-human small {{ display:block; margin-top:8px; color:var(--muted); line-height:1.35; }}
+    .forecast-technical details {{ margin-top:14px; }}
+    .forecast-technical summary {{ cursor:pointer; font-weight:800; color:var(--text); padding:12px 0; }}
+    .forecast-technical .grid {{ margin-top:12px; }}
+    @media (max-width: 1000px) {{ .forecast-cards {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
+    @media (max-width: 620px) {{ .forecast-cards {{ grid-template-columns:1fr; }} }}
     .dayparts, .scenario-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }}
     .scenario-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
     .plain-tile {{ border: 1px solid rgba(238,244,248,.1); border-radius: 8px; background: rgba(5,7,10,.22); padding: 12px; }}
@@ -991,15 +1005,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       </div>
     </section>
     <section id="tab-forecast" class="tab-panel" role="tabpanel" data-tab-panel="forecast">
-      <div class="grid three">
-        {_forecast_card("Price Forecast Panel", payload["price_forecast"])}
-        {_forecast_card("PV Forecast Panel", payload["pv_forecast"])}
-        {_forecast_card("Load Forecast Panel", payload["load_forecast"])}
-      </div>
-      <article class="card" style="margin-top:14px">
-        <h2>Latest Cycle Table</h2>
-        {_cycle_table(payload["latest_cycle_table"])}
-      </article>
+      {_forecast_layperson_html(payload)}
     </section>
     <section id="tab-benchmark" class="tab-panel" role="tabpanel" data-tab-panel="benchmark">
       <div class="grid top">
@@ -1487,6 +1493,132 @@ def _energy_flow(flow: dict[str, Any]) -> str:
 
 def _kv(data: dict[str, Any], suffix: str = "") -> str:
     return '<div class="list">' + "".join(f"<div><span>{_esc(key)}</span><strong>{_fmt(value, suffix)}</strong></div>" for key, value in data.items()) + "</div>"
+
+
+def _avg_forecast(rows: list[dict[str, Any]], key: str) -> float:
+    values = [_num(row.get(key), 0.0) for row in rows if isinstance(row, dict)]
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+def _forecast_range(rows: list[dict[str, Any]], key: str) -> tuple[float, float]:
+    values = [_num(row.get(key), 0.0) for row in rows if isinstance(row, dict)]
+    if not values:
+        return (0.0, 0.0)
+    return (min(values), max(values))
+
+
+def forecast_layperson_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    price_rows = payload.get("price_forecast") if isinstance(payload.get("price_forecast"), list) else []
+    pv_rows = payload.get("pv_forecast") if isinstance(payload.get("pv_forecast"), list) else []
+    load_rows = payload.get("load_forecast") if isinstance(payload.get("load_forecast"), list) else []
+    cycle_rows = payload.get("latest_cycle_table") if isinstance(payload.get("latest_cycle_table"), list) else []
+
+    avg_price = _avg_forecast(price_rows, "import_price")
+    avg_pv = _avg_forecast(pv_rows, "pv_kwh")
+    avg_load = _avg_forecast(load_rows, "load_kwh")
+    pv_min, pv_max = _forecast_range(pv_rows, "pv_kwh")
+    load_min, load_max = _forecast_range(load_rows, "load_kwh")
+
+    if avg_price >= 0.30:
+        price_label = "Duur"
+        price_text = f"Gemiddeld ongeveer EUR {avg_price:.2f}/kWh. Voorzichtig met inkopen."
+    elif avg_price <= 0.16:
+        price_label = "Goedkoop"
+        price_text = f"Gemiddeld ongeveer EUR {avg_price:.2f}/kWh. Dit is een gunstiger prijsvenster."
+    else:
+        price_label = "Normaal"
+        price_text = f"Gemiddeld ongeveer EUR {avg_price:.2f}/kWh. Geen extreem prijsvenster."
+
+    if avg_pv >= 3.0:
+        pv_label = "Veel zon"
+        pv_text = f"Zon ligt grofweg tussen {pv_min:.1f} en {pv_max:.1f} kW. Er is waarschijnlijk ruimte om lokaal te gebruiken of te laden."
+    elif avg_pv >= 1.0:
+        pv_label = "Redelijke zon"
+        pv_text = f"Zon ligt grofweg tussen {pv_min:.1f} en {pv_max:.1f} kW. Niet slecht, maar niet onbeperkt."
+    else:
+        pv_label = "Weinig zon"
+        pv_text = f"Zon ligt grofweg tussen {pv_min:.1f} en {pv_max:.1f} kW. Verwacht weinig overschot."
+
+    if avg_load >= 3.0:
+        load_label = "Hoog verbruik"
+        load_text = f"Huisverbruik ligt grofweg tussen {load_min:.1f} en {load_max:.1f} kW. Het huis vraagt relatief veel."
+    elif avg_load >= 1.2:
+        load_label = "Normaal verbruik"
+        load_text = f"Huisverbruik ligt grofweg tussen {load_min:.1f} en {load_max:.1f} kW. Dit is een normaal verbruiksblok."
+    else:
+        load_label = "Laag verbruik"
+        load_text = f"Huisverbruik ligt grofweg tussen {load_min:.1f} en {load_max:.1f} kW. Het huis vraagt weinig."
+
+    first = cycle_rows[0] if cycle_rows and isinstance(cycle_rows[0], dict) else {}
+    reason = _text(first.get("reason_code"), "shadow_hold")
+    soc = _num(first.get("soc_percent"), _num(_dict(payload.get("battery_soc_card")).get("soc_percent"), 0.0))
+    setpoint = _num(first.get("setpoint_kw"), 0.0)
+
+    if reason == "charge_from_pv_surplus" or setpoint > 0.05:
+        plan_label = "Batterij laden met zon"
+        plan_text = f"De planning verwacht zonne-overschot. Batterij start rond {soc:.1f}% en mag richting de bovengrens lopen."
+    elif reason == "max_soc_clamped_charge":
+        plan_label = "Bijna vol, laden begrenzen"
+        plan_text = f"De batterij zit rond {soc:.1f}%. Laden wordt begrensd om niet over de bovengrens te gaan."
+    elif reason == "max_soc_hold" or soc >= 94.0:
+        plan_label = "Vasthouden bij bijna vol"
+        plan_text = f"De batterij zit rond {soc:.1f}%. De planning wil vooral vasthouden."
+    else:
+        plan_label = "Alleen observeren"
+        plan_text = "Er is geen harde actie. Energy Brain kijkt mee en toont alleen een schaduwplanning."
+
+    meaning = f"{pv_label.lower()}, {load_label.lower()}, prijs {price_label.lower()}. Verwachte richting: {plan_label.lower()}."
+
+    return {
+        "meaning": meaning,
+        "cards": [
+            {"title": "Stroomprijs", "value": price_label, "detail": price_text},
+            {"title": "Zon", "value": pv_label, "detail": pv_text},
+            {"title": "Huisverbruik", "value": load_label, "detail": load_text},
+            {"title": "Batterijplan", "value": plan_label, "detail": plan_text},
+        ],
+    }
+
+
+def _forecast_layperson_html(payload: dict[str, Any]) -> str:
+    data = forecast_layperson_summary(payload)
+    cards = "".join(
+        "<div class=\"forecast-card-human\">"
+        f"<span>{_esc(card.get('title'))}</span>"
+        f"<strong>{_esc(card.get('value'))}</strong>"
+        f"<small>{_esc(card.get('detail'))}</small>"
+        "</div>"
+        for card in data.get("cards", [])
+        if isinstance(card, dict)
+    )
+
+    return f"""
+      <div class="forecast-overview">
+        <article class="forecast-hero">
+          <p class="eyebrow">Forecast in gewone taal · Alleen meekijken</p>
+          <h2>Komende uren samengevat</h2>
+          <p>{_esc(data.get("meaning", "Geen betrouwbare forecast-samenvatting beschikbaar."))}</p>
+        </article>
+        <div class="forecast-cards">{cards}</div>
+        <article class="card forecast-technical">
+          <details>
+            <summary>Technische details tonen</summary>
+            <div class="grid three">
+              {_forecast_card("Price Forecast Panel", payload["price_forecast"])}
+              {_forecast_card("PV Forecast Panel", payload["pv_forecast"])}
+              {_forecast_card("Load Forecast Panel", payload["load_forecast"])}
+            </div>
+            <article class="card" style="margin-top:14px">
+              <h2>Latest Cycle Table</h2>
+              {_cycle_table(payload["latest_cycle_table"])}
+            </article>
+          </details>
+        </article>
+      </div>
+    """
+
 
 
 def _forecast_card(title: str, rows: list[dict[str, Any]]) -> str:
