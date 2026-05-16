@@ -3193,3 +3193,132 @@ def render_tesla_cockpit_html(summary: dict[str, object]) -> str:
 def render_dashboard_html(summary: dict[str, object]) -> str:
     rendered = _eb_prev_render_dashboard_plus_route_final(summary)
     return _eb_pf_replace_final(rendered, summary)
+
+# EB_PV_SANITY_GUARD_V1
+# Read-only UI guard: do not present implausible PV power as normal truth.
+# This does not change planner/controller behavior and sends no commands.
+
+_EB_PRE_PV_GUARD_RENDER_DASHBOARD_HTML = render_dashboard_html
+
+
+def _eb_pv_guard_number_v1(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _eb_pv_guard_text_v1(pv_kw: float, load_kw: float, battery_kw: float, grid_kw: float) -> str:
+    # Conservative home PV display guard.
+    # Above 25 kW is suspicious for this EMS context unless explicitly configured later.
+    if pv_kw > 25.0:
+        return (
+            "PV-waarde lijkt onrealistisch hoog: "
+            f"{pv_kw:.1f} kW. "
+            "Energy Brain toont dit als verdachte input. "
+            "Controleer of de PV-bron actuele kW is en geen dagteller, Wh/kWh-teller of forecast-som."
+        )
+
+    if pv_kw < -0.1:
+        return (
+            "PV-waarde is negatief en daarom verdacht. "
+            "Energy Brain toont dit als onzekere input."
+        )
+
+    if abs(grid_kw) < 0.05:
+        grid_text = "Er is bijna geen netverbruik of teruglevering."
+    elif grid_kw < 0:
+        grid_text = f"Er gaat ongeveer {abs(grid_kw):.1f} kW terug naar het net."
+    else:
+        grid_text = f"Het net vult ongeveer {grid_kw:.1f} kW bij."
+
+    if battery_kw > 0.05:
+        battery_text = f"De batterij wordt geladen met ongeveer {battery_kw:.1f} kW."
+    elif battery_kw < -0.05:
+        battery_text = f"De batterij helpt het huis met ongeveer {abs(battery_kw):.1f} kW."
+    else:
+        battery_text = "De batterij staat praktisch stil."
+
+    return (
+        f"Huis gebruikt {load_kw:.1f} kW. "
+        f"Zon levert {pv_kw:.1f} kW. "
+        f"{battery_text} "
+        f"{grid_text}"
+    )
+
+
+def _eb_insert_pv_guard_banner_v1(html_text: str, summary: dict) -> str:
+    flow = summary.get("energy_flow") if isinstance(summary, dict) else {}
+    if not isinstance(flow, dict):
+        flow = {}
+
+    pv_kw = _eb_pv_guard_number_v1(flow.get("pv_kw"))
+    load_kw = _eb_pv_guard_number_v1(flow.get("load_kw"))
+    battery_kw = _eb_pv_guard_number_v1(flow.get("battery_kw"))
+    grid_kw = _eb_pv_guard_number_v1(flow.get("grid_kw"))
+
+    message = _eb_pv_guard_text_v1(pv_kw, load_kw, battery_kw, grid_kw)
+    suspicious = pv_kw > 25.0 or pv_kw < -0.1
+
+    cls = "eb-pv-sanity-warning" if suspicious else "eb-pv-sanity-ok"
+    label = "PV input controleren" if suspicious else "Energy flow"
+
+    css = """
+<style id="eb-pv-sanity-guard-style">
+.eb-pv-sanity-warning,
+.eb-pv-sanity-ok {
+  margin: 18px auto;
+  max-width: 860px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,209,102,.42);
+  background: rgba(255,209,102,.10);
+  color: #eef4f8;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.eb-pv-sanity-ok {
+  border-color: rgba(67,214,166,.32);
+  background: rgba(67,214,166,.07);
+}
+.eb-pv-sanity-warning strong,
+.eb-pv-sanity-ok strong {
+  display: block;
+  margin-bottom: 6px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #ffd166;
+}
+.eb-pv-sanity-ok strong {
+  color: #43d6a6;
+}
+</style>
+"""
+
+    banner = (
+        css
+        + f'<section class="{cls}" id="eb-pv-sanity-guard">'
+        + f"<strong>{label}</strong>"
+        + f"<span>{message}</span>"
+        + "</section>"
+    )
+
+    # Put warning/summary directly before the visual energy flow where possible.
+    anchors = [
+        '<section class="eb-plus-flow-final"',
+        '<section class="flow"',
+        '<section class="human-grid"',
+        '</main>',
+    ]
+    for anchor in anchors:
+        if anchor in html_text:
+            return html_text.replace(anchor, banner + anchor, 1)
+
+    return html_text + banner
+
+
+def render_dashboard_html(summary: dict) -> str:
+    rendered = _EB_PRE_PV_GUARD_RENDER_DASHBOARD_HTML(summary)
+    return _eb_insert_pv_guard_banner_v1(rendered, summary)
