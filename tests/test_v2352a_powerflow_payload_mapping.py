@@ -54,8 +54,9 @@ def test_direct_powerflow_svg_uses_current_api_values_and_labels():
     assert "0.7 kW" in html
     assert "2.6 kW" in html
     assert "87%" in html
-    assert "Overschot naar batterij" in html
-    assert "Export naar net" in html
+    assert "Batterij wordt geladen met 2.6 kW" in html
+    assert "Er gaat 2.6 kW terug naar het net" in html
+    assert "Teruglevering: 2.6 kW" in html
     assert "beperkte data" not in html
     assert 'data-read-only="true"' in html
 

@@ -308,12 +308,20 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     elif abs(pv_kw) < 0.001 and abs(load_kw) < 0.001:
         quality = "beperkte data"
 
+    planner_soc = None
+    timeline = source.get("planner_timeline") or source.get("latest_cycle_table") or []
+    if isinstance(timeline, list) and timeline:
+        first_step = timeline[0] if isinstance(timeline[0], dict) else {}
+        planner_soc = _pf_float(first_step.get("soc_percent"), soc)
+
     return {
         "pv_kw": round(pv_kw, 1),
         "load_kw": round(load_kw, 1),
         "battery_kw": round(battery_kw, 1),
         "grid_kw": round(grid_kw, 1),
         "battery_soc_percent": round(soc),
+        "battery_soc_live_percent": round(soc, 1),
+        "planner_step_soc_percent": round(planner_soc, 1) if planner_soc is not None else None,
         "data_quality": quality,
         "read_only": True,
         "control_allowed": False,
@@ -413,61 +421,142 @@ def _pf_kw(value: Any) -> str:
     return f"{_pf_float(value, 0.0):.1f} kW"
 
 
+def powerflow_plain_status(snapshot: dict[str, Any]) -> dict[str, str]:
+    snap = snapshot if isinstance(snapshot, dict) else {}
+    pv_kw = _pf_float(snap.get("pv_kw"), 0.0)
+    load_kw = _pf_float(snap.get("load_kw"), 0.0)
+    battery_kw = _pf_float(snap.get("battery_kw"), 0.0)
+    grid_kw = _pf_float(snap.get("grid_kw"), 0.0)
+    live_soc = _pf_float(snap.get("battery_soc_live_percent", snap.get("battery_soc_percent")), 0.0)
+    planner_soc = snap.get("planner_step_soc_percent")
+
+    if battery_kw > 0.05:
+        battery_text = f"Batterij wordt geladen met {_pf_kw(battery_kw)}."
+        battery_badge = f"Laden: {_pf_kw(battery_kw)}"
+    elif battery_kw < -0.05:
+        battery_text = f"Batterij helpt het huis met {_pf_kw(abs(battery_kw))}."
+        battery_badge = f"Helpt huis: {_pf_kw(abs(battery_kw))}"
+    else:
+        battery_text = "Batterij staat praktisch stil."
+        battery_badge = "Batterij stil"
+
+    if grid_kw > 0.05:
+        grid_text = f"Het net vult nog {_pf_kw(grid_kw)} bij."
+        grid_badge = f"Net vult bij: {_pf_kw(grid_kw)}"
+    elif grid_kw < -0.05:
+        grid_text = f"Er gaat {_pf_kw(abs(grid_kw))} terug naar het net."
+        grid_badge = f"Teruglevering: {_pf_kw(abs(grid_kw))}"
+    else:
+        grid_text = "Er is bijna geen netverbruik of teruglevering."
+        grid_badge = "Net bijna nul"
+
+    solar_text = f"Zon levert {_pf_kw(pv_kw)}."
+    house_text = f"Huis gebruikt {_pf_kw(load_kw)}."
+
+    if isinstance(planner_soc, (int, float)) and abs(float(planner_soc) - live_soc) >= 1.0:
+        soc_text = f"Batterij nu {live_soc:.1f}%. Planner stap 0 rekent met {float(planner_soc):.1f}%."
+    else:
+        soc_text = f"Batterij nu {live_soc:.1f}%."
+
+    return {
+        "headline": f"{house_text} {solar_text} {battery_text} {grid_text}",
+        "solar": solar_text,
+        "house": house_text,
+        "battery": battery_text,
+        "grid": grid_text,
+        "soc": soc_text,
+        "battery_badge": battery_badge,
+        "grid_badge": grid_badge,
+    }
+
+
+
 def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) -> str:
     snap = snapshot if isinstance(snapshot, dict) else {}
     edge_list = edges if isinstance(edges, list) else []
+    plain = powerflow_plain_status(snap)
 
     path_map = {
-        "zon_naar_huis": "M 150 88 C 250 88, 290 168, 390 180",
-        "zon_naar_batterij": "M 150 108 C 250 145, 280 300, 390 318",
-        "batterij_naar_huis": "M 500 318 C 610 300, 610 205, 500 180",
-        "net_import": "M 720 180 C 630 180, 590 180, 505 180",
-        "net_export": "M 505 180 C 590 180, 630 180, 720 180",
+        "zon_naar_huis": "M 178 92 C 250 92, 270 150, 330 150",
+        "zon_naar_batterij": "M 178 105 C 250 135, 300 218, 360 230",
+        "batterij_naar_huis": "M 430 230 C 490 218, 500 166, 462 150",
+        "net_import": "M 604 150 C 548 150, 510 150, 462 150",
+        "net_export": "M 462 150 C 510 150, 548 150, 604 150",
     }
 
     paths: list[str] = []
     dots: list[str] = []
-    labels: list[str] = []
 
     for idx, edge in enumerate(edge_list):
         direction = str(edge.get("direction", "geen_duidelijke_stroomrichting"))
         path_id = f"pf-path-{idx}"
-        d = path_map.get(direction, "M 120 360 C 250 390, 580 390, 720 360")
+        d = path_map.get(direction, "M 150 285 C 260 310, 500 310, 610 285")
         active = bool(edge.get("active"))
         cls = "pf-edge active" if active else "pf-edge idle"
         paths.append(f'<path id="{path_id}" class="{cls}" d="{d}" />')
         if active:
             dots.append(
-                f'<circle class="pf-dot" r="5">'
-                f'<animateMotion dur="2.6s" repeatCount="indefinite">'
+                f'<circle class="pf-dot" r="4.5">'
+                f'<animateMotion dur="2.4s" repeatCount="indefinite">'
                 f'<mpath href="#{path_id}" />'
                 f'</animateMotion></circle>'
             )
-        labels.append(
-            f'<span class="pf-edge-label">{_esc(edge.get("label", "Stroomrichting"))}: '
-            f'{_pf_kw(edge.get("value_kw", 0.0))}</span>'
-        )
 
-    return f"""<article class="powerflow-panel human-card" data-read-only="true">
+    live_soc = snap.get("battery_soc_live_percent", snap.get("battery_soc_percent", 0))
+    node_soc = snap.get("battery_soc_percent", live_soc)
+
+    return f"""<article class="powerflow-panel human-card compact-powerflow" data-read-only="true">
   <div class="powerflow-head">
     <div>
       <p class="eyebrow">Alleen meekijken - Geen aansturing</p>
       <h2>Energy Flow nu</h2>
-      <p>Dit is alleen een weergave. Energy Brain stuurt niets aan.</p>
+      <p>Dit is alleen een weergave. Energy Brain stuurt niets aan. Waar komt de stroom nu vandaan en waar gaat die heen?</p>
     </div>
     <div class="powerflow-quality">Stroomrichting - {_esc(snap.get("data_quality", "schaduwdata"))}</div>
   </div>
-  <svg class="powerflow-svg" viewBox="0 0 840 420" role="img" aria-label="Read-only Energy Brain powerflow">
-    <g class="pf-node pf-sun"><circle cx="150" cy="96" r="52"/><text x="150" y="92">Zon</text><text x="150" y="118">{_pf_kw(snap.get("pv_kw", 0.0))}</text></g>
-    <g class="pf-node pf-home"><rect x="390" y="140" width="120" height="86" rx="22"/><text x="450" y="180">Huis</text><text x="450" y="205">{_pf_kw(snap.get("load_kw", 0.0))}</text></g>
-    <g class="pf-node pf-battery"><rect x="390" y="282" width="120" height="74" rx="18"/><text x="450" y="315">Batterij</text><text x="450" y="338">{_esc(snap.get("battery_soc_percent", 0))}%</text></g>
-    <g class="pf-node pf-grid"><rect x="700" y="142" width="92" height="84" rx="18"/><text x="746" y="180">Net</text><text x="746" y="205">{_pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0)))}</text></g>
+
+  <div class="powerflow-plain">
+    <strong>{_esc(plain["headline"])}</strong>
+    <span>{_esc(plain["soc"])}</span>
+  </div>
+
+  <svg class="powerflow-svg compact" viewBox="0 0 760 330" role="img" aria-label="Read-only Energy Brain powerflow">
     <g class="pf-lines">{''.join(paths)}{''.join(dots)}</g>
+
+    <g class="pf-node pf-sun">
+      <circle cx="135" cy="96" r="56"/>
+      <text x="135" y="86">Zon</text>
+      <text x="135" y="112">{_pf_kw(snap.get("pv_kw", 0.0))}</text>
+    </g>
+
+    <g class="pf-node pf-home">
+      <rect x="330" y="112" width="132" height="78" rx="22"/>
+      <text x="396" y="143">Huis</text>
+      <text x="396" y="168">{_pf_kw(snap.get("load_kw", 0.0))}</text>
+    </g>
+
+    <g class="pf-node pf-battery">
+      <rect x="335" y="218" width="122" height="70" rx="20"/>
+      <text x="396" y="246">Batterij</text>
+      <text x="396" y="270">{_esc(node_soc)}% nu</text>
+    </g>
+
+    <g class="pf-node pf-grid">
+      <rect x="604" y="114" width="104" height="74" rx="20"/>
+      <text x="656" y="143">Net</text>
+      <text x="656" y="168">{_pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0)))}</text>
+    </g>
   </svg>
-  <div class="powerflow-labels">{''.join(labels)}</div>
+
+  <div class="powerflow-summary-grid">
+    <div><span>Zon</span><strong>{_pf_kw(snap.get("pv_kw", 0.0))}</strong><small>naar huis of batterij</small></div>
+    <div><span>Huis</span><strong>{_pf_kw(snap.get("load_kw", 0.0))}</strong><small>actueel verbruik</small></div>
+    <div><span>Batterij</span><strong>{_esc(plain["battery_badge"])}</strong><small>{_esc(plain["soc"])}</small></div>
+    <div><span>Net</span><strong>{_esc(plain["grid_badge"])}</strong><small>import of teruglevering</small></div>
+  </div>
+
   <p class="powerflow-explain">{_esc(powerflow_explanation(snap, edge_list))}</p>
 </article>"""
-
 
 def render_powerflow_panel(payload: dict[str, Any]) -> str:
     snapshot = powerflow_snapshot(payload)
@@ -737,6 +826,22 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .powerflow-labels {{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 0; }}
     .pf-edge-label {{ border:1px solid var(--line); border-radius:999px; padding:7px 10px; color:#d9e6ef; background:rgba(255,255,255,.05); }}
     .powerflow-explain {{ margin:12px 0 0; color:#d9e6ef; }}
+    .compact-powerflow {{ padding:22px; }}
+    .compact-powerflow .powerflow-head {{ margin-bottom:14px; }}
+    .powerflow-plain {{ border:1px solid rgba(122,186,255,.18); background:rgba(255,255,255,.04); border-radius:18px; padding:14px 16px; margin:12px 0 14px; display:grid; gap:6px; }}
+    .powerflow-plain strong {{ margin:0; font-size:1.02rem; color:#edf7fb; }}
+    .powerflow-plain span {{ color:var(--muted); }}
+    .powerflow-svg.compact {{ min-height:240px; max-height:330px; background:radial-gradient(circle at 52% 48%, rgba(90,160,255,.16), rgba(0,0,0,0) 48%); }}
+    .compact-powerflow .pf-node circle,
+    .compact-powerflow .pf-node rect {{ filter: drop-shadow(0 12px 22px rgba(0,0,0,.22)); }}
+    .compact-powerflow .pf-edge {{ stroke-width:5.5; stroke-dasharray:9 12; opacity:.9; }}
+    .compact-powerflow .pf-dot {{ fill:#f7fbff; filter:drop-shadow(0 0 7px rgba(255,255,255,.8)); }}
+    .powerflow-summary-grid {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }}
+    .powerflow-summary-grid div {{ border:1px solid var(--line); border-radius:16px; padding:11px 12px; background:rgba(255,255,255,.035); }}
+    .powerflow-summary-grid span {{ display:block; color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; }}
+    .powerflow-summary-grid strong {{ display:block; margin-top:4px; color:#edf7fb; font-size:1rem; line-height:1.25; }}
+    .powerflow-summary-grid small {{ display:block; margin-top:5px; color:var(--muted); line-height:1.3; }}
+    @media (max-width: 900px) {{ .powerflow-summary-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
     @keyframes eb-flow-dash {{ from {{ stroke-dashoffset:42; }} to {{ stroke-dashoffset:0; }} }}
     @media (prefers-reduced-motion: reduce) {{ .pf-edge.active {{ animation:none; }} .pf-dot animateMotion {{ display:none; }} }}
     .plain-dashboard {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }}
