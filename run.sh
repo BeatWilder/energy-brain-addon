@@ -1,6 +1,20 @@
 #!/usr/bin/with-contenv bashio
 set -euo pipefail
 
+# Energy Brain read-only web UI
+# Safe by design:
+# - reads /data/energy_brain_cycles.jsonl only
+# - no Home Assistant service calls
+# - no battery writes
+# - no control buttons
+export ENERGY_BRAIN_UI_HOST="${ENERGY_BRAIN_UI_HOST:-0.0.0.0}"
+export ENERGY_BRAIN_UI_PORT="${ENERGY_BRAIN_UI_PORT:-8099}"
+export ENERGY_BRAIN_HISTORY_PATH="${ENERGY_BRAIN_HISTORY_PATH:-/data/energy_brain_cycles.jsonl}"
+
+echo "Starting Energy Brain read-only UI on ${ENERGY_BRAIN_UI_HOST}:${ENERGY_BRAIN_UI_PORT}"
+python3 -m energy_brain.web_ui &
+
+
 export ENERGY_BRAIN_MODE="$(bashio::config 'mode')"
 export ENERGY_BRAIN_CYCLE_SECONDS="$(bashio::config 'cycle_seconds')"
 export ENERGY_BRAIN_HORIZON_STEPS="$(bashio::config 'horizon_steps')"

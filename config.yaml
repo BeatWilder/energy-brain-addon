@@ -1,8 +1,7 @@
 name: Energy Brain EMS
 slug: energy_brain
 description: Deterministic, physics-aware Energy Management System for Home Assistant
-version: "0.1.13"
-
+version: "0.1.14"
 arch:
   - amd64
   - aarch64
@@ -62,3 +61,10 @@ schema:
   command_service_domain: str
   command_service: str
   command_value_field: str
+
+# Energy Brain read-only web UI
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: Energy Brain read-only web UI
+

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import os
+
 import html
 import json
 from pathlib import Path
 from typing import Any
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
-DEFAULT_HISTORY_PATH = Path("/data/energy_brain_cycles.jsonl")
+DEFAULT_HISTORY_PATH = Path(os.environ.get("ENERGY_BRAIN_HISTORY_PATH", "/data/energy_brain_cycles.jsonl"))
 NO_VALID_CYCLE = {
     "status": "safe",
     "valid_cycle": False,
@@ -239,3 +242,73 @@ def _list(value: Any) -> list[Any]:
 
 def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
+    """Read-only HTTP handler for the Energy Brain observer UI."""
+
+    server_version = "EnergyBrainReadOnlyUI/1.0"
+
+    def do_GET(self) -> None:
+        if self.path == "/health":
+            self._send_json({"status": "ok", "read_only": True})
+            return
+
+        if self.path == "/api/latest-cycle":
+            cycle = read_latest_cycle()
+            summary = summarize_cycle(cycle)
+            self._send_json(summary)
+            return
+
+        if self.path == "/":
+            cycle = read_latest_cycle()
+            summary = summarize_cycle(cycle)
+            html = render_dashboard_html(summary)
+            self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        self._send_json({"status": "not_found", "read_only": True}, status=404)
+
+    def do_POST(self) -> None:
+        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
+
+    def do_PUT(self) -> None:
+        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
+
+    def do_PATCH(self) -> None:
+        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
+
+    def do_DELETE(self) -> None:
+        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
+
+    def log_message(self, format: str, *args: object) -> None:
+        # Keep add-on logs clean; the EMS cycle logger remains the source of truth.
+        return
+
+    def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
+        body = json.dumps(payload, sort_keys=True).encode("utf-8")
+        self._send_response(status, body, "application/json; charset=utf-8")
+
+    def _send_response(self, status: int, body: bytes, content_type: str) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def main() -> None:
+    """Run the read-only Energy Brain web UI."""
+    from http.server import ThreadingHTTPServer
+
+    host = os.environ.get("ENERGY_BRAIN_UI_HOST", "0.0.0.0")
+    port = int(os.environ.get("ENERGY_BRAIN_UI_PORT", "8099"))
+
+    server = ThreadingHTTPServer((host, port), EnergyBrainWebUIHandler)
+    print(f"Energy Brain read-only UI listening on http://{host}:{port}", flush=True)
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
