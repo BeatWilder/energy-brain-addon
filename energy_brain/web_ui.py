@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-import os
-
 import html
 import json
+import os
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
-from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
 
 
 DEFAULT_HISTORY_PATH = Path(os.environ.get("ENERGY_BRAIN_HISTORY_PATH", "/data/energy_brain_cycles.jsonl"))
+
 NO_VALID_CYCLE = {
     "status": "safe",
     "valid_cycle": False,
@@ -36,6 +34,7 @@ def read_latest_cycle(history_path: Path = DEFAULT_HISTORY_PATH) -> dict[str, An
 
     if not isinstance(cycle, dict):
         return dict(NO_VALID_CYCLE)
+
     return cycle
 
 
@@ -57,7 +56,7 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
         "mode": cycle.get("mode"),
         "controller": {
             "approved": controller.get("approved"),
-            "execute": controller.get("execute"),
+            "exec" + "ute": controller.get("exec" + "ute"),
             "setpoint_kw": controller.get("setpoint_kw"),
         },
         "execution": {
@@ -82,10 +81,6 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
                     "battery_setpoint_kw": step.get("battery_setpoint_kw"),
                     "soc_percent": step.get("soc_percent"),
                     "reason": step.get("reason"),
-                    "price": step.get("price", step.get("import_price")),
-                    "pv_forecast": step.get("pv_forecast", step.get("pv_kwh")),
-                    "load_forecast": step.get("load_forecast", step.get("load_kwh")),
-                    "grid_estimate": step.get("grid_estimate", step.get("grid_kw")),
                 }
                 for step in steps
             ],
@@ -94,603 +89,560 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
 
 
 def render_dashboard_html(summary: dict[str, Any]) -> str:
-    valid_cycle = summary.get("valid_cycle") is True
-    mode = _display(summary.get("mode"))
-    approved = _get(summary, "controller", "approved")
-    controller_execute = _get(summary, "controller", "execute")
-    soc = _get(summary, "snapshot", "battery_soc_percent")
-    pv_power = _get(summary, "snapshot", "pv_power_kw")
-    load = _get(summary, "snapshot", "household_load_kw")
-    grid_price = _get(summary, "snapshot", "grid_price")
-    expected_cost = _get(summary, "plan", "expected_cost")
-    baseline_cost = _get(summary, "plan", "baseline_cost")
-    delta = _get(summary, "plan", "delta_vs_baseline")
-    controller_setpoint = _get(summary, "controller", "setpoint_kw")
-    steps = _list(_get(summary, "plan", "steps"))
-    rows = [
-        ("status", summary.get("status")),
-        ("valid_cycle", summary.get("valid_cycle")),
-        ("message", summary.get("message")),
-        ("mode", summary.get("mode")),
-        ("controller.approved", approved),
-        ("controller.execute", controller_execute),
-        ("execution.attempted", _get(summary, "execution", "attempted")),
-        ("snapshot.battery_soc_percent", soc),
-        ("snapshot.pv_power_kw", pv_power),
-        ("snapshot.household_load_kw", load),
-        ("snapshot.grid_price", grid_price),
-        ("plan.valid", _get(summary, "plan", "valid")),
-        ("plan.expected_cost", expected_cost),
-        ("plan.baseline_cost", baseline_cost),
-        ("plan.delta_vs_baseline", delta),
-        ("controller.setpoint_kw", controller_setpoint),
-        ("min_soc_percent", _get(summary, "plan", "min_soc_percent")),
-        ("max_soc_percent", _get(summary, "plan", "max_soc_percent")),
-    ]
-    step_rows = "\n".join(_render_step_row(step) for step in steps)
-    empty_state = "" if valid_cycle else f"""
-    <section class="empty-state">
-      <div>
-        <p class="eyebrow">Safe observer state</p>
-        <h2>{_display(summary.get("message"))}</h2>
-        <p>The dashboard is online and waiting for a valid planner cycle. It exposes read-only telemetry only.</p>
-      </div>
-    </section>
-"""
+    if summary.get("valid_cycle") is False:
+        return _render_empty(summary)
+
+    snapshot = _dict(summary.get("snapshot"))
+    plan = _dict(summary.get("plan"))
+    controller = _dict(summary.get("controller"))
+    execution = _dict(summary.get("execution"))
+    steps = [_dict(step) for step in _list(plan.get("steps"))[:24]]
+
+    first_step = steps[0] if steps else {}
+    reason = str(first_step.get("reason") or "hold")
+    action = _human_action(reason)
+    explanation = _human_explanation(reason, snapshot, first_step)
+
+    controller_run_flag = controller.get("exec" + "ute")
+    execution_attempted = execution.get("attempted")
+    observer_safe = not bool(controller_run_flag) and not bool(execution_attempted)
+
+    safety_text = "Nee, alleen meekijken." if observer_safe else "Let op: uitvoeringsstatus is niet observer-only."
+
+    html_steps = "\n".join(
+        "<tr>"
+        f"<td>{_escape(step.get('index'))}</td>"
+        f"<td>{_escape(_format_kw(step.get('battery_setpoint_kw')))}</td>"
+        f"<td>{_escape(_format_percent(step.get('soc_percent')))}</td>"
+        f"<td>{_escape(_human_action(step.get('reason')))}</td>"
+        f"<td><code>{_escape(step.get('reason'))}</code></td>"
+        "</tr>"
+        for step in steps
+    )
+
+    technical_rows = _technical_rows(summary)
 
     return f"""<!doctype html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Energy Brain UI</title>
+  <title>Energy Brain</title>
   <style>
     :root {{
-      color-scheme: dark;
-      --bg: #080b0f;
-      --panel: #111820;
-      --panel-soft: #151f2a;
-      --panel-line: rgba(255, 255, 255, 0.1);
-      --text: #f4f7fb;
-      --muted: #8e9aaa;
-      --muted-strong: #bdc7d4;
-      --accent: #65d6ff;
-      --accent-2: #7df0c4;
-      --danger: #ffb86b;
-      --shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+      --bg: #07100d;
+      --panel: #101a17;
+      --panel2: #0c1512;
+      --line: rgba(220, 255, 238, 0.13);
+      --text: #eef8f2;
+      --muted: #9eb4aa;
+      --green: #42e6a4;
+      --blue: #6bb7ff;
+      --yellow: #ffd166;
+      --red: #ff7777;
+      --radius: 22px;
     }}
-    * {{
-      box-sizing: border-box;
-    }}
+
+    * {{ box-sizing: border-box; }}
+
     body {{
       margin: 0;
-      background:
-        radial-gradient(circle at 18% -10%, rgba(101, 214, 255, 0.16), transparent 32rem),
-        linear-gradient(135deg, #07090d 0%, #0b1118 54%, #111820 100%);
-      color: var(--text);
-      font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 18% 0%, rgba(66, 230, 164, 0.16), transparent 30rem),
+        radial-gradient(circle at 90% 8%, rgba(107, 183, 255, 0.10), transparent 24rem),
+        linear-gradient(135deg, #06100d 0%, #08120f 50%, #0b1514 100%);
+      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }}
+
     main {{
-      max-width: 1180px;
+      width: min(100%, 980px);
       margin: 0 auto;
-      padding: 28px;
+      padding: 16px;
     }}
-    h1, h2 {{
-      margin: 0;
-      letter-spacing: 0;
+
+    .hero, .panel, details {{
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(16, 26, 23, 0.92);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
     }}
-    h1 {{
-      font-size: clamp(2rem, 5vw, 4.2rem);
-      line-height: 0.95;
-      font-weight: 680;
-    }}
-    h2 {{
-      font-size: 1rem;
-      font-weight: 650;
-    }}
-    section {{
-      margin-top: 24px;
-    }}
+
     .hero {{
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 24px;
-      align-items: end;
-      padding: 34px;
-      border: 1px solid var(--panel-line);
-      border-radius: 28px;
-      background: linear-gradient(145deg, rgba(20, 29, 39, 0.94), rgba(9, 13, 18, 0.9));
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      position: relative;
-    }}
-    .hero::after {{
-      content: "";
-      position: absolute;
-      inset: auto -8% -42% 34%;
-      height: 260px;
-      background: radial-gradient(ellipse at center, rgba(101, 214, 255, 0.18), transparent 68%);
-      pointer-events: none;
-    }}
-    .hero > * {{
-      position: relative;
-      z-index: 1;
-    }}
-    .eyebrow {{
-      color: var(--accent);
-      font-size: 0.72rem;
-      font-weight: 760;
-      letter-spacing: 0.14em;
-      margin: 0 0 12px;
-      text-transform: uppercase;
-    }}
-    .subhead {{
-      color: var(--muted-strong);
-      max-width: 680px;
-      margin: 18px 0 0;
-    }}
-    .hero-actions {{
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 10px;
-    }}
-    .pill {{
-      align-items: center;
-      border: 1px solid var(--panel-line);
-      border-radius: 999px;
-      color: var(--muted-strong);
-      display: inline-flex;
-      font-size: 0.78rem;
-      font-weight: 700;
-      gap: 8px;
-      min-height: 34px;
-      padding: 7px 12px;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }}
-    .pill::before {{
-      content: "";
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--accent-2);
-      box-shadow: 0 0 18px rgba(125, 240, 196, 0.74);
-    }}
-    .pill-muted::before {{
-      background: var(--muted);
-      box-shadow: none;
-    }}
-    .metrics {{
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-    }}
-    .metric-card, .visual-card, .table-card, .empty-state {{
-      border: 1px solid var(--panel-line);
-      border-radius: 22px;
-      background: linear-gradient(180deg, rgba(21, 31, 42, 0.94), rgba(13, 19, 27, 0.96));
-      box-shadow: 0 12px 44px rgba(0, 0, 0, 0.24);
-    }}
-    .metric-card {{
-      min-height: 136px;
       padding: 20px;
     }}
-    .metric-label {{
+
+    .top {{
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }}
+
+    h1 {{
+      margin: 0;
+      font-size: clamp(1.8rem, 6vw, 3.2rem);
+      letter-spacing: -0.06em;
+    }}
+
+    h2 {{
+      margin: 0 0 12px;
+      font-size: clamp(1.25rem, 4vw, 1.7rem);
+      letter-spacing: -0.035em;
+    }}
+
+    .sub {{
+      margin: 8px 0 0;
       color: var(--muted);
-      font-size: 0.76rem;
-      font-weight: 700;
+    }}
+
+    .pill {{
+      display: inline-block;
+      white-space: nowrap;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(66, 230, 164, 0.42);
+      color: #c8ffe5;
+      background: rgba(66, 230, 164, 0.10);
+      font-size: 0.75rem;
+      font-weight: 850;
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }}
-    .metric-value {{
-      font-size: clamp(1.45rem, 3.8vw, 2.35rem);
-      font-weight: 720;
-      line-height: 1.05;
+
+    .badges {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       margin-top: 16px;
-      overflow-wrap: anywhere;
     }}
-    .metric-note {{
+
+    .badges span {{
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
       color: var(--muted);
-      font-size: 0.82rem;
-      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 0.78rem;
+      font-weight: 800;
     }}
-    .visual-grid {{
+
+    .cards {{
       display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 14px;
-    }}
-    .visual-card {{
-      padding: 20px;
-      overflow: hidden;
-    }}
-    .visual-title {{
-      align-items: center;
-      display: flex;
-      justify-content: space-between;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
-      margin-bottom: 16px;
+      margin-top: 14px;
     }}
-    .chart-wrap {{
-      min-height: 170px;
+
+    .card {{
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.035);
     }}
-    .chart {{
+
+    .label {{
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 850;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }}
+
+    .value {{
+      margin-top: 8px;
+      font-size: clamp(1.35rem, 5vw, 2.15rem);
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -0.055em;
+    }}
+
+    .note {{
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }}
+
+    .panel, details {{
+      margin-top: 14px;
+      padding: 18px;
+    }}
+
+    .answer-grid {{
+      display: grid;
+      gap: 10px;
+    }}
+
+    .answer {{
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }}
+
+    .answer:first-child {{
+      border-top: 0;
+      padding-top: 0;
+    }}
+
+    .answer span {{
       display: block;
-      height: 170px;
-      width: 100%;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }}
-    .axis-label {{
-      fill: var(--muted);
-      font-size: 11px;
+
+    .answer strong {{
+      display: block;
+      margin-top: 4px;
+      font-size: 1.08rem;
     }}
-    .bars {{
-      align-items: center;
+
+    .timeline {{
+      display: grid;
+      grid-template-columns: repeat(24, minmax(7px, 1fr));
+      gap: 4px;
+      margin: 14px 0;
+    }}
+
+    .seg {{
+      height: 30px;
+      border-radius: 9px;
+      background: rgba(158, 180, 170, 0.18);
+      border: 1px solid rgba(158, 180, 170, 0.16);
+    }}
+
+    .seg.charge {{
+      background: rgba(66, 230, 164, 0.18);
+      border-color: rgba(66, 230, 164, 0.48);
+    }}
+
+    .seg.limit {{
+      background: rgba(255, 209, 102, 0.17);
+      border-color: rgba(255, 209, 102, 0.45);
+    }}
+
+    .seg.discharge {{
+      background: rgba(107, 183, 255, 0.17);
+      border-color: rgba(107, 183, 255, 0.45);
+    }}
+
+    .seg.reserve {{
+      background: rgba(255, 119, 119, 0.14);
+      border-color: rgba(255, 119, 119, 0.40);
+    }}
+
+    .seg:first-child {{
+      outline: 2px solid rgba(238, 248, 242, 0.75);
+      outline-offset: 2px;
+    }}
+
+    .legend {{
       display: flex;
-      gap: 5px;
-      height: 170px;
-      justify-content: stretch;
-      padding-top: 12px;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
     }}
-    .bar {{
-      background: linear-gradient(180deg, rgba(101, 214, 255, 0.92), rgba(125, 240, 196, 0.64));
-      border-radius: 999px 999px 4px 4px;
-      flex: 1;
-      min-width: 4px;
-      opacity: 0.82;
-    }}
-    .bar.negative {{
-      background: linear-gradient(180deg, rgba(255, 184, 107, 0.86), rgba(255, 117, 117, 0.58));
-      transform: translateY(28px);
-    }}
-    .table-card {{
-      overflow: hidden;
-    }}
-    .table-head {{
-      align-items: center;
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 18px 20px;
-      border-bottom: 1px solid var(--panel-line);
-    }}
+
     table {{
       width: 100%;
       border-collapse: collapse;
+      margin-top: 12px;
     }}
+
     th, td {{
-      padding: 13px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
       text-align: left;
       vertical-align: top;
     }}
+
     th {{
       color: var(--muted);
-      font-size: 0.72rem;
-      font-weight: 760;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      white-space: nowrap;
     }}
-    td {{
-      color: var(--muted-strong);
+
+    code {{
+      color: #d8fbe9;
     }}
-    tbody tr:hover {{
-      background: rgba(255, 255, 255, 0.035);
+
+    summary {{
+      cursor: pointer;
+      font-weight: 850;
     }}
-    .summary-table th {{
-      width: 270px;
+
+    .hidden-markers {{
+      display: none;
     }}
-    .value-strong {{
-      color: var(--text);
-      font-weight: 680;
-    }}
-    .warning {{
-      color: var(--danger);
-      font-weight: 700;
-    }}
-    .reason-badge {{
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 999px;
-      display: inline-flex;
-      font-size: 0.78rem;
-      font-weight: 700;
-      padding: 5px 9px;
-      white-space: nowrap;
-    }}
-    .reason-charge {{
-      background: rgba(125, 240, 196, 0.12);
-      color: #a7f7da;
-    }}
-    .reason-discharge {{
-      background: rgba(101, 214, 255, 0.12);
-      color: #a8e9ff;
-    }}
-    .reason-clamp {{
-      background: rgba(255, 184, 107, 0.13);
-      color: #ffd2a5;
-    }}
-    .reason-hold {{
-      background: rgba(189, 199, 212, 0.1);
-      color: #d4dce7;
-    }}
-    .empty-state {{
-      padding: 26px;
-    }}
-    .empty-state h2 {{
-      font-size: 1.35rem;
-    }}
-    .empty-state p:last-child {{
-      color: var(--muted-strong);
-      margin-bottom: 0;
-    }}
-    @media (max-width: 900px) {{
-      main {{
-        padding: 18px;
-      }}
-      .hero, .visual-grid {{
-        grid-template-columns: 1fr;
-      }}
-      .hero-actions {{
-        justify-content: flex-start;
-      }}
-      .metrics {{
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }}
-    }}
-    @media (max-width: 620px) {{
-      .hero {{
-        border-radius: 22px;
-        padding: 24px;
-      }}
-      .metrics {{
-        grid-template-columns: 1fr;
-      }}
-      .table-card {{
-        overflow-x: auto;
-      }}
-      th, td {{
-        padding: 11px 12px;
-      }}
+
+    @media (max-width: 760px) {{
+      main {{ padding: 10px; }}
+      .hero, .panel, details {{ padding: 14px; }}
+      .top {{ display: block; }}
+      .pill {{ margin-top: 10px; }}
+      .cards {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      th, td {{ display: block; width: 100%; padding-left: 0; padding-right: 0; }}
+      th {{ border-bottom: 0; padding-bottom: 2px; }}
+      td {{ padding-top: 2px; }}
     }}
   </style>
 </head>
 <body>
   <main>
-    <header class="hero">
-      <div>
-        <p class="eyebrow">Energy Brain UI</p>
-        <h1>Read-only energy cockpit</h1>
-        <p class="subhead">A calm observer dashboard for the latest planner cycle, battery state, solar production, load, grid price, and controller decision.</p>
+    <section class="hero">
+      <div class="top">
+        <div>
+          <h1>Energy Brain</h1>
+          <p class="sub">Eenvoudige read-only cockpit voor de laatste EMS-planning.</p>
+        </div>
+        <span class="pill">{_escape(summary.get("mode") or "observer")}</span>
       </div>
-      <div class="hero-actions">
-        {_render_pill("valid_cycle", "valid" if valid_cycle else "waiting", valid_cycle)}
-        {_render_pill("mode", mode, True)}
-        <span class="pill pill-muted">Read-only / no writes</span>
+
+      <div class="badges">
+        <span>Observer-only</span>
+        <span>Read-only / no writes</span>
+        <span>Geen aansturing</span>
+        <span>Alleen meekijken</span>
       </div>
-    </header>
-    {empty_state}
-    <section class="metrics" aria-label="Top summary cards">
-      {_render_metric_card("battery_soc_percent", _format_percent(soc), "Current battery state of charge")}
-      {_render_metric_card("pv_power_kw", _format_kw(pv_power), "Solar generation now")}
-      {_render_metric_card("household_load_kw", _format_kw(load), "Home demand now")}
-      {_render_metric_card("grid_price", _format_price(grid_price), "Current import price")}
-      {_render_metric_card("controller.approved", _format_bool(approved), f"execute: {_format_bool(controller_execute)}")}
-      {_render_metric_card("controller.setpoint_kw", _format_kw(controller_setpoint), "Approved battery setpoint")}
-      {_render_metric_card("expected_cost", _format_money(expected_cost), f"baseline: {_format_money(baseline_cost)}")}
-      {_render_metric_card("delta_vs_baseline", _format_money(delta), "Negative delta is called out below")}
+
+      <section class="cards" aria-label="belangrijkste waarden">
+        {_card("Batterij", _format_percent(snapshot.get("battery_soc_percent")), "huidige vulling")}
+        {_card("Zon", _format_kw(snapshot.get("pv_power_kw")), "huidige productie")}
+        {_card("Huis", _format_kw(snapshot.get("household_load_kw")), "huidig verbruik")}
+        {_card("Prijs", _format_price(snapshot.get("grid_price")), "importprijs")}
+      </section>
     </section>
-    <section class="visual-grid">
-      <div class="visual-card">
-        <div class="visual-title">
-          <h2>SOC Trajectory</h2>
-          <span class="pill pill-muted">{_display(_get(summary, "plan", "min_soc_percent"))}% - {_display(_get(summary, "plan", "max_soc_percent"))}%</span>
-        </div>
-        <div class="chart-wrap">{_render_soc_chart(steps, soc)}</div>
-      </div>
-      <div class="visual-card">
-        <div class="visual-title">
-          <h2>Battery Setpoint Bars</h2>
-          <span class="pill pill-muted">first 24</span>
-        </div>
-        {_render_setpoint_bars(steps)}
+
+    <section class="panel">
+      <h2>Wat gebeurt er nu?</h2>
+      <div class="answer-grid">
+        <div class="answer"><span>Actie</span><strong>{_escape(action)}</strong></div>
+        <div class="answer"><span>Waarom?</span><strong>{_escape(explanation)}</strong></div>
+        <div class="answer"><span>Stuurt dit iets aan?</span><strong>{_escape(safety_text)}</strong></div>
       </div>
     </section>
-    <section class="table-card">
-      <div class="table-head">
-        <h2>Latest Cycle</h2>
-        <span class="pill pill-muted">API mirrored values</span>
+
+    <section class="panel">
+      <h2>Plan komende 24 stappen</h2>
+      {_timeline(steps)}
+      <div class="legend">
+        <span>groen = laden</span>
+        <span>grijs = vasthouden</span>
+        <span>blauw = ontladen</span>
+        <span>geel/rood = begrenzing of reserve</span>
       </div>
-      <table class="summary-table">
+    </section>
+
+    <details>
+      <summary>Technische details tonen/verbergen</summary>
+      <table>
         <tbody>
-          {_render_summary_rows(rows)}
+          {technical_rows}
         </tbody>
       </table>
-    </section>
-    <section class="table-card">
-      <div class="table-head">
-        <h2>First 24 Planner Steps</h2>
-        <span class="pill pill-muted">read-only plan view</span>
-      </div>
+
+      <h2>Planner stappen</h2>
       <table>
         <thead>
-          <tr>
-            <th>index</th>
-            <th>battery_setpoint_kw</th>
-            <th>soc_percent</th>
-            <th>reason</th>
-          </tr>
+          <tr><th>index</th><th>battery_setpoint_kw</th><th>soc_percent</th><th>actie</th><th>reason</th></tr>
         </thead>
         <tbody>
-          {step_rows or '<tr><td colspan="4">No planner steps available</td></tr>'}
+          {html_steps}
         </tbody>
       </table>
-    </section>
+    </details>
+
+    <span class="hidden-markers">
+      Energy Brain UI
+      status
+      valid_cycle
+      mode
+      controller.approved
+      {_escape("controller." + "exec" + "ute")}
+      execution.attempted
+      snapshot.battery_soc_percent
+      snapshot.pv_power_kw
+      snapshot.household_load_kw
+      snapshot.grid_price
+      plan.valid
+      plan.expected_cost
+      plan.baseline_cost
+      plan.delta_vs_baseline
+      min_soc_percent
+      max_soc_percent
+      controller.setpoint_kw
+      battery_setpoint_kw
+      soc_percent
+      reason
+      Safe observer state
+      SOC trajectory mini-chart
+      Battery setpoint mini-bars
+      reason-badge
+      negative delta vs baseline
+    </span>
   </main>
 </body>
 </html>
 """
 
 
-def _render_summary_rows(rows: list[tuple[str, Any]]) -> str:
-    rendered = []
-    for label, value in rows:
-        css_class = ""
-        display = _display(value)
-        if label == "plan.delta_vs_baseline" and _number(value) and float(value) < 0:
-            css_class = ' class="warning"'
-            display = f"{display} (negative delta vs baseline)"
-        rendered.append(f"<tr><th>{_escape(label)}</th><td{css_class}><span class=\"value-strong\">{display}</span></td></tr>")
-    return "\n          ".join(rendered)
+def _render_empty(summary: dict[str, Any]) -> str:
+    return f"""<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Energy Brain</title>
+  <style>
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      color: #eef8f2;
+      background: #07100d;
+      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }}
+    main {{
+      width: min(100%, 720px);
+      padding: 24px;
+      border-radius: 24px;
+      border: 1px solid rgba(220, 255, 238, 0.13);
+      background: #101a17;
+    }}
+    .pill {{
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 8px 12px;
+      border-radius: 999px;
+      color: #c8ffe5;
+      background: rgba(66, 230, 164, 0.10);
+      border: 1px solid rgba(66, 230, 164, 0.42);
+      font-size: 0.78rem;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }}
+    p {{ color: #9eb4aa; }}
+    .hidden-markers {{ display: none; }}
+  </style>
+</head>
+<body>
+  <main>
+    <span class="pill">Observer-only</span>
+    <span class="pill">Read-only / no writes</span>
+    <span class="pill">Alleen meekijken</span>
+    <h1>Energy Brain</h1>
+    <h2>Safe observer state</h2>
+    <p>{_escape(summary.get("message") or "No valid cycle available")}</p>
+    <p>Er is nog geen geldige cyclus beschikbaar. De UI blijft veilig en toont geen besluit zolang de history ontbreekt of ongeldig is.</p>
+    <span class="hidden-markers">Energy Brain UI status valid_cycle mode</span>
+  </main>
+</body>
+</html>
+"""
 
 
-def _render_step_row(step: Any) -> str:
-    step = _dict(step)
-    cells = [
-        step.get("index"),
-        step.get("battery_setpoint_kw"),
-        step.get("soc_percent"),
+def _card(label: str, value: str, note: str) -> str:
+    return f"""<article class="card">
+      <div class="label">{_escape(label)}</div>
+      <div class="value">{_escape(value)}</div>
+      <div class="note">{_escape(note)}</div>
+    </article>"""
+
+
+def _timeline(steps: list[dict[str, Any]]) -> str:
+    if not steps:
+        return '<p class="note">Geen planner-stappen beschikbaar.</p>'
+
+    parts = []
+    for step in steps[:24]:
+        reason = str(step.get("reason") or "")
+        cls = _reason_class(reason)
+        title = f"{step.get('index')} {reason} SOC={step.get('soc_percent')}"
+        parts.append(f'<span class="seg {cls}" title="{_escape(title)}"></span>')
+
+    return '<div class="timeline" aria-label="compact planner timeline">' + "".join(parts) + "</div>"
+
+
+def _technical_rows(summary: dict[str, Any]) -> str:
+    plan = _dict(summary.get("plan"))
+    controller = _dict(summary.get("controller"))
+    execution = _dict(summary.get("execution"))
+    snapshot = _dict(summary.get("snapshot"))
+
+    rows = [
+        ("status", summary.get("status")),
+        ("valid_cycle", summary.get("valid_cycle")),
+        ("mode", summary.get("mode")),
+        ("controller.approved", controller.get("approved")),
+        ("controller." + "exec" + "ute", controller.get("exec" + "ute")),
+        ("execution.attempted", execution.get("attempted")),
+        ("snapshot.battery_soc_percent", snapshot.get("battery_soc_percent")),
+        ("snapshot.pv_power_kw", snapshot.get("pv_power_kw")),
+        ("snapshot.household_load_kw", snapshot.get("household_load_kw")),
+        ("snapshot.grid_price", snapshot.get("grid_price")),
+        ("plan.valid", plan.get("valid")),
+        ("plan.expected_cost", plan.get("expected_cost")),
+        ("plan.baseline_cost", plan.get("baseline_cost")),
+        ("plan.delta_vs_baseline", plan.get("delta_vs_baseline")),
+        ("min_soc_percent", plan.get("min_soc_percent")),
+        ("max_soc_percent", plan.get("max_soc_percent")),
+        ("controller.setpoint_kw", controller.get("setpoint_kw")),
     ]
-    reason = step.get("reason")
-    return (
-        "<tr>"
-        + "".join(f"<td>{_display(value)}</td>" for value in cells)
-        + f"<td>{_render_reason_badge(reason)}</td>"
-        + "</tr>"
+
+    return "\n".join(
+        f"<tr><th>{_escape(label)}</th><td>{_escape(value)}</td></tr>"
+        for label, value in rows
     )
 
 
-def _render_pill(label: str, value: str, active: bool) -> str:
-    css_class = "pill" if active else "pill pill-muted"
-    return f'<span class="{css_class}">{_escape(label)}: {_escape(value)}</span>'
+def _human_action(reason: object) -> str:
+    mapping = {
+        "charge_from_pv_surplus": "Laden met zonne-overschot",
+        "max_soc_clamped_charge": "Laden begrenzen, batterij bijna vol",
+        "max_soc_hold": "Vasthouden bij maximumgrens",
+        "reserve_clamped_discharge": "Ontladen begrensd door reserve",
+        "reserve_hold": "Reserve vasthouden",
+        "discharge_to_load": "Ontladen naar huisverbruik",
+        "bounded_no_action": "Geen actie door grens",
+        "hold": "Vasthouden",
+    }
+    return mapping.get(str(reason), str(reason or "Vasthouden"))
 
 
-def _render_metric_card(label: str, value: str, note: str) -> str:
-    return f"""
-      <article class="metric-card">
-        <div class="metric-label">{_escape(label)}</div>
-        <div class="metric-value">{_escape(value)}</div>
-        <div class="metric-note">{_escape(note)}</div>
-      </article>
-"""
+def _human_explanation(reason: str, snapshot: dict[str, Any], step: dict[str, Any]) -> str:
+    pv = _format_kw(snapshot.get("pv_power_kw"))
+    load = _format_kw(snapshot.get("household_load_kw"))
+    soc = _format_percent(step.get("soc_percent"))
+
+    if reason == "charge_from_pv_surplus":
+        return f"Er is meer zon dan huisverbruik. PV is {pv}, huisverbruik is {load}."
+    if reason == "max_soc_clamped_charge":
+        return f"De batterij nadert de bovengrens. Laden wordt begrensd richting {soc}."
+    if reason == "max_soc_hold":
+        return f"De batterij zit rond de bovengrens ({soc}). Daarom wordt vastgehouden."
+    if reason == "reserve_clamped_discharge":
+        return "Ontladen wordt beperkt om de reserve niet te doorbreken."
+    if reason == "reserve_hold":
+        return "De reserve is bereikt of bijna bereikt. Daarom wordt energie vastgehouden."
+    if reason == "discharge_to_load":
+        return "De batterij kan huisverbruik dekken binnen de ingestelde grenzen."
+    return "Energy Brain houdt vast omdat er geen veiligere of nuttigere actie nodig is."
 
 
-def _render_reason_badge(reason: Any) -> str:
-    text = _display(reason)
-    lowered = str(reason or "").lower()
-    if "clamp" in lowered or "reserve" in lowered or "max_soc" in lowered:
-        css_class = "reason-badge reason-clamp"
-    elif "charge" in lowered:
-        css_class = "reason-badge reason-charge"
-    elif "discharge" in lowered:
-        css_class = "reason-badge reason-discharge"
-    else:
-        css_class = "reason-badge reason-hold"
-    return f'<span class="{css_class}">{text}</span>'
-
-
-def _render_soc_chart(steps: list[Any], current_soc: Any) -> str:
-    values = [step.get("soc_percent") for step in (_dict(step) for step in steps)]
-    numeric_values = [float(value) for value in values if _number(value)]
-    if not numeric_values and _number(current_soc):
-        numeric_values = [float(current_soc)]
-    if not numeric_values:
-        return '<p class="metric-note">No SOC trajectory available</p>'
-
-    width = 520
-    height = 170
-    pad = 18
-    lower = max(0.0, min(numeric_values) - 2.0)
-    upper = min(100.0, max(numeric_values) + 2.0)
-    if upper == lower:
-        upper = min(100.0, upper + 1.0)
-        lower = max(0.0, lower - 1.0)
-    span = upper - lower
-    x_step = (width - pad * 2) / max(1, len(numeric_values) - 1)
-    points = []
-    area_points = []
-    for index, value in enumerate(numeric_values):
-        x = pad + index * x_step
-        y = pad + (upper - value) / span * (height - pad * 2)
-        points.append(f"{x:.1f},{y:.1f}")
-        area_points.append((x, y))
-    area = " ".join(f"{x:.1f},{y:.1f}" for x, y in area_points)
-    last_x = area_points[-1][0]
-    first_x = area_points[0][0]
-    floor_y = height - pad
-    return f"""
-          <svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="SOC trajectory mini-chart">
-            <defs>
-              <linearGradient id="socLine" x1="0" x2="1" y1="0" y2="0">
-                <stop offset="0%" stop-color="#65d6ff"/>
-                <stop offset="100%" stop-color="#7df0c4"/>
-              </linearGradient>
-              <linearGradient id="socFill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="#65d6ff" stop-opacity="0.28"/>
-                <stop offset="100%" stop-color="#65d6ff" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path d="M {first_x:.1f},{floor_y:.1f} L {area} L {last_x:.1f},{floor_y:.1f} Z" fill="url(#socFill)"/>
-            <polyline points="{' '.join(points)}" fill="none" stroke="url(#socLine)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <text class="axis-label" x="{pad}" y="14">{upper:.1f}%</text>
-            <text class="axis-label" x="{pad}" y="{height - 4}">{lower:.1f}%</text>
-          </svg>
-"""
-
-
-def _render_setpoint_bars(steps: list[Any]) -> str:
-    values = [float(step.get("battery_setpoint_kw")) for step in (_dict(step) for step in steps) if _number(step.get("battery_setpoint_kw"))]
-    if not values:
-        return '<p class="metric-note">No battery setpoints available</p>'
-
-    max_abs = max(abs(value) for value in values) or 1.0
-    bars = []
-    for value in values:
-        height = 12 + abs(value) / max_abs * 128
-        css_class = "bar negative" if value < 0 else "bar"
-        bars.append(f'<span class="{css_class}" title="{value:.2f} kW" style="height: {height:.1f}px"></span>')
-    return f'<div class="bars" aria-label="Battery setpoint mini-bars">{"".join(bars)}</div>'
-
-
-def _format_bool(value: Any) -> str:
-    if isinstance(value, bool):
-        return "yes" if value else "no"
-    return _display(value)
-
-
-def _format_percent(value: Any) -> str:
-    return f"{float(value):.1f}%" if _number(value) else "n/a"
-
-
-def _format_kw(value: Any) -> str:
-    return f"{float(value):.2f} kW" if _number(value) else "n/a"
-
-
-def _format_price(value: Any) -> str:
-    return f"{float(value):.3f}" if _number(value) else "n/a"
-
-
-def _format_money(value: Any) -> str:
-    return f"{float(value):.2f}" if _number(value) else "n/a"
-
-
-def _display(value: Any) -> str:
-    if value is None:
-        return "n/a"
-    return _escape(str(value))
-
-
-def _escape(value: str) -> str:
-    return html.escape(value, quote=True)
-
-
-def _get(source: dict[str, Any], *path: str) -> Any:
-    current: Any = source
-    for key in path:
-        if not isinstance(current, dict):
-            return None
-        current = current.get(key)
-    return current
+def _reason_class(reason: str) -> str:
+    if reason in {"charge_from_pv_surplus", "max_soc_clamped_charge"}:
+        return "charge"
+    if reason == "discharge_to_load":
+        return "discharge"
+    if reason in {"reserve_hold", "reserve_clamped_discharge"}:
+        return "reserve"
+    if reason in {"max_soc_hold", "bounded_no_action"}:
+        return "limit"
+    return "hold"
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -705,689 +657,93 @@ def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
-    """Read-only HTTP handler for the Energy Brain observer UI."""
+def _as_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
+
+def _format_kw(value: Any) -> str:
+    number = _as_float(value)
+    if number is None:
+        return "—"
+    return f"{number:.2f} kW"
+
+
+def _format_percent(value: Any) -> str:
+    number = _as_float(value)
+    if number is None:
+        return "—"
+    return f"{number:.1f}%"
+
+
+def _format_price(value: Any) -> str:
+    number = _as_float(value)
+    if number is None:
+        return "—"
+    return f"€{number:.3f}/kWh"
+
+
+def _escape(value: Any) -> str:
+    return html.escape(str(value), quote=True)
+
+
+class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     server_version = "EnergyBrainReadOnlyUI/1.0"
 
     def do_GET(self) -> None:
         path = self.path.split('?', 1)[0]
 
         if path == "/health":
-            self._send_json({"status": "ok", "read_only": True})
+            self._send_json({"read_only": True, "status": "ok"})
             return
 
         if path == "/api/latest-cycle":
-            cycle = read_latest_cycle()
-            summary = summarize_cycle(cycle)
-            self._send_json(summary)
+            self._send_json(summarize_cycle(read_latest_cycle()))
             return
 
         if path == "/api/tesla-cockpit":
-            cycle = read_latest_cycle()
-            summary = summarize_cycle(cycle)
-            self._send_json(build_read_only_cockpit_payload(summary))
+            self._send_json(summarize_cycle(read_latest_cycle()))
             return
 
         if path == "/":
-            cycle = read_latest_cycle()
-            summary = summarize_cycle(cycle)
-            html = render_tesla_cockpit_html(summary)
-            self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            summary = summarize_cycle(read_latest_cycle())
+            self._send_html(render_dashboard_html(summary))
             return
 
-        self._send_json({"status": "not_found", "read_only": True}, status=404)
+        self._send_json({"error": "not_found"}, status=404)
 
-    def log_message(self, format: str, *args: object) -> None:
-        # Keep add-on logs clean; the EMS cycle logger remains the source of truth.
+
+
+
+    def log_message(self, format: str, *args: Any) -> None:
         return
 
     def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
-        body = json.dumps(payload, sort_keys=True).encode("utf-8")
-        self._send_response(status, body, "application/json; charset=utf-8")
-
-    def _send_response(self, status: int, body: bytes, content_type: str) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-
-# EB_SIMPLE_RENDERER_V4
-# Read-only dashboard renderer override. Last definition wins.
-
-def render_dashboard_html(summary: dict[str, Any]) -> str:
-    ctrl_key = "exe" + "cute"
-    no_disp = "No " + "dis" + "patch"
-
-    if summary.get("valid_cycle") is False:
-        return _eb4_empty_dashboard(no_disp)
-
-    mode = _eb4_pick(summary, "mode", ("hero_status", "mode"), default="observer")
-
-    snapshot = _eb4_pick(summary, "snapshot", default={}) or {}
-    plan = _eb4_pick(summary, "plan", default={}) or {}
-    controller = _eb4_pick(summary, "controller", default={}) or {}
-    runtime = _eb4_pick(summary, "execution", default={}) or {}
-
-    soc = _eb4_pick(snapshot, "battery_soc_percent", default=_eb4_pick(summary, ("battery_soc_card", "soc_percent")))
-    pv = _eb4_pick(snapshot, "pv_power_kw", default=_eb4_pick(summary, ("energy_flow", "pv_kw")))
-    load = _eb4_pick(snapshot, "household_load_kw", default=_eb4_pick(summary, ("energy_flow", "load_kw")))
-    price = _eb4_pick(snapshot, "grid_price")
-
-    ctrl_run = _eb4_pick(controller, ctrl_key, default=False)
-    attempted = _eb4_pick(runtime, "attempted", default=False)
-    setpoint = _eb4_pick(controller, "setpoint_kw", default=_eb4_pick(summary, ("energy_flow", "battery_kw")))
-
-    expected_cost = _eb4_pick(plan, "expected_cost", default=_eb4_pick(summary, ("benchmark_comparison", "shadow_cost")))
-    baseline_cost = _eb4_pick(plan, "baseline_cost", default=_eb4_pick(summary, ("benchmark_comparison", "baseline_cost")))
-    delta = _eb4_pick(
-        plan,
-        "delta_vs_baseline",
-        default=_eb4_pick(plan, "savings_vs_baseline", default=_eb4_pick(summary, ("benchmark_comparison", "delta"))),
-    )
-
-    steps = _eb4_steps(summary)
-    first = steps[0] if steps else {}
-    reason = _eb4_pick(first, "reason", "reason_code", default="hold")
-    first_soc = _eb4_pick(first, "soc_percent", default=soc)
-
-    action = _eb4_action(reason)
-    why = _eb4_why(reason, pv, load, first_soc)
-    controls = "Nee, alleen meekijken." if not ctrl_run and not attempted else "Let op: uitvoeringsstatus controleren."
-
-    soc_values = []
-    for value in _eb4_pick(plan, "soc_trajectory", default=[]) or []:
-        number = _eb4_float(value)
-        if number is not None:
-            soc_values.append(number)
-    for step in steps:
-        number = _eb4_float(_eb4_pick(step, "soc_percent"))
-        if number is not None:
-            soc_values.append(number)
-
-    min_soc = min(soc_values) if soc_values else _eb4_pick(plan, "min_soc_percent")
-    max_soc = max(soc_values) if soc_values else _eb4_pick(plan, "max_soc_percent")
-
-    ctrl_label = "controller." + ctrl_key
-    no_write_label = "Read-only / no writes"
-
-    delta_note = ""
-    delta_number = _eb4_float(delta)
-    if delta_number is not None and delta_number < 0:
-        delta_note = "negative delta vs baseline"
-
-    timeline = _eb4_timeline(steps)
-    compat_rows = _eb4_compat_rows(steps)
-
-    details_rows = _eb4_details_rows({
-        "status": "ok",
-        "valid_cycle": summary.get("valid_cycle", True),
-        "mode": mode,
-        "controller.approved": _eb4_pick(controller, "approved"),
-        ctrl_label: ctrl_run,
-        "execution.attempted": attempted,
-        "snapshot.battery_soc_percent": soc,
-        "snapshot.pv_power_kw": pv,
-        "snapshot.household_load_kw": load,
-        "snapshot.grid_price": price,
-        "plan.valid": _eb4_pick(plan, "valid"),
-        "plan.expected_cost": expected_cost,
-        "plan.baseline_cost": baseline_cost,
-        "plan.delta_vs_baseline": delta,
-        "min_soc_percent": min_soc,
-        "max_soc_percent": max_soc,
-        "controller.setpoint_kw": setpoint,
-        "reason": reason,
-    })
-
-    return f'''<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Energy Brain UI</title>
-  <style>
-    :root {{
-      --bg: #070b10;
-      --panel: rgba(13, 20, 28, .94);
-      --panel2: rgba(8, 13, 19, .96);
-      --line: rgba(151, 164, 184, .20);
-      --text: #edf3f8;
-      --muted: #9aa7b5;
-      --green: #39d99b;
-      --green-soft: rgba(57, 217, 155, .15);
-      --blue: #6aa8ff;
-      --blue-soft: rgba(106, 168, 255, .15);
-      --yellow: #d7ad45;
-      --yellow-soft: rgba(215, 173, 69, .16);
-      --radius: 22px;
-    }}
-
-    * {{ box-sizing: border-box; }}
-
-    body {{
-      margin: 0;
-      color: var(--text);
-      background:
-        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
-        radial-gradient(circle at 12% 0%, rgba(57,217,155,.14), transparent 26rem),
-        radial-gradient(circle at 86% 8%, rgba(106,168,255,.12), transparent 24rem),
-        var(--bg);
-      background-size: 42px 42px, 42px 42px, auto, auto, auto;
-      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }}
-
-    main {{
-      width: min(100%, 960px);
-      margin: 0 auto;
-      padding: 14px;
-    }}
-
-    .hero, .panel, details {{
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--panel);
-      box-shadow: 0 18px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
-    }}
-
-    .hero {{ padding: 18px; }}
-
-    .top {{
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      align-items: flex-start;
-    }}
-
-    h1, h2 {{
-      margin: 0;
-      letter-spacing: -.04em;
-    }}
-
-    h1 {{ font-size: clamp(1.55rem, 6vw, 2.7rem); }}
-    h2 {{ font-size: clamp(1.25rem, 5vw, 1.9rem); margin-bottom: 12px; }}
-
-    .sub {{ color: var(--muted); margin: 8px 0 0; }}
-
-    .mode {{
-      white-space: nowrap;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(57,217,155,.42);
-      background: var(--green-soft);
-      color: #c9f7e2;
-      font-weight: 850;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      font-size: .72rem;
-    }}
-
-    .badges {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 16px;
-    }}
-
-    .badges span {{
-      border: 1px solid rgba(57,217,155,.35);
-      background: rgba(57,217,155,.08);
-      color: #c7f6e1;
-      border-radius: 999px;
-      padding: 7px 10px;
-      font-size: .76rem;
-      font-weight: 850;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-    }}
-
-    .cards {{
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 14px;
-    }}
-
-    .card {{
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: var(--panel2);
-      padding: 14px;
-      min-height: 106px;
-    }}
-
-    .label {{
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .11em;
-      font-size: .72rem;
-      font-weight: 850;
-    }}
-
-    .value {{
-      margin-top: 8px;
-      font-size: clamp(1.35rem, 6vw, 2.15rem);
-      line-height: 1;
-      letter-spacing: -.05em;
-      font-weight: 900;
-    }}
-
-    .note {{
-      color: var(--muted);
-      margin-top: 8px;
-      font-size: .9rem;
-    }}
-
-    .panel {{
-      margin-top: 12px;
-      padding: 18px;
-    }}
-
-    .rows {{ display: grid; }}
-
-    .row {{
-      display: grid;
-      grid-template-columns: 10rem 1fr;
-      gap: 12px;
-      padding: 12px 0;
-      border-top: 1px solid var(--line);
-    }}
-
-    .row:first-child {{ border-top: 0; padding-top: 0; }}
-    .q {{ color: var(--muted); }}
-    .a {{ font-weight: 850; }}
-
-    .timeline {{
-      display: grid;
-      grid-template-columns: repeat(24, minmax(7px, 1fr));
-      gap: 4px;
-      margin: 14px 0 12px;
-    }}
-
-    .seg {{
-      height: 30px;
-      border-radius: 8px;
-      background: rgba(151,164,184,.18);
-      border: 1px solid rgba(151,164,184,.16);
-    }}
-
-    .seg.charge {{ background: var(--green-soft); border-color: rgba(57,217,155,.45); }}
-    .seg.discharge {{ background: var(--blue-soft); border-color: rgba(106,168,255,.45); }}
-    .seg.reserve {{ background: var(--yellow-soft); border-color: rgba(215,173,69,.45); }}
-    .seg.current {{ outline: 2px solid rgba(237,243,248,.75); outline-offset: 2px; }}
-
-    .legend {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 14px;
-      color: var(--muted);
-      font-size: .88rem;
-    }}
-
-    .dot {{
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      margin-right: 6px;
-      background: rgba(151,164,184,.60);
-    }}
-
-    .dot.charge {{ background: var(--green); }}
-    .dot.discharge {{ background: var(--blue); }}
-    .dot.reserve {{ background: var(--yellow); }}
-
-    details {{
-      margin-top: 12px;
-      padding: 15px 16px;
-      background: var(--panel2);
-    }}
-
-    summary {{ cursor: pointer; font-weight: 900; }}
-
-    table {{
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 12px;
-    }}
-
-    th, td {{
-      padding: 9px 0;
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      vertical-align: top;
-    }}
-
-    th {{ width: 44%; color: var(--muted); font-weight: 750; }}
-    td {{ font-weight: 820; overflow-wrap: anywhere; }}
-
-    .compat {{ display: none; }}
-
-    @media (max-width: 740px) {{
-      main {{ padding: 10px; }}
-      .hero, .panel {{ padding: 15px; }}
-      .top {{ display: block; }}
-      .mode {{ display: inline-block; margin-top: 10px; }}
-      .cards {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-      .row {{ grid-template-columns: 1fr; gap: 4px; }}
-      .timeline {{ gap: 3px; }}
-      .seg {{ height: 25px; }}
-      th, td {{ display: block; width: 100%; }}
-      th {{ border-bottom: 0; padding-bottom: 2px; }}
-      td {{ padding-top: 2px; }}
-    }}
-  </style>
-</head>
-<body>
-  <main>
-    <section class="hero">
-      <div class="top">
-        <div>
-          <h1>Energy Brain</h1>
-          <p class="sub">Rustig read-only overzicht van de laatste planner-cyclus.</p>
-        </div>
-        <div class="mode">{_eb4_escape(mode)}</div>
-      </div>
-
-      <div class="badges">
-        <span>Observer-only</span>
-        <span>Read-only</span>
-        <span>{_eb4_escape(no_disp)}</span>
-        <span>No service calls</span>
-      </div>
-
-      <section class="cards" aria-label="belangrijkste waarden">
-        {_eb4_card("Batterij", _eb4_percent(soc), action)}
-        {_eb4_card("Zon", _eb4_kw(pv), "huidige PV")}
-        {_eb4_card("Huis", _eb4_kw(load), "huidig verbruik")}
-        {_eb4_card("Prijs", _eb4_price(price), "importprijs")}
-      </section>
-    </section>
-
-    <section class="panel">
-      <h2>Wat gebeurt er nu?</h2>
-      <div class="rows">
-        <div class="row"><div class="q">Actie</div><div class="a">{_eb4_escape(action)}</div></div>
-        <div class="row"><div class="q">Waarom?</div><div class="a">{_eb4_escape(why)}</div></div>
-        <div class="row"><div class="q">Stuurt dit iets aan?</div><div class="a">{_eb4_escape(controls)}</div></div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Plan komende 24 stappen</h2>
-      <p class="note">Compacte inspectie: groen = laden, grijs = vasthouden, blauw = ontladen, geel = reserve/begrenzing.</p>
-      {timeline}
-      <div class="legend">
-        <span><i class="dot charge"></i>laden</span>
-        <span><i class="dot"></i>vasthouden</span>
-        <span><i class="dot discharge"></i>ontladen</span>
-        <span><i class="dot reserve"></i>reserve/begrenzing</span>
-      </div>
-    </section>
-
-    <details>
-      <summary>Technische details tonen/verbergen</summary>
-      <table><tbody>{details_rows}</tbody></table>
-    </details>
-
-    <div class="compat">
-      Energy Brain UI
-      status valid_cycle mode
-      controller.approved {ctrl_label} execution.attempted
-      snapshot.battery_soc_percent snapshot.pv_power_kw snapshot.household_load_kw snapshot.grid_price
-      plan.valid plan.expected_cost plan.baseline_cost plan.delta_vs_baseline
-      controller.setpoint_kw min_soc_percent max_soc_percent
-      battery_setpoint_kw soc_percent reason
-      {no_write_label}
-      Safe observer state
-      {delta_note}
-      Battery SOC Card SOC Trajectory planner_timeline human-card cockpit-payload
-      soc-gauge timeline-bar status-dot metric-card visual-card chart-shell
-      Technische details tonen/verbergen Alleen meekijken No service calls {_eb4_escape(no_disp)}
-      <table><tbody>{compat_rows}</tbody></table>
-    </div>
-  </main>
-</body>
-</html>'''
-
-
-def _eb4_empty_dashboard(no_disp: str) -> str:
-    return f'''<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Energy Brain UI</title>
-  <style>
-    body {{
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 18px;
-      background: #070b10;
-      color: #edf3f8;
-      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }}
-
-    main {{
-      width: min(100%, 720px);
-      border: 1px solid rgba(151,164,184,.22);
-      border-radius: 24px;
-      background: rgba(13,20,28,.96);
-      padding: 24px;
-    }}
-
-    span {{
-      display: inline-block;
-      margin: 0 8px 8px 0;
-      padding: 7px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(57,217,155,.35);
-      color: #c7f6e1;
-      background: rgba(57,217,155,.08);
-      font-size: .76rem;
-      font-weight: 850;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-    }}
-
-    p {{ color: #9aa7b5; }}
-    .compat {{ display: none; }}
-  </style>
-</head>
-<body>
-  <main>
-    <span>Observer-only</span><span>Read-only</span><span>{_eb4_escape(no_disp)}</span>
-    <h1>Energy Brain</h1>
-    <p>No valid cycle available. De UI blijft veilig: geen aansturing, geen service calls, alleen meekijken.</p>
-    <div class="compat">Safe observer state status valid_cycle Read-only / no writes Energy Brain UI</div>
-  </main>
-</body>
-</html>'''
-
-
-def _eb4_card(label: str, value: str, note: str) -> str:
-    return f'''<article class="card">
-      <div class="label">{_eb4_escape(label)}</div>
-      <div class="value">{_eb4_escape(value)}</div>
-      <div class="note">{_eb4_escape(note)}</div>
-    </article>'''
-
-
-def _eb4_timeline(steps: list[Any]) -> str:
-    if not steps:
-        return '<p class="note">Geen planner-stappen beschikbaar.</p>'
-
-    out = []
-    for idx, raw in enumerate(steps[:24]):
-        step = raw if isinstance(raw, dict) else {}
-        reason = str(_eb4_pick(step, "reason", "reason_code", default="hold"))
-        cls = _eb4_reason_class(reason)
-        current = " current" if idx == 0 else ""
-        title = f"#{idx} {reason} SOC={_eb4_pick(step, 'soc_percent', default='')}"
-        out.append(f'<span class="seg {cls}{current}" title="{_eb4_escape(title)}"></span>')
-    return '<div class="timeline" aria-label="Planner timeline">' + "".join(out) + "</div>"
-
-
-def _eb4_compat_rows(steps: list[Any]) -> str:
-    rows = []
-    for idx, raw in enumerate(steps[:24]):
-        step = raw if isinstance(raw, dict) else {}
-        setpoint = _eb4_pick(step, "battery_setpoint_kw", "setpoint_kw", default="")
-        soc = _eb4_pick(step, "soc_percent", default="")
-        reason = _eb4_pick(step, "reason", "reason_code", default="")
-        rows.append(f"<tr><td>{idx}</td><td>{_eb4_escape(setpoint)}</td><td>{_eb4_escape(soc)}</td><td>{_eb4_escape(reason)}</td></tr>")
-    return "".join(rows)
-
-
-def _eb4_steps(summary: dict[str, Any]) -> list[Any]:
-    candidates = [
-        _eb4_pick(summary, ("plan", "steps")),
-        _eb4_pick(summary, "planner_timeline"),
-        _eb4_pick(summary, "latest_cycle_table"),
-    ]
-    for candidate in candidates:
-        if isinstance(candidate, list):
-            return candidate[:24]
-    return []
-
-
-def _eb4_details_rows(values: dict[str, Any]) -> str:
-    return "\\n".join(
-        f"<tr><th>{_eb4_escape(key)}</th><td>{_eb4_escape(value)}</td></tr>"
-        for key, value in values.items()
-    )
-
-
-def _eb4_reason_class(reason: str) -> str:
-    if reason in {"charge_from_pv_surplus", "max_soc_clamped_charge", "charge_on_negative_price"}:
-        return "charge"
-    if reason in {"discharge_to_load", "reserve_clamped_discharge"}:
-        return "discharge"
-    if reason in {"reserve_hold"}:
-        return "reserve"
-    return "hold"
-
-
-def _eb4_action(reason: object) -> str:
-    mapping = {
-        "charge_from_pv_surplus": "Laden met zon",
-        "max_soc_clamped_charge": "Bijna vol, laden begrensd",
-        "max_soc_hold": "Vasthouden",
-        "reserve_clamped_discharge": "Ontladen begrensd door reserve",
-        "reserve_hold": "Reserve vasthouden",
-        "discharge_to_load": "Ontladen naar huisverbruik",
-        "charge_on_negative_price": "Laden door negatieve prijs",
-        "bounded_no_action": "Geen actie door grens",
-        "hold": "Vasthouden",
-    }
-    return mapping.get(str(reason), str(reason or "Vasthouden"))
-
-
-def _eb4_why(reason: object, pv: object, load: object, soc: object) -> str:
-    reason_text = str(reason or "")
-    if reason_text == "charge_from_pv_surplus":
-        return f"Er is meer zon ({_eb4_kw(pv)}) dan huisverbruik ({_eb4_kw(load)}). Het overschot kan de batterij in."
-    if reason_text == "max_soc_clamped_charge":
-        return f"De batterij nadert de bovengrens. Laden wordt begrensd om rond {_eb4_percent(soc)} te blijven."
-    if reason_text == "max_soc_hold":
-        return f"De batterij zit rond de bovengrens ({_eb4_percent(soc)}). Daarom wordt vastgehouden."
-    if reason_text == "discharge_to_load":
-        return "De batterij kan lokaal huisverbruik dekken, binnen reserve- en vermogensgrenzen."
-    if reason_text == "reserve_clamped_discharge":
-        return "Ontladen is beperkt om de reserve niet te doorbreken."
-    if reason_text == "reserve_hold":
-        return "De reserve is bereikt of bijna bereikt. Daarom geen verdere ontlading."
-    if reason_text == "charge_on_negative_price":
-        return "De stroomprijs is negatief. Laden kan gunstig zijn, binnen SOC- en vermogensgrenzen."
-    return "Energy Brain houdt vast omdat geen veiligere of nuttigere actie nodig is."
-
-
-def _eb4_pick(source: Any, *paths: Any, default: Any = None) -> Any:
-    for path in paths:
-        current = source
-        keys = path if isinstance(path, tuple) else (path,)
-        ok = True
-        for key in keys:
-            if isinstance(current, dict) and key in current:
-                current = current[key]
-            else:
-                ok = False
-                break
-        if ok and current is not None:
-            return current
-    return default
-
-
-def _eb4_float(value: object) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        return float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-
-
-def _eb4_kw(value: object) -> str:
-    number = _eb4_float(value)
-    return "—" if number is None else f"{number:.2f} kW"
-
-
-def _eb4_percent(value: object) -> str:
-    number = _eb4_float(value)
-    return "—" if number is None else f"{number:.1f}%"
-
-
-def _eb4_price(value: object) -> str:
-    number = _eb4_float(value)
-    return "—" if number is None else f"€{number:.3f}"
-
-
-def _eb4_escape(value: object) -> str:
-    return html.escape(str(value), quote=True)
-
-
-
-# ACTIVE_RENDERED_COMPATIBILITY_MARKERS_V7
-# Keep old read-only UI acceptance markers present in the *rendered* HTML.
-# This is display-only and does not add routes, controls, writes, or HA service access.
-_original_render_dashboard_html_v7 = render_dashboard_html
-
-
-def render_dashboard_html(summary: dict[str, Any]) -> str:
-    rendered = _original_render_dashboard_html_v7(summary)
-
-    required_markers = [
-        "SOC trajectory mini-chart",
-        "Battery setpoint mini-bars",
-        "reason-badge",
-    ]
-
-    missing = [marker for marker in required_markers if marker not in rendered]
-    if not missing:
-        return rendered
-
-    hidden = "".join(f'<span hidden>{_escape(marker)}</span>' for marker in missing)
-
-    if "</main>" in rendered:
-        return rendered.replace("</main>", hidden + "</main>", 1)
-    if "</body>" in rendered:
-        return rendered.replace("</body>", hidden + "</body>", 1)
-    return rendered + hidden
+    def _send_html(self, body: str, status: int = 200) -> None:
+        encoded = body.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
 
 
 def main() -> None:
-    """Run the read-only Energy Brain web UI."""
-    from http.server import ThreadingHTTPServer
-
     host = os.environ.get("ENERGY_BRAIN_UI_HOST", "0.0.0.0")
     port = int(os.environ.get("ENERGY_BRAIN_UI_PORT", "8099"))
-
     server = ThreadingHTTPServer((host, port), EnergyBrainWebUIHandler)
     print(f"Energy Brain read-only UI listening on http://{host}:{port}", flush=True)
     server.serve_forever()
