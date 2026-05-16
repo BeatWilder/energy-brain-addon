@@ -67,7 +67,6 @@ ports:
   8099/tcp: 8099
 ports_description:
   8099/tcp: "Energy Brain read-only web UI"
-  8099/tcp: Energy Brain read-only web UI
 webui: "http://[HOST]:[PORT:8099]/"
 ingress: true
 ingress_port: 8099
