@@ -2062,3 +2062,393 @@ def _eb_active_insert_time_note_v1(rendered: str) -> str:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+import re as _re
+
+
+def _eb_pf_num(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _eb_pf_kw(value: Any) -> str:
+    return f"{abs(_eb_pf_num(value)):.1f} kW"
+
+
+def _eb_pf_soc(value: Any) -> str:
+    try:
+        return f"{float(value):.1f}%"
+    except (TypeError, ValueError):
+        return "0.0%"
+
+
+def _eb_pf_grid_note(grid_kw: Any) -> str:
+    value = _eb_pf_num(grid_kw)
+    if abs(value) < 0.05:
+        return "bijna nul"
+    return "teruglevering" if value < 0 else "netafname"
+
+
+def _eb_pf_battery_note(battery_kw: Any) -> str:
+    value = _eb_pf_num(battery_kw)
+    if abs(value) < 0.05:
+        return "praktisch stil"
+    if value > 0:
+        return f"laadt met {abs(value):.1f} kW"
+    return f"ontlaadt met {abs(value):.1f} kW"
+
+
+def _eb_pf_summary(flow: dict[str, Any]) -> str:
+    pv_kw = _eb_pf_num(flow.get("pv_kw"))
+    load_kw = _eb_pf_num(flow.get("load_kw"))
+    battery_kw = _eb_pf_num(flow.get("battery_kw"))
+    grid_kw = _eb_pf_num(flow.get("grid_kw"))
+
+    battery_note = _eb_pf_battery_note(battery_kw)
+
+    if abs(grid_kw) < 0.05:
+        grid_note = "Er is bijna geen netverbruik of teruglevering."
+    elif grid_kw < 0:
+        grid_note = f"Er is ongeveer {abs(grid_kw):.1f} kW teruglevering."
+    else:
+        grid_note = f"Er is ongeveer {abs(grid_kw):.1f} kW netverbruik."
+
+    return (
+        f"Huis gebruikt {load_kw:.1f} kW. "
+        f"Zon levert {pv_kw:.1f} kW. "
+        f"Batterij staat {battery_note}. "
+        f"{grid_note}"
+    )
+
+
+_EB_PLUS_FLOW_CSS = """
+/* eb-plus-flow-style-marker */
+.eb-plus-flow {
+  padding: 16px 0 8px;
+}
+.eb-plus-summary {
+  max-width: 760px;
+  margin: 0 auto 18px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(150,170,210,.22);
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.025));
+  box-shadow: 0 18px 60px rgba(40,95,180,.12);
+}
+.eb-plus-summary strong {
+  display: block;
+  font-size: 1.06rem;
+  line-height: 1.35;
+  color: #eef4f8;
+}
+.eb-plus-summary .note {
+  margin-top: 12px;
+  font-size: .95rem;
+  color: #aebdcb;
+}
+.eb-plus-stage {
+  position: relative;
+  max-width: 760px;
+  margin: 0 auto 24px;
+  min-height: 520px;
+  border-radius: 28px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(70,140,255,.16), rgba(0,0,0,0) 34%),
+    linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+}
+.eb-plus-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 80px 80px;
+  pointer-events: none;
+}
+.eb-plus-node {
+  position: absolute;
+  z-index: 2;
+  min-width: 116px;
+  min-height: 116px;
+  padding: 14px 16px;
+  border-radius: 26px;
+  border: 2px solid rgba(130,170,230,.4);
+  background: rgba(10,18,26,.78);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+}
+.eb-plus-node .title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #eef4f8;
+  margin-bottom: 4px;
+}
+.eb-plus-node .value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #eef4f8;
+}
+.eb-plus-node .sub {
+  margin-top: 4px;
+  font-size: .9rem;
+  color: #afc0cf;
+}
+.eb-plus-node-top {
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-color: rgba(242,184,75,.85);
+}
+.eb-plus-node-left {
+  top: 205px;
+  left: 48px;
+  border-color: rgba(189,137,255,.85);
+}
+.eb-plus-node-center {
+  top: 220px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-color: rgba(112,170,255,.85);
+  min-width: 128px;
+}
+.eb-plus-node-right {
+  top: 205px;
+  right: 48px;
+  border-color: rgba(92,220,220,.85);
+}
+.eb-plus-node-bottom {
+  bottom: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-color: rgba(67,214,166,.85);
+}
+.eb-plus-line {
+  position: absolute;
+  z-index: 1;
+  background: linear-gradient(90deg, rgba(120,190,255,.75), rgba(120,190,255,.55));
+  border-radius: 99px;
+  opacity: .95;
+}
+.eb-plus-line-top {
+  top: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 82px;
+}
+.eb-plus-line-bottom {
+  top: 335px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 96px;
+}
+.eb-plus-line-left {
+  top: 275px;
+  left: 168px;
+  width: calc(50% - 232px);
+  height: 6px;
+}
+.eb-plus-line-right {
+  top: 275px;
+  right: 168px;
+  width: calc(50% - 232px);
+  height: 6px;
+}
+.eb-plus-dot {
+  position: absolute;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #79c3ff;
+  box-shadow: 0 0 0 4px rgba(121,195,255,.18);
+}
+.eb-plus-dot-top { top: 234px; left: calc(50% - 7px); }
+.eb-plus-dot-left { top: 271px; left: calc(50% - 7px); }
+.eb-plus-dot-right { top: 271px; left: calc(50% - 7px); }
+.eb-plus-dot-bottom { top: 334px; left: calc(50% - 7px); }
+
+.eb-plus-stats {
+  max-width: 760px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.eb-plus-stat {
+  border-radius: 24px;
+  border: 1px solid rgba(150,170,210,.18);
+  background: rgba(255,255,255,.03);
+  padding: 18px 18px 20px;
+}
+.eb-plus-stat .label {
+  font-size: .95rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #aebdcb;
+  margin-bottom: 8px;
+}
+.eb-plus-stat .big {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #eef4f8;
+  margin-bottom: 6px;
+}
+.eb-plus-stat .small {
+  color: #aebdcb;
+  font-size: .95rem;
+}
+@media (max-width: 720px) {
+  .eb-plus-stage {
+    min-height: 600px;
+  }
+  .eb-plus-node {
+    min-width: 100px;
+    min-height: 100px;
+    padding: 12px 12px;
+  }
+  .eb-plus-node-left { left: 12px; top: 220px; }
+  .eb-plus-node-right { right: 12px; top: 220px; }
+  .eb-plus-node-center { top: 232px; }
+  .eb-plus-node-top { top: 48px; }
+  .eb-plus-node-bottom { bottom: 54px; }
+  .eb-plus-line-left { left: 118px; width: calc(50% - 168px); top: 281px; }
+  .eb-plus-line-right { right: 118px; width: calc(50% - 168px); top: 281px; }
+  .eb-plus-line-top { top: 160px; height: 92px; }
+  .eb-plus-line-bottom { top: 336px; height: 112px; }
+  .eb-plus-stats { grid-template-columns: 1fr 1fr; gap: 14px; }
+}
+"""
+
+
+def _eb_plus_flow_section(summary: dict[str, Any]) -> str:
+    summary = summary or {}
+    flow = summary.get("energy_flow") or {}
+    battery = summary.get("battery_soc_card") or {}
+
+    pv_kw = _eb_pf_num(flow.get("pv_kw"))
+    load_kw = _eb_pf_num(flow.get("load_kw"))
+    battery_kw = _eb_pf_num(flow.get("battery_kw"))
+    grid_kw = _eb_pf_num(flow.get("grid_kw"))
+    soc_percent = battery.get("soc_percent")
+
+    pv_text = _eb_pf_kw(pv_kw)
+    load_text = _eb_pf_kw(load_kw)
+    battery_power_text = _eb_pf_kw(battery_kw)
+    grid_text = _eb_pf_kw(grid_kw)
+    soc_text = _eb_pf_soc(soc_percent)
+
+    summary_text = html.escape(_eb_pf_summary(flow))
+    battery_note = html.escape(_eb_pf_battery_note(battery_kw))
+    grid_note = html.escape(_eb_pf_grid_note(grid_kw))
+
+    return f"""
+      <section class="flow eb-plus-flow" aria-label="Energy Flow Overview">
+        <article class="eb-plus-summary">
+          <strong>{summary_text}</strong>
+          <p class="note">Batterij nu {html.escape(soc_text)}.</p>
+        </article>
+
+        <div class="eb-plus-stage">
+          <div class="eb-plus-line eb-plus-line-top"></div>
+          <div class="eb-plus-line eb-plus-line-left"></div>
+          <div class="eb-plus-line eb-plus-line-right"></div>
+          <div class="eb-plus-line eb-plus-line-bottom"></div>
+
+          <div class="eb-plus-dot eb-plus-dot-top"></div>
+          <div class="eb-plus-dot eb-plus-dot-left"></div>
+          <div class="eb-plus-dot eb-plus-dot-right"></div>
+          <div class="eb-plus-dot eb-plus-dot-bottom"></div>
+
+          <div class="eb-plus-node eb-plus-node-top">
+            <div class="title">Zon</div>
+            <div class="value">{html.escape(pv_text)}</div>
+          </div>
+
+          <div class="eb-plus-node eb-plus-node-left">
+            <div class="title">Net</div>
+            <div class="value">{html.escape(grid_text)}</div>
+            <div class="sub">{grid_note}</div>
+          </div>
+
+          <div class="eb-plus-node eb-plus-node-center">
+            <div class="title">Huis</div>
+            <div class="value">{html.escape(load_text)}</div>
+          </div>
+
+          <div class="eb-plus-node eb-plus-node-right">
+            <div class="title">Status</div>
+            <div class="value">Read-only</div>
+            <div class="sub">alleen meekijken</div>
+          </div>
+
+          <div class="eb-plus-node eb-plus-node-bottom">
+            <div class="title">Batterij</div>
+            <div class="value">{html.escape(soc_text)}</div>
+            <div class="sub">{html.escape(battery_power_text)} nu</div>
+          </div>
+        </div>
+
+        <div class="eb-plus-stats">
+          <article class="eb-plus-stat">
+            <div class="label">Zon</div>
+            <div class="big">{html.escape(pv_text)}</div>
+            <div class="small">naar huis of batterij</div>
+          </article>
+          <article class="eb-plus-stat">
+            <div class="label">Huis</div>
+            <div class="big">{html.escape(load_text)}</div>
+            <div class="small">actueel verbruik</div>
+          </article>
+          <article class="eb-plus-stat">
+            <div class="label">Batterij</div>
+            <div class="big">{html.escape(soc_text)}</div>
+            <div class="small">{html.escape(battery_note)}</div>
+          </article>
+          <article class="eb-plus-stat">
+            <div class="label">Net</div>
+            <div class="big">{html.escape(grid_text)}</div>
+            <div class="small">{grid_note}</div>
+          </article>
+        </div>
+      </section>
+    """
+
+
+_original_render_tesla_cockpit_html_plus_flow = render_tesla_cockpit_html
+
+
+def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
+    rendered = _original_render_tesla_cockpit_html_plus_flow(summary)
+    try:
+        plus_flow = _eb_plus_flow_section(summary)
+
+        rendered = _re.sub(
+            r'<section class="flow" aria-label="Energy Flow Overview">.*?</section>',
+            plus_flow,
+            rendered,
+            count=1,
+            flags=_re.S,
+        )
+
+        if "eb-plus-flow-style-marker" not in rendered:
+            css_block = "\n" + _EB_PLUS_FLOW_CSS + "\n"
+            if "</style>" in rendered:
+                rendered = rendered.replace("</style>", css_block + "</style>", 1)
+            else:
+                rendered = css_block + rendered
+
+    except Exception:
+        return rendered
+    return rendered
