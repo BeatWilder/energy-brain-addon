@@ -266,6 +266,209 @@ def today_summary(payload: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _pf_float(value: Any, fallback: float = 0.0) -> float:
+    try:
+        if value is None:
+            return fallback
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _pf_get_number(source: dict[str, Any], keys: list[str], fallback: float = 0.0) -> float:
+    for key in keys:
+        if key in source:
+            return _pf_float(source.get(key), fallback)
+    return fallback
+
+
+def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
+    source = payload if isinstance(payload, dict) else {}
+    flow = source.get("flow") if isinstance(source.get("flow"), dict) else {}
+    summary = source.get("summary") if isinstance(source.get("summary"), dict) else {}
+
+    merged: dict[str, Any] = {}
+    merged.update(source)
+    merged.update(flow)
+    merged.update(summary)
+
+    pv_kw = _pf_get_number(merged, ["pv_kw", "solar_kw", "pv_power_kw", "expected_pv_kw"], 0.0)
+    load_kw = _pf_get_number(merged, ["load_kw", "house_kw", "household_load_kw", "expected_load_kw"], 0.0)
+    battery_kw = _pf_get_number(merged, ["battery_kw", "battery_setpoint_kw", "battery_power_kw", "planned_battery_kw"], 0.0)
+    grid_kw = _pf_get_number(merged, ["grid_kw", "grid_balance_kw", "net_kw", "estimated_grid_kw"], load_kw - pv_kw)
+    soc = _pf_get_number(merged, ["soc_percent", "battery_soc_percent", "battery_soc"], 0.0)
+
+    quality = "live/schaduwdata"
+    if not source:
+        quality = "schaduwdata"
+    elif abs(pv_kw) < 0.001 and abs(load_kw) < 0.001:
+        quality = "beperkte data"
+
+    return {
+        "pv_kw": round(pv_kw, 1),
+        "load_kw": round(load_kw, 1),
+        "battery_kw": round(battery_kw, 1),
+        "grid_kw": round(grid_kw, 1),
+        "battery_soc_percent": round(soc),
+        "data_quality": quality,
+        "read_only": True,
+        "control_allowed": False,
+    }
+
+
+def powerflow_edges(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    snap = snapshot if isinstance(snapshot, dict) else {}
+    pv_kw = _pf_float(snap.get("pv_kw"), 0.0)
+    load_kw = _pf_float(snap.get("load_kw"), 0.0)
+    battery_kw = _pf_float(snap.get("battery_kw"), 0.0)
+    grid_kw = _pf_float(snap.get("grid_kw"), 0.0)
+
+    edges: list[dict[str, Any]] = []
+
+    if pv_kw > 0.05:
+        edges.append({
+            "source": "Zon",
+            "target": "Huis",
+            "value_kw": round(min(pv_kw, max(load_kw, 0.0)), 1),
+            "direction": "zon_naar_huis",
+            "label": "Zon naar huis",
+            "active": True,
+        })
+
+    surplus = pv_kw - load_kw
+    if surplus > 0.05 and battery_kw > 0.05:
+        edges.append({
+            "source": "Zon",
+            "target": "Batterij",
+            "value_kw": round(min(surplus, battery_kw), 1),
+            "direction": "zon_naar_batterij",
+            "label": "Overschot naar batterij",
+            "active": True,
+        })
+
+    if battery_kw < -0.05:
+        edges.append({
+            "source": "Batterij",
+            "target": "Huis",
+            "value_kw": round(abs(battery_kw), 1),
+            "direction": "batterij_naar_huis",
+            "label": "Batterij helpt huis",
+            "active": True,
+        })
+
+    if grid_kw > 0.05:
+        edges.append({
+            "source": "Net",
+            "target": "Huis",
+            "value_kw": round(grid_kw, 1),
+            "direction": "net_import",
+            "label": "Import uit net",
+            "active": True,
+        })
+    elif grid_kw < -0.05:
+        edges.append({
+            "source": "Huis",
+            "target": "Net",
+            "value_kw": round(abs(grid_kw), 1),
+            "direction": "net_export",
+            "label": "Export naar net",
+            "active": True,
+        })
+
+    if not edges:
+        edges.append({
+            "source": "Energy Brain",
+            "target": "Huis",
+            "value_kw": 0.0,
+            "direction": "geen_duidelijke_stroomrichting",
+            "label": "Geen duidelijke stroomrichting",
+            "active": False,
+        })
+
+    return edges
+
+
+def powerflow_explanation(snapshot: dict[str, Any], edges: list[dict[str, Any]]) -> str:
+    active = [edge for edge in edges if isinstance(edge, dict) and edge.get("active")]
+    labels = " ".join(str(edge.get("label", "")) for edge in active)
+
+    if not active:
+        return "Er is nog niet genoeg duidelijke data om de stroomrichting betrouwbaar te tonen."
+    if "Overschot" in labels:
+        return "Er lijkt zonne-overschot te zijn. Een deel kan richting batterij."
+    if "Import" in labels:
+        return "Het huis gebruikt meer dan zon en batterij nu leveren. Het net helpt mee."
+    if "Export" in labels:
+        return "Er lijkt stroom over te zijn. Die gaat richting het net."
+    if "Batterij" in labels:
+        return "De batterij helpt mee om het huis te voeden."
+    return "Energy Brain toont de actuele stroomrichting als read-only weergave."
+
+
+def _pf_kw(value: Any) -> str:
+    return f"{_pf_float(value, 0.0):.1f} kW"
+
+
+def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) -> str:
+    snap = snapshot if isinstance(snapshot, dict) else {}
+    edge_list = edges if isinstance(edges, list) else []
+
+    path_map = {
+        "zon_naar_huis": "M 150 88 C 250 88, 290 168, 390 180",
+        "zon_naar_batterij": "M 150 108 C 250 145, 280 300, 390 318",
+        "batterij_naar_huis": "M 500 318 C 610 300, 610 205, 500 180",
+        "net_import": "M 720 180 C 630 180, 590 180, 505 180",
+        "net_export": "M 505 180 C 590 180, 630 180, 720 180",
+    }
+
+    paths: list[str] = []
+    dots: list[str] = []
+    labels: list[str] = []
+
+    for idx, edge in enumerate(edge_list):
+        direction = str(edge.get("direction", "geen_duidelijke_stroomrichting"))
+        path_id = f"pf-path-{idx}"
+        d = path_map.get(direction, "M 120 360 C 250 390, 580 390, 720 360")
+        active = bool(edge.get("active"))
+        cls = "pf-edge active" if active else "pf-edge idle"
+        paths.append(f'<path id="{path_id}" class="{cls}" d="{d}" />')
+        if active:
+            dots.append(
+                f'<circle class="pf-dot" r="5">'
+                f'<animateMotion dur="2.6s" repeatCount="indefinite">'
+                f'<mpath href="#{path_id}" />'
+                f'</animateMotion></circle>'
+            )
+        labels.append(
+            f'<span class="pf-edge-label">{_esc(edge.get("label", "Stroomrichting"))}: '
+            f'{_pf_kw(edge.get("value_kw", 0.0))}</span>'
+        )
+
+    return f"""<article class="powerflow-panel human-card" data-read-only="true">
+  <div class="powerflow-head">
+    <div>
+      <p class="eyebrow">Alleen meekijken - Geen aansturing</p>
+      <h2>Energy Flow nu</h2>
+      <p>Dit is alleen een weergave. Energy Brain stuurt niets aan.</p>
+    </div>
+    <div class="powerflow-quality">Stroomrichting - {_esc(snap.get("data_quality", "schaduwdata"))}</div>
+  </div>
+  <svg class="powerflow-svg" viewBox="0 0 840 420" role="img" aria-label="Read-only Energy Brain powerflow">
+    <g class="pf-node pf-sun"><circle cx="150" cy="96" r="52"/><text x="150" y="92">Zon</text><text x="150" y="118">{_pf_kw(snap.get("pv_kw", 0.0))}</text></g>
+    <g class="pf-node pf-home"><rect x="390" y="140" width="120" height="86" rx="22"/><text x="450" y="180">Huis</text><text x="450" y="205">{_pf_kw(snap.get("load_kw", 0.0))}</text></g>
+    <g class="pf-node pf-battery"><rect x="390" y="282" width="120" height="74" rx="18"/><text x="450" y="315">Batterij</text><text x="450" y="338">{_esc(snap.get("battery_soc_percent", 0))}%</text></g>
+    <g class="pf-node pf-grid"><rect x="700" y="142" width="92" height="84" rx="18"/><text x="746" y="180">Net</text><text x="746" y="205">{_pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0)))}</text></g>
+    <g class="pf-lines">{''.join(paths)}{''.join(dots)}</g>
+  </svg>
+  <div class="powerflow-labels">{''.join(labels)}</div>
+  <p class="powerflow-explain">{_esc(powerflow_explanation(snap, edge_list))}</p>
+</article>"""
+
+
+def render_powerflow_panel(payload: dict[str, Any]) -> str:
+    snapshot = powerflow_snapshot(payload)
+    return render_powerflow_svg(snapshot, powerflow_edges(snapshot))
+
 def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
     """Build display-only cockpit data from a summarized local cycle."""
 
@@ -511,6 +714,27 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .human-card ul {{ margin: 12px 0 0; padding-left: 18px; color: #d9e6ef; }}
     .human-card li + li {{ margin-top: 7px; }}
     .human-card strong {{ display: block; margin-top: 12px; font-size: 1.05rem; line-height: 1.34; }}
+    .powerflow-panel {{ grid-column: 1 / -1; overflow: hidden; position: relative; }}
+    .powerflow-head {{ display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:10px; }}
+    .powerflow-head h2 {{ margin:3px 0 7px; font-size:1.25rem; }}
+    .powerflow-head p {{ margin:0; color:var(--muted); }}
+    .powerflow-quality {{ border:1px solid var(--line); border-radius:999px; padding:8px 12px; color:#d9e6ef; white-space:nowrap; background:rgba(255,255,255,.05); }}
+    .powerflow-svg {{ width:100%; min-height:260px; display:block; margin-top:6px; border-radius:18px; background:radial-gradient(circle at 50% 35%, rgba(90,160,255,.13), rgba(0,0,0,0) 42%); }}
+    .pf-node circle, .pf-node rect {{ fill:rgba(16,28,38,.92); stroke:rgba(149,218,255,.42); stroke-width:2; }}
+    .pf-node text {{ fill:#edf7fb; font-size:18px; font-weight:700; text-anchor:middle; dominant-baseline:middle; }}
+    .pf-node text + text {{ fill:#a9c1cf; font-size:14px; font-weight:600; }}
+    .pf-sun circle {{ stroke:rgba(255,211,106,.75); }}
+    .pf-battery rect {{ stroke:rgba(95,220,160,.65); }}
+    .pf-grid rect {{ stroke:rgba(160,180,255,.62); }}
+    .pf-edge {{ fill:none; stroke:rgba(130,150,165,.35); stroke-width:5; stroke-linecap:round; stroke-dasharray:10 12; }}
+    .pf-edge.active {{ stroke:rgba(113,214,255,.75); animation:eb-flow-dash 2.8s linear infinite; }}
+    .pf-edge.idle {{ stroke:rgba(130,150,165,.25); }}
+    .pf-dot {{ fill:#ffffff; opacity:.95; }}
+    .powerflow-labels {{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 0; }}
+    .pf-edge-label {{ border:1px solid var(--line); border-radius:999px; padding:7px 10px; color:#d9e6ef; background:rgba(255,255,255,.05); }}
+    .powerflow-explain {{ margin:12px 0 0; color:#d9e6ef; }}
+    @keyframes eb-flow-dash {{ from {{ stroke-dashoffset:42; }} to {{ stroke-dashoffset:0; }} }}
+    @media (prefers-reduced-motion: reduce) {{ .pf-edge.active {{ animation:none; }} .pf-dot animateMotion {{ display:none; }} }}
     .plain-dashboard {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }}
     .plain-wide {{ grid-column: 1 / -1; }}
     .plan-card {{ grid-column: 1 / -1; background: linear-gradient(145deg, rgba(21,31,41,.96), rgba(8,12,16,.94)); }}
@@ -604,6 +828,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     </div>
     {_banner(payload["degraded_mode_banner"])}
     <section id="tab-overview" class="tab-panel active" role="tabpanel" data-tab-panel="overview">
+      {render_powerflow_panel(payload)}
       {_plain_planner_html(payload["plain_planner"])}
       {_human_summary_html(payload["human_summary"])}
       <div class="grid top">
