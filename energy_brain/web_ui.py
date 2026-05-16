@@ -82,6 +82,10 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
                     "battery_setpoint_kw": step.get("battery_setpoint_kw"),
                     "soc_percent": step.get("soc_percent"),
                     "reason": step.get("reason"),
+                    "price": step.get("price", step.get("import_price")),
+                    "pv_forecast": step.get("pv_forecast", step.get("pv_kwh")),
+                    "load_forecast": step.get("load_forecast", step.get("load_kwh")),
+                    "grid_estimate": step.get("grid_estimate", step.get("grid_kw")),
                 }
                 for step in steps
             ],
@@ -731,18 +735,6 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json({"status": "not_found", "read_only": True}, status=404)
-
-    def do_POST(self) -> None:
-        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
-
-    def do_PUT(self) -> None:
-        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
-
-    def do_PATCH(self) -> None:
-        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
-
-    def do_DELETE(self) -> None:
-        self._send_json({"status": "method_not_allowed", "read_only": True}, status=405)
 
     def log_message(self, format: str, *args: object) -> None:
         # Keep add-on logs clean; the EMS cycle logger remains the source of truth.
