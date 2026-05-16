@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from app.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
+
 
 DEFAULT_HISTORY_PATH = Path(os.environ.get("ENERGY_BRAIN_HISTORY_PATH", "/data/energy_brain_cycles.jsonl"))
 NO_VALID_CYCLE = {
@@ -715,10 +717,16 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             self._send_json(summary)
             return
 
+        if self.path == "/api/tesla-cockpit":
+            cycle = read_latest_cycle()
+            summary = summarize_cycle(cycle)
+            self._send_json(build_read_only_cockpit_payload(summary))
+            return
+
         if self.path == "/":
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
-            html = render_dashboard_html(summary)
+            html = render_tesla_cockpit_html(summary)
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
