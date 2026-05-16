@@ -711,23 +711,25 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     server_version = "EnergyBrainReadOnlyUI/1.0"
 
     def do_GET(self) -> None:
-        if self.path == "/health":
+        path = self.path.split('?', 1)[0]
+
+        if path == "/health":
             self._send_json({"status": "ok", "read_only": True})
             return
 
-        if self.path == "/api/latest-cycle":
+        if path == "/api/latest-cycle":
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             self._send_json(summary)
             return
 
-        if self.path == "/api/tesla-cockpit":
+        if path == "/api/tesla-cockpit":
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             self._send_json(build_read_only_cockpit_payload(summary))
             return
 
-        if self.path == "/":
+        if path == "/":
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             html = render_tesla_cockpit_html(summary)

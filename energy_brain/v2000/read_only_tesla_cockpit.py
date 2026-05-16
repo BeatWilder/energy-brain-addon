@@ -68,6 +68,47 @@ def human_chart_legend() -> list[str]:
     ]
 
 
+
+def human_step_time_label(index: int) -> str:
+    """Return a human-friendly step time label for visible UI text."""
+    try:
+        step = int(index)
+    except (TypeError, ValueError):
+        step = 0
+    if step <= 0:
+        return "nu"
+    if step == 1:
+        return "over ongeveer 1 uur"
+    return f"over ongeveer {step} uur"
+
+
+def human_next_step_sentence(payload: dict) -> str:
+    """Return a short Dutch next-step sentence without technical planner wording."""
+    plain = payload.get("plain_planner") if isinstance(payload, dict) else {}
+    if not isinstance(plain, dict):
+        plain = {}
+
+    sections = plain.get("plan_card_sections") or []
+    first = sections[0] if sections and isinstance(sections[0], dict) else {}
+    action = str(first.get("action") or plain.get("meaning", {}).get("wat") or "").strip().lower()
+
+    if "laden" in action and "zon" in action:
+        step = "laden met zonne-overschot"
+    elif "laden" in action:
+        step = "laden"
+    elif "ontladen" in action or "huisverbruik" in action or "batterij gebruiken" in action:
+        step = "de batterij gebruiken voor huisverbruik"
+    elif "reserve" in action:
+        step = "reserve bewaren"
+    elif "vasthouden" in action or "niets" in action or not action:
+        step = "niets veranderen"
+    else:
+        step = action
+
+    return f"Energy Brain kijkt mee. De volgende logische stap is {step}. Er wordt niets aangestuurd."
+
+
+
 def plain_window_label(reason_or_kind: str) -> str:
     value = _text(reason_or_kind, "hold").lower()
     if value in ("charge", "charge_from_pv_surplus") or "charge_from_pv" in value:
@@ -314,7 +355,7 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
             "why": human_reason_for_step(next_step),
             "safety": human_safety_summary(),
             "chart_legend": human_chart_legend(),
-            "selected_step_heading": f"Stap #{_text(selected_step.get('step'), '0')} · over 0 uur",
+            "selected_step_heading": f"Stap #{_text(selected_step.get('step'), '0')} · {human_step_time_label(selected_step.get('step', 0))}",
             "selected_step_advice": f"Advies: {human_action_for_step(selected_step)}",
             "selected_step_why": f"Waarom: {_human_reason_fragment(selected_step)}",
         },
@@ -1065,8 +1106,7 @@ def _plain_planner_html(data: dict[str, Any]) -> str:
         f'<p class="note">Stuurt dit iets aan? {_esc(meaning.get("stuurt"))}</p></article>'
         '<article class="human-card"><h2>Wat moet ik hiermee doen?</h2>'
         f'<strong>{_esc(data.get("what_to_do"))}</strong></article>'
-        '<article class="human-card plain-wide"><h2>Plan in gewone taal</h2>'
-        f'<div class="dayparts">{dayparts}</div></article>'
+        ''
         '<article class="human-card"><h2>Kostenvergelijking</h2>'
         f'<p class="note">{_esc(cost.get("energy_brain"))}</p>'
         f'<p class="note">{_esc(cost.get("baseline"))}</p>'
@@ -1188,7 +1228,7 @@ def _step_detail(step: dict[str, Any]) -> str:
     reason = _text(step.get("reason_code"), "shadow_hold")
     plain = plain_step_summary(step)
     human_fields = {
-        "Stap": f"#{_text(step.get('step'), '0')} · over 0 uur",
+        "Stap": f"#{_text(step.get('step'), '0')} · {human_step_time_label(step.get('step', 0))}",
         "Wat gebeurt er?": plain.get("wat"),
         "Waarom?": plain.get("waarom"),
         "Wat betekent dit voor mijn huis?": plain.get("huis"),
@@ -1220,7 +1260,7 @@ def _chart_step_summary(step: dict[str, Any]) -> str:
     reason = _text(step.get("reason_code"), "shadow_hold")
     plain = plain_step_summary(step)
     human_fields = {
-        "Stap": f"#{_text(step.get('step'), '0')} · over 0 uur",
+        "Stap": f"#{_text(step.get('step'), '0')} · {human_step_time_label(step.get('step', 0))}",
         "Wat gebeurt er?": plain.get("wat"),
         "Waarom?": plain.get("waarom"),
         "Wat betekent dit voor mijn huis?": plain.get("huis"),
