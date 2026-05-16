@@ -297,6 +297,10 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     merged.update(battery_soc_card)
 
     pv_kw = _pf_get_number(merged, ["pv_kw", "solar_kw", "pv_power_kw", "expected_pv_kw"], 0.0)
+    pv_raw_kw = pv_kw
+    pv_sign_normalized = pv_raw_kw < -0.05
+    if pv_sign_normalized:
+        pv_kw = abs(pv_raw_kw)
     load_kw = _pf_get_number(merged, ["load_kw", "house_kw", "household_load_kw", "expected_load_kw"], 0.0)
     battery_kw = _pf_get_number(merged, ["battery_kw", "battery_setpoint_kw", "battery_power_kw", "planned_battery_kw"], 0.0)
     grid_kw = _pf_get_number(merged, ["grid_kw", "grid_balance_kw", "net_kw", "estimated_grid_kw"], load_kw - pv_kw)
@@ -314,8 +318,13 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         first_step = timeline[0] if isinstance(timeline[0], dict) else {}
         planner_soc = _pf_float(first_step.get("soc_percent"), soc)
 
+    if pv_sign_normalized:
+        quality = f"{quality} · PV teken genormaliseerd"
+
     return {
         "pv_kw": round(pv_kw, 1),
+        "pv_raw_kw": round(pv_raw_kw, 1),
+        "pv_sign_normalized": bool(pv_sign_normalized),
         "load_kw": round(load_kw, 1),
         "battery_kw": round(battery_kw, 1),
         "grid_kw": round(grid_kw, 1),
@@ -451,6 +460,8 @@ def powerflow_plain_status(snapshot: dict[str, Any]) -> dict[str, str]:
         grid_badge = "Net bijna nul"
 
     solar_text = f"Zon levert {_pf_kw(pv_kw)}."
+    if bool(snap.get("pv_sign_normalized")):
+        solar_text += " PV-teken is genormaliseerd."
     house_text = f"Huis gebruikt {_pf_kw(load_kw)}."
 
     if isinstance(planner_soc, (int, float)) and abs(float(planner_soc) - live_soc) >= 1.0:
