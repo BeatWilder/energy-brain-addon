@@ -1613,6 +1613,145 @@ def _eb_time_hint(index: int) -> str:
         return "interne stap 0 · huidige periode"
     return f"interne stap {index} · vooruitblik"
 
+# ENERGY_BRAIN_PLAN_TIME_LABELS_OBVIOUS_V1
+_previous_render_dashboard_html_time_labels_v1 = render_dashboard_html
+
+
+def _eb_time_label_for_step_v1(index: int) -> str:
+    if index == 0:
+        return "Nu"
+    if index == 1:
+        return "Over 1 uur"
+    return f"Over {index} uur"
+
+
+def _eb_time_help_panel_v1() -> str:
+    return """
+    <section class="human-card plain-wide" aria-label="Uitleg planner tijdstappen">
+      <h2>Wat betekenen #0 t/m #23?</h2>
+      <p><strong>#0 is nu. #1 is over 1 uur. #2 is over 2 uur. #23 is over 23 uur.</strong></p>
+      <p class="note">Dit zijn geen vaste klokuren zoals 00:00 tot 23:00. Het zijn vooruitkijk-stappen vanaf dit moment.</p>
+      <div class="summary-list">
+        <div><span>Interne stap 0</span><strong>Nu</strong></div>
+        <div><span>Interne stap 1</span><strong>Over 1 uur</strong></div>
+        <div><span>Interne stap 2</span><strong>Over 2 uur</strong></div>
+        <div><span>Interne stap 23</span><strong>Over 23 uur</strong></div>
+      </div>
+    </section>
+    """
+
+
+def _eb_make_plan_time_labels_obvious_v1(rendered: str) -> str:
+    # Voeg een duidelijke uitleg toe net boven de plan-inspectie.
+    help_panel = _eb_time_help_panel_v1()
+    if "Wat betekenen #0 t/m #23?" not in rendered:
+        anchor = '<section id="tab-plan"'
+        if anchor in rendered:
+            rendered = rendered.replace(anchor, help_panel + anchor, 1)
+        elif "</main>" in rendered:
+            rendered = rendered.replace("</main>", help_panel + "</main>", 1)
+
+    # Maak de zichtbare step-knoppen menselijker zonder data-attributen te wijzigen.
+    for index in range(24):
+        label = _eb_time_label_for_step_v1(index)
+        rendered = rendered.replace(
+            f"<span>#{{index}}</span><span>display-only fallback</span>".replace("{index}", str(index)),
+            f"<span>{label}</span><span>interne stap {index}</span>",
+        )
+        rendered = rendered.replace(
+            f"<span>#{index}</span><span>display-only</span>",
+            f"<span>{label}</span><span>interne stap {index}</span>",
+        )
+        rendered = rendered.replace(
+            f'aria-label="inspect only planner step {index}"',
+            f'aria-label="inspecteer planner stap {index}: {label}"',
+        )
+
+    # Maak geselecteerde detailtekst ook duidelijker.
+    rendered = rendered.replace("#0 · nu", "Nu · interne stap 0")
+    rendered = rendered.replace("#0 / +0h", "Nu / interne stap 0 / +0 uur")
+    rendered = rendered.replace("selected step #0", "geselecteerde stap: nu")
+
+    return rendered
+
+
+def render_dashboard_html(summary: dict[str, Any]) -> str:
+    return _eb_make_plan_time_labels_obvious_v1(
+        _previous_render_dashboard_html_time_labels_v1(summary)
+    )
+
+# ENERGY_BRAIN_PLAN_TIME_LABELS_OBVIOUS_V2
+_previous_render_dashboard_html_time_labels_v2 = render_dashboard_html
+
+
+def _eb_plan_time_label_v2(index: int) -> str:
+    if index == 0:
+        return "Nu"
+    if index == 1:
+        return "Over 1 uur"
+    return f"Over {index} uur"
+
+
+def _eb_plan_time_help_v2() -> str:
+    return """
+    <section class="human-card plain-wide" aria-label="Planner tijdlijn uitleg">
+      <h2>Wat betekenen #0 t/m #23?</h2>
+      <p><strong>#0 is nu. #1 is over 1 uur. #2 is over 2 uur. #23 is over 23 uur.</strong></p>
+      <p class="note">Het zijn vooruitkijk-stappen vanaf dit moment, geen vaste klokuren van een dag.</p>
+      <div class="summary-list">
+        <div><span>Interne stap 0</span><strong>Nu</strong></div>
+        <div><span>Interne stap 1</span><strong>Over 1 uur</strong></div>
+        <div><span>Interne stap 2</span><strong>Over 2 uur</strong></div>
+        <div><span>Interne stap 23</span><strong>Over 23 uur</strong></div>
+      </div>
+    </section>
+    """
+
+
+def _eb_render_plan_time_labels_v2(rendered: str) -> str:
+    help_panel = _eb_plan_time_help_v2()
+
+    if "Interne stap 23" not in rendered:
+        anchor = '<section id="tab-plan"'
+        if anchor in rendered:
+            rendered = rendered.replace(anchor, help_panel + anchor, 1)
+        elif "</main>" in rendered:
+            rendered = rendered.replace("</main>", help_panel + "</main>", 1)
+        else:
+            rendered += help_panel
+
+    for index in range(24):
+        label = _eb_plan_time_label_v2(index)
+
+        rendered = rendered.replace(
+            f"<span>#{index}</span><span>display-only fallback</span>",
+            f"<span>{label}</span><span>Interne stap {index}</span>",
+        )
+        rendered = rendered.replace(
+            f"<span>#{index}</span><span>display-only</span>",
+            f"<span>{label}</span><span>Interne stap {index}</span>",
+        )
+        rendered = rendered.replace(
+            f"<span>#{index}</span>",
+            f"<span>{label}</span>",
+        )
+        rendered = rendered.replace(
+            f'aria-label="inspect only planner step {index}"',
+            f'aria-label="inspecteer planner stap {index}: {label}"',
+        )
+
+    rendered = rendered.replace("#0 · nu", "Nu · Interne stap 0")
+    rendered = rendered.replace("#0 / +0h", "Nu / Interne stap 0 / +0 uur")
+    rendered = rendered.replace("selected step #0", "geselecteerde stap: nu")
+
+    return rendered
+
+
+def render_dashboard_html(summary: dict[str, Any]) -> str:
+    return _eb_render_plan_time_labels_v2(
+        _previous_render_dashboard_html_time_labels_v2(summary)
+    )
+
 
 if __name__ == "__main__":
     main()
