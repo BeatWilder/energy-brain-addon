@@ -317,7 +317,14 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     discharge_kw = max(-battery_kw, 0.0)
     grid_balanced_kw = load_kw + charge_kw - pv_kw - discharge_kw
     grid_balance_delta_kw = grid_raw_kw - grid_balanced_kw
-    grid_balance_corrected = abs(grid_balance_delta_kw) > 0.35
+
+    # Display-only correction threshold:
+    # - ignore tiny meter jitter below roughly 80 W
+    # - still correct small-load contradictions, e.g. house 0.3 kW + battery -0.3 kW
+    #   should not also show 0.3 kW grid import.
+    balance_reference_kw = max(abs(load_kw), abs(pv_kw), abs(battery_kw), abs(grid_raw_kw), 0.0)
+    grid_balance_threshold_kw = max(0.08, min(0.35, balance_reference_kw * 0.20))
+    grid_balance_corrected = abs(grid_balance_delta_kw) > grid_balance_threshold_kw
 
     grid_kw = grid_balanced_kw if grid_balance_corrected else grid_raw_kw
     soc = _pf_get_number(merged, ["soc_percent", "battery_soc_percent", "battery_soc"], 0.0)
@@ -352,6 +359,7 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         "grid_raw_kw": round(grid_raw_kw, 1),
         "grid_balanced_kw": round(grid_balanced_kw, 1),
         "grid_balance_delta_kw": round(grid_balance_delta_kw, 1),
+        "grid_balance_threshold_kw": round(grid_balance_threshold_kw, 2),
         "grid_balance_corrected": bool(grid_balance_corrected),
         "battery_soc_percent": round(soc),
         "battery_soc_live_percent": round(soc, 1),
