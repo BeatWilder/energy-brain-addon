@@ -68,6 +68,107 @@ def human_chart_legend() -> list[str]:
     ]
 
 
+def plain_window_label(reason_or_kind: str) -> str:
+    value = _text(reason_or_kind, "hold").lower()
+    if value in ("charge", "charge_from_pv_surplus") or "charge_from_pv" in value:
+        return "Laden met zon"
+    if value in ("clamp", "max_soc_clamped_charge") or "clamp" in value:
+        return "Bijna vol, laden begrensd"
+    if value in ("baseline", "baseline_compare") or "baseline" in value:
+        return "Vergelijking met simpel plan"
+    if value in ("hold", "max_soc_hold", "reserve_hold", "shadow_hold") or "hold" in value:
+        return "Vasthouden"
+    return "Vasthouden"
+
+
+def plain_step_summary(step: dict[str, Any]) -> dict[str, str]:
+    reason = _text(step.get("reason_code") or step.get("reason"), "shadow_hold")
+    label = plain_window_label(reason)
+    soc = _fmt_plain(_num(step.get("soc_percent"), 0.0))
+    pv = _fmt_plain(_num(step.get("pv_forecast"), 0.0))
+    load = _fmt_plain(_num(step.get("load_forecast"), 0.0))
+    return {
+        "wat": label,
+        "waarom": human_reason_for_step({"reason_code": reason}),
+        "huis": f"De batterij staat rond {soc}%. Verwachte zon is {pv} kW en verwacht huisverbruik is {load} kW.",
+        "stuurt": "Nee, alleen meekijken.",
+    }
+
+
+def plain_daypart_plan(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    usable = rows if rows else []
+    picks = [("Nu", 0), ("Straks", 2), ("Vanavond", 12), ("Morgen", 20)]
+    plan = []
+    for label, index in picks:
+        step = usable[min(index, len(usable) - 1)] if usable else {}
+        summary = plain_step_summary(step)
+        plan.append(
+            {
+                "label": label,
+                "summary": summary["wat"],
+                "why": summary["waarom"],
+                "home": summary["huis"],
+            }
+        )
+    return plan
+
+
+def plain_cost_comparison(payload: dict[str, Any]) -> dict[str, str]:
+    data = _dict(payload.get("benchmark_comparison"))
+    energy_brain = data.get("shadow_cost")
+    baseline = data.get("baseline_cost")
+    if not isinstance(energy_brain, (int, float)) or isinstance(energy_brain, bool):
+        return {
+            "energy_brain": "Nog onvoldoende echte kostendata.",
+            "baseline": "Simpele basisstrategie ontbreekt.",
+            "difference": "Nog onvoldoende echte kostendata; dit is een schaduwvergelijking.",
+        }
+    if not isinstance(baseline, (int, float)) or isinstance(baseline, bool):
+        return {
+            "energy_brain": f"Energy Brain verwachting: ongeveer EUR {_fmt_money(energy_brain)}.",
+            "baseline": "Simpele basisstrategie ontbreekt.",
+            "difference": "Nog onvoldoende echte kostendata; dit is een schaduwvergelijking.",
+        }
+    difference = round(float(baseline) - float(energy_brain), 2)
+    direction = "beter" if difference >= 0 else "slechter"
+    return {
+        "energy_brain": f"Energy Brain verwachting: ongeveer EUR {_fmt_money(energy_brain)}.",
+        "baseline": f"Simpele basisstrategie: ongeveer EUR {_fmt_money(baseline)}.",
+        "difference": f"Energy Brain verwacht ongeveer EUR {_fmt_money(abs(difference))} {direction} dan de simpele basislijn.",
+    }
+
+
+def plain_scenario_cards(payload: dict[str, Any]) -> list[dict[str, str]]:
+    rows = _list(payload.get("planner_timeline"))
+    battery = _dict(payload.get("battery_soc_card"))
+    current = _num(battery.get("soc_percent"), 64.0)
+    end_soc = _num((rows[-1] if rows else {}).get("soc_percent"), current)
+    return [
+        {
+            "title": "Normaal",
+            "value": f"Eindigt rond {_fmt_plain(end_soc)}% batterijvulling.",
+            "note": "Schaduw/voorbeeld op basis van de huidige planning.",
+        },
+        {
+            "title": "Minder zon",
+            "value": f"Eindigt grofweg rond {_fmt_plain(max(0.0, end_soc - 6.0))}%.",
+            "note": "Voorbeeldscenario: minder zonne-opwek dan verwacht.",
+        },
+        {
+            "title": "Meer verbruik",
+            "value": f"Eindigt grofweg rond {_fmt_plain(max(0.0, end_soc - 4.0))}%.",
+            "note": "Voorbeeldscenario: het huis gebruikt meer stroom.",
+        },
+    ]
+
+
+def plain_predbat_reference_note() -> str:
+    return (
+        "Net als Predbat kijkt Energy Brain vooruit naar batterijvulling, zon, verbruik en prijs. "
+        "Energy Brain gebruikt Predbat alleen als voorbeeld/benchmark en draait zelfstandig."
+    )
+
+
 def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
     """Build display-only cockpit data from a summarized local cycle."""
 
@@ -86,7 +187,7 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
     next_step = _next_interesting_step(cycle_rows)
     next_step_index = int(_num(next_step.get("step"), 0.0)) if next_step else 0
 
-    return {
+    payload = {
         "schema_version": SCHEMA_VERSION,
         "source": "local_cycle_summary_or_deterministic_shadow",
         "read_only": True,
@@ -203,6 +304,25 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
         },
         "latest_cycle_table": raw_rows,
     }
+    payload["plain_planner"] = {
+        "short": (
+            "Energy Brain kijkt mee. De volgende logische stap is "
+            f"{human_action_for_step(next_step)}, maar er wordt niets aangestuurd."
+        ),
+        "meaning": plain_step_summary(next_step),
+        "daypart_plan": plain_daypart_plan(cycle_rows),
+        "cost_comparison": plain_cost_comparison(payload),
+        "scenarios": plain_scenario_cards(payload),
+        "actual_vs_predicted": {
+            "title": "Voorspelling vs werkelijkheid",
+            "status": "Nog niet genoeg meetdata om dit betrouwbaar te beoordelen.",
+        },
+        "predbat_reference": plain_predbat_reference_note(),
+        "what_to_do": (
+            "Niets. Dit scherm is bedoeld om te controleren of de planning logisch lijkt voordat er ooit automatische aansturing komt."
+        ),
+    }
+    return payload
 
 
 def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
@@ -291,6 +411,13 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .human-card ul {{ margin: 12px 0 0; padding-left: 18px; color: #d9e6ef; }}
     .human-card li + li {{ margin-top: 7px; }}
     .human-card strong {{ display: block; margin-top: 12px; font-size: 1.05rem; line-height: 1.34; }}
+    .plain-dashboard {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }}
+    .plain-wide {{ grid-column: 1 / -1; }}
+    .dayparts, .scenario-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }}
+    .scenario-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+    .plain-tile {{ border: 1px solid rgba(238,244,248,.1); border-radius: 8px; background: rgba(5,7,10,.22); padding: 12px; }}
+    .plain-tile h3 {{ color: var(--text); text-transform: none; font-size: .92rem; }}
+    .plain-tile p {{ color: #d9e6ef; margin-top: 8px; }}
     .technical-toggle {{ margin-top: 14px; }}
     .technical-area {{ margin-top: 14px; }}
     .technical-area summary {{ cursor: pointer; color: var(--text); font-weight: 780; }}
@@ -340,7 +467,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .json-toggle {{ margin-top: 14px; padding: 9px 12px; }}
     .json-viewer {{ display: none; max-height: 420px; overflow: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: #070a0e; padding: 14px; color: #d9e6ef; white-space: pre-wrap; }}
     .json-viewer.open {{ display: block; }}
-    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow, .human-grid {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
+    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow, .human-grid, .plain-dashboard, .dayparts, .scenario-grid {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
     @media (max-width: 620px) {{ main {{ padding: 14px; }} .hero {{ padding: 22px; }} .steps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .window-row {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -367,6 +494,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     </div>
     {_banner(payload["degraded_mode_banner"])}
     <section id="tab-overview" class="tab-panel active" role="tabpanel" data-tab-panel="overview">
+      {_plain_planner_html(payload["plain_planner"])}
       {_human_summary_html(payload["human_summary"])}
       <div class="grid top">
         <article class="card">
@@ -482,6 +610,15 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       if (reason === 'shadow_hold') return 'geen actie nodig';
       return 'Energy Brain kijkt mee en verandert niets';
     }}
+    function plainWindowLabel(reason) {{
+      if (reason === 'charge_from_pv_surplus') return 'Laden met zon';
+      if (reason === 'max_soc_clamped_charge') return 'Bijna vol, laden begrensd';
+      if (reason === 'baseline_compare') return 'Vergelijking met simpel plan';
+      return 'Vasthouden';
+    }}
+    function homeMeaning(step) {{
+      return `De batterij staat rond ${{safeValue(step.soc_percent, '%')}}. Verwachte zon is ${{safeValue(step.pv_forecast)}} kW en verwacht huisverbruik is ${{safeValue(step.load_forecast)}} kW.`;
+    }}
     function reasonFragment(step) {{
       const text = humanReasons[step.reason_code || 'shadow_hold'] || humanReasons.shadow_hold || 'er is geen duidelijke betere actie';
       return text.charAt(0).toLowerCase() + text.slice(1).replace(/\\.$/, '');
@@ -497,8 +634,10 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       detail.innerHTML = `
         <div class="list">
           <div><span>Stap</span><strong>#${{safeValue(step.step)}} · over ${{index}} uur</strong></div>
-          <div><span>Advies</span><strong>${{humanAction(step)}}</strong></div>
-          <div><span>Waarom</span><strong>${{reasonFragment(step)}}</strong></div>
+          <div><span>Wat gebeurt er?</span><strong>${{plainWindowLabel(reason)}}</strong></div>
+          <div><span>Waarom?</span><strong>${{reasonFragment(step)}}</strong></div>
+          <div><span>Wat betekent dit voor mijn huis?</span><strong>${{homeMeaning(step)}}</strong></div>
+          <div><span>Stuurt dit iets aan?</span><strong>Nee, alleen meekijken.</strong></div>
         </div>
         <details class="technical-area">
           <summary>Technische details tonen/verbergen</summary>
@@ -524,8 +663,10 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
           <h3>Current/selected step details</h3>
           <div class="list">
             <div><span>Stap</span><strong>#${{safeValue(step.step)}} · over ${{index}} uur</strong></div>
-            <div><span>Advies</span><strong>${{humanAction(step)}}</strong></div>
-            <div><span>Waarom</span><strong>${{reasonFragment(step)}}</strong></div>
+            <div><span>Wat gebeurt er?</span><strong>${{plainWindowLabel(reason)}}</strong></div>
+            <div><span>Waarom?</span><strong>${{reasonFragment(step)}}</strong></div>
+            <div><span>Wat betekent dit voor mijn huis?</span><strong>${{homeMeaning(step)}}</strong></div>
+            <div><span>Stuurt dit iets aan?</span><strong>Nee, alleen meekijken.</strong></div>
           </div>
           <details class="technical-area">
             <summary>Technische details tonen/verbergen</summary>
@@ -642,10 +783,10 @@ def _timeline(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _plan_windows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
-        {"label": "charge windows", "kind": "charge", "segments": _segments(rows, lambda row: _num(row.get("setpoint_kw"), 0.0) > 0.05)},
-        {"label": "hold windows", "kind": "hold", "segments": _segments(rows, lambda row: abs(_num(row.get("setpoint_kw"), 0.0)) <= 0.05)},
-        {"label": "clamp/max-SOC windows", "kind": "clamp", "segments": _segments(rows, lambda row: "clamp" in _text(row.get("reason_code"), "").lower() or "max_soc" in _text(row.get("reason_code"), "").lower())},
-        {"label": "baseline comparison windows", "kind": "baseline", "segments": _segments(rows, lambda row: "baseline" in _text(row.get("reason_code"), "").lower() or int(_num(row.get("step"), 0)) % 8 == 0)},
+        {"label": plain_window_label("charge"), "technical_label": "charge windows", "kind": "charge", "segments": _segments(rows, lambda row: _num(row.get("setpoint_kw"), 0.0) > 0.05)},
+        {"label": plain_window_label("hold"), "technical_label": "hold windows", "kind": "hold", "segments": _segments(rows, lambda row: abs(_num(row.get("setpoint_kw"), 0.0)) <= 0.05)},
+        {"label": plain_window_label("clamp"), "technical_label": "clamp/max-SOC windows", "kind": "clamp", "segments": _segments(rows, lambda row: "clamp" in _text(row.get("reason_code"), "").lower() or "max_soc" in _text(row.get("reason_code"), "").lower())},
+        {"label": plain_window_label("baseline"), "technical_label": "baseline comparison windows", "kind": "baseline", "segments": _segments(rows, lambda row: "baseline" in _text(row.get("reason_code"), "").lower() or int(_num(row.get("step"), 0)) % 8 == 0)},
     ]
 
 
@@ -713,6 +854,12 @@ def _fmt_plain(value: Any) -> str:
     return str(value)
 
 
+def _fmt_money(value: Any) -> str:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return f"{float(value):.2f}"
+    return str(value)
+
+
 def _reason_explanations() -> dict[str, str]:
     return {
         "shadow_hold": "Holding is shown when the shadow plan has no beneficial move or fallback data is active.",
@@ -769,6 +916,51 @@ def _banner(data: dict[str, Any]) -> str:
     )
 
 
+def _plain_planner_html(data: dict[str, Any]) -> str:
+    meaning = _dict(data.get("meaning"))
+    cost = _dict(data.get("cost_comparison"))
+    dayparts = "".join(
+        '<article class="plain-tile">'
+        f'<h3>{_esc(item.get("label"))}</h3>'
+        f'<p><strong>{_esc(item.get("summary"))}</strong></p>'
+        f'<p class="mini">{_esc(item.get("why"))}</p>'
+        "</article>"
+        for item in _list(data.get("daypart_plan"))
+    )
+    scenarios = "".join(
+        '<article class="plain-tile">'
+        f'<h3>{_esc(item.get("title"))}</h3>'
+        f'<p>{_esc(item.get("value"))}</p>'
+        f'<p class="mini">{_esc(item.get("note"))}</p>'
+        "</article>"
+        for item in _list(data.get("scenarios"))
+    )
+    actual = _dict(data.get("actual_vs_predicted"))
+    return (
+        '<section class="plain-dashboard" aria-label="Predbat-inspired planner uitleg">'
+        '<article class="human-card"><h2>Kort gezegd</h2>'
+        f'<strong>{_esc(data.get("short"))}</strong></article>'
+        '<article class="human-card"><h2>Wat betekent dit?</h2>'
+        f'<strong>{_esc(meaning.get("huis"))}</strong>'
+        f'<p class="note">Stuurt dit iets aan? {_esc(meaning.get("stuurt"))}</p></article>'
+        '<article class="human-card"><h2>Wat moet ik hiermee doen?</h2>'
+        f'<strong>{_esc(data.get("what_to_do"))}</strong></article>'
+        '<article class="human-card plain-wide"><h2>Plan in gewone taal</h2>'
+        f'<div class="dayparts">{dayparts}</div></article>'
+        '<article class="human-card"><h2>Kostenvergelijking</h2>'
+        f'<p class="note">{_esc(cost.get("energy_brain"))}</p>'
+        f'<p class="note">{_esc(cost.get("baseline"))}</p>'
+        f'<strong>{_esc(cost.get("difference"))}</strong></article>'
+        '<article class="human-card"><h2>Voorspelling vs werkelijkheid</h2>'
+        f'<strong>{_esc(actual.get("status"))}</strong></article>'
+        '<article class="human-card"><h2>Waarom lijkt dit op Predbat?</h2>'
+        f'<strong>{_esc(data.get("predbat_reference"))}</strong></article>'
+        '<article class="human-card plain-wide"><h2>Scenario&#x27;s</h2>'
+        f'<div class="scenario-grid">{scenarios}</div></article>'
+        "</section>"
+    )
+
+
 def _human_summary_html(data: dict[str, Any]) -> str:
     current = "".join(f"<li>{_esc(item)}</li>" for item in _list(data.get("current_state")))
     safety = "".join(f"<li>{_esc(item)}</li>" for item in _list(data.get("safety")))
@@ -820,7 +1012,7 @@ def _timeline_html(rows: list[dict[str, Any]]) -> str:
             f'<button type="button" class="step-button{active}" data-index="{index}" data-step="{index}" aria-label="inspect only planner step {index}">'
             f'<span class="step-index"><span>#{_esc(row.get("step"))}</span><span>{_esc(row.get("validity"))}</span></span>'
             f'<span class="step-soc">{_fmt(row.get("soc_percent"), "%")}</span>'
-            f'<span class="step-reason">{_esc(reason)}</span>'
+            f'<span class="step-reason">{_esc(plain_window_label(reason))}</span>'
             "</button>"
         )
     return '<div class="steps">' + "".join(parts) + "</div>"
@@ -830,7 +1022,11 @@ def _window_html(windows: list[dict[str, Any]]) -> str:
     rows = []
     for window in windows:
         segments = "".join(f'<span class="segment {_esc(window.get("kind"))}" style="left:{segment["left"]}%;width:{segment["width"]}%"></span>' for segment in _list(window.get("segments")))
-        rows.append(f'<div class="window-row"><span class="mini">{_esc(window.get("label"))}</span><span class="track">{segments}</span></div>')
+        rows.append(
+            f'<div class="window-row"><span class="mini">{_esc(window.get("label"))}'
+            f'<small style="display:block;color:var(--muted)">{_esc(window.get("technical_label"))}</small></span>'
+            f'<span class="track">{segments}</span></div>'
+        )
     return '<div class="windows" aria-label="visual plan window labels only">' + "".join(rows) + "</div>"
 
 
@@ -870,10 +1066,13 @@ def _cycle_table(rows: list[dict[str, Any]]) -> str:
 
 def _step_detail(step: dict[str, Any]) -> str:
     reason = _text(step.get("reason_code"), "shadow_hold")
+    plain = plain_step_summary(step)
     human_fields = {
         "Stap": f"#{_text(step.get('step'), '0')} · over 0 uur",
-        "Advies": human_action_for_step(step),
-        "Waarom": _human_reason_fragment(step),
+        "Wat gebeurt er?": plain.get("wat"),
+        "Waarom?": plain.get("waarom"),
+        "Wat betekent dit voor mijn huis?": plain.get("huis"),
+        "Stuurt dit iets aan?": plain.get("stuurt"),
     }
     technical_fields = {
         "selected step index/time": f"#{_text(step.get('step'), '0')} / +0h",
@@ -899,10 +1098,13 @@ def _step_detail(step: dict[str, Any]) -> str:
 
 def _chart_step_summary(step: dict[str, Any]) -> str:
     reason = _text(step.get("reason_code"), "shadow_hold")
+    plain = plain_step_summary(step)
     human_fields = {
         "Stap": f"#{_text(step.get('step'), '0')} · over 0 uur",
-        "Advies": human_action_for_step(step),
-        "Waarom": _human_reason_fragment(step),
+        "Wat gebeurt er?": plain.get("wat"),
+        "Waarom?": plain.get("waarom"),
+        "Wat betekent dit voor mijn huis?": plain.get("huis"),
+        "Stuurt dit iets aan?": plain.get("stuurt"),
     }
     technical_fields = {
         "step/hour": f"#{_text(step.get('step'), '0')} / +0h",
