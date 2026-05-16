@@ -115,6 +115,23 @@ def test_dashboard_renders_required_labels_and_reasons():
         assert reason in html
 
 
+def test_dashboard_renders_readonly_status_and_inline_visuals():
+    html = render_dashboard_html(summarize_cycle(_cycle()))
+
+    assert "Read-only / no writes" in html
+    assert "SOC trajectory mini-chart" in html
+    assert "Battery setpoint mini-bars" in html
+    assert "reason-badge" in html
+
+
+def test_dashboard_renders_polished_empty_state():
+    html = render_dashboard_html({"status": "safe", "valid_cycle": False, "message": "No valid cycle available"})
+
+    assert "Safe observer state" in html
+    assert "No valid cycle available" in html
+    assert "Read-only / no writes" in html
+
+
 def test_negative_delta_is_labelled_carefully():
     cycle = _cycle()
     cycle["plan"]["savings_vs_baseline"] = -0.42
@@ -160,7 +177,14 @@ def test_planner_and_controller_sources_are_unchanged():
     import subprocess
 
     result = subprocess.run(
-        ["git", "diff", "--", "energy_brain/planner.py", "energy_brain/controller.py"],
+        [
+            "git",
+            "diff",
+            "--",
+            "energy_brain/planner.py",
+            "energy_brain/controller.py",
+            "energy_brain/main.py",
+        ],
         check=True,
         capture_output=True,
         text=True,
