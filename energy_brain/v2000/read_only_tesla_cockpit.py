@@ -516,12 +516,18 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     edge_list = edges if isinstance(edges, list) else []
     plain = powerflow_plain_status(snap)
 
+    # HA-style centered powerflow layout:
+    #              Zon
+    #               |
+    # Net ---- centraal punt ---- Huis
+    #               |
+    #            Batterij
     path_map = {
-        "zon_naar_huis": "M 178 92 C 250 92, 270 150, 330 150",
-        "zon_naar_batterij": "M 178 105 C 250 135, 300 218, 360 230",
-        "batterij_naar_huis": "M 430 230 C 490 218, 500 166, 462 150",
-        "net_import": "M 604 150 C 548 150, 510 150, 462 150",
-        "net_export": "M 462 150 C 510 150, 548 150, 604 150",
+        "zon_naar_huis": "M 380 168 C 380 215, 430 280, 530 280",
+        "zon_naar_batterij": "M 380 168 C 380 235, 380 325, 380 388",
+        "batterij_naar_huis": "M 380 388 C 380 330, 455 280, 530 280",
+        "net_import": "M 230 280 C 300 280, 455 280, 530 280",
+        "net_export": "M 530 280 C 455 280, 300 280, 230 280",
     }
 
     paths: list[str] = []
@@ -530,13 +536,13 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     for idx, edge in enumerate(edge_list):
         direction = str(edge.get("direction", "geen_duidelijke_stroomrichting"))
         path_id = f"pf-path-{idx}"
-        d = path_map.get(direction, "M 150 285 C 260 310, 500 310, 610 285")
+        d = path_map.get(direction, "M 230 280 C 300 280, 455 280, 530 280")
         active = bool(edge.get("active"))
         cls = "pf-edge active" if active else "pf-edge idle"
         paths.append(f'<path id="{path_id}" class="{cls}" d="{d}" />')
         if active:
             dots.append(
-                f'<circle class="pf-dot" r="4.5">'
+                f'<circle class="pf-dot" r="5.5">'
                 f'<animateMotion dur="2.4s" repeatCount="indefinite">'
                 f'<mpath href="#{path_id}" />'
                 f'</animateMotion></circle>'
@@ -545,7 +551,7 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     live_soc = snap.get("battery_soc_live_percent", snap.get("battery_soc_percent", 0))
     node_soc = snap.get("battery_soc_percent", live_soc)
 
-    return f"""<article class="powerflow-panel human-card compact-powerflow" data-read-only="true">
+    return f"""<article class="powerflow-panel human-card compact-powerflow ha-powerflow-large" data-read-only="true">
   <div class="powerflow-head">
     <div>
       <p class="eyebrow">Alleen meekijken - Geen aansturing</p>
@@ -560,31 +566,36 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     <span>{_esc(plain["soc"])}</span>
   </div>
 
-  <svg class="powerflow-svg compact" viewBox="0 0 760 330" role="img" aria-label="Read-only Energy Brain powerflow">
-    <g class="pf-lines">{''.join(paths)}{''.join(dots)}</g>
-
-    <g class="pf-node pf-sun">
-      <circle cx="135" cy="96" r="56"/>
-      <text x="135" y="86">Zon</text>
-      <text x="135" y="112">{_pf_kw(snap.get("pv_kw", 0.0))}</text>
+  <svg class="powerflow-svg compact ha-flow" viewBox="0 0 760 560" role="img" aria-label="Read-only Energy Brain powerflow">
+    <g class="pf-lines">
+      <path class="pf-backbone" d="M 380 168 L 380 392" />
+      <path class="pf-backbone" d="M 230 280 L 530 280" />
+      <circle class="pf-junction" cx="380" cy="280" r="7" />
+      {''.join(paths)}{''.join(dots)}
     </g>
 
-    <g class="pf-node pf-home">
-      <rect x="330" y="112" width="132" height="78" rx="22"/>
-      <text x="396" y="143">Huis</text>
-      <text x="396" y="168">{_pf_kw(snap.get("load_kw", 0.0))}</text>
-    </g>
-
-    <g class="pf-node pf-battery">
-      <rect x="335" y="218" width="122" height="70" rx="20"/>
-      <text x="396" y="246">Batterij</text>
-      <text x="396" y="270">{_esc(node_soc)}% nu</text>
+    <g class="pf-node pf-sun pf-node-round">
+      <circle cx="380" cy="92" r="74"/>
+      <text x="380" y="74">Zon</text>
+      <text x="380" y="104">{_pf_kw(snap.get("pv_kw", 0.0))}</text>
     </g>
 
     <g class="pf-node pf-grid">
-      <rect x="604" y="114" width="104" height="74" rx="20"/>
-      <text x="656" y="143">Net</text>
-      <text x="656" y="168">{_pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0)))}</text>
+      <rect x="80" y="225" width="150" height="110" rx="30"/>
+      <text x="155" y="262">Net</text>
+      <text x="155" y="298">{_pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0)))}</text>
+    </g>
+
+    <g class="pf-node pf-home">
+      <rect x="530" y="225" width="150" height="110" rx="30"/>
+      <text x="605" y="262">Huis</text>
+      <text x="605" y="298">{_pf_kw(snap.get("load_kw", 0.0))}</text>
+    </g>
+
+    <g class="pf-node pf-battery">
+      <rect x="295" y="388" width="170" height="112" rx="32"/>
+      <text x="380" y="428">Batterij</text>
+      <text x="380" y="464">{_esc(node_soc)}% nu</text>
     </g>
   </svg>
 
@@ -854,8 +865,8 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .powerflow-quality {{ border:1px solid var(--line); border-radius:999px; padding:8px 12px; color:#d9e6ef; white-space:nowrap; background:rgba(255,255,255,.05); }}
     .powerflow-svg {{ width:100%; min-height:260px; display:block; margin-top:6px; border-radius:18px; background:radial-gradient(circle at 50% 35%, rgba(90,160,255,.13), rgba(0,0,0,0) 42%); }}
     .pf-node circle, .pf-node rect {{ fill:rgba(16,28,38,.92); stroke:rgba(149,218,255,.42); stroke-width:2; }}
-    .pf-node text {{ fill:#edf7fb; font-size:18px; font-weight:700; text-anchor:middle; dominant-baseline:middle; }}
-    .pf-node text + text {{ fill:#a9c1cf; font-size:14px; font-weight:600; }}
+    .pf-node text {{ fill:#edf7fb; font-size:22px; font-weight:800; text-anchor:middle; dominant-baseline:middle; }}
+    .pf-node text + text {{ fill:#a9c1cf; font-size:18px; font-weight:700; }}
     .pf-sun circle {{ stroke:rgba(255,211,106,.75); }}
     .pf-battery rect {{ stroke:rgba(95,220,160,.65); }}
     .pf-grid rect {{ stroke:rgba(160,180,255,.62); }}
@@ -871,10 +882,13 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .powerflow-plain {{ border:1px solid rgba(122,186,255,.18); background:rgba(255,255,255,.04); border-radius:18px; padding:14px 16px; margin:12px 0 14px; display:grid; gap:6px; }}
     .powerflow-plain strong {{ margin:0; font-size:1.02rem; color:#edf7fb; }}
     .powerflow-plain span {{ color:var(--muted); }}
-    .powerflow-svg.compact {{ min-height:240px; max-height:330px; background:radial-gradient(circle at 52% 48%, rgba(90,160,255,.16), rgba(0,0,0,0) 48%); }}
+    .powerflow-svg.compact {{ min-height:420px; max-height:560px; background:radial-gradient(circle at 50% 50%, rgba(90,160,255,.18), rgba(0,0,0,0) 56%); }}
+    .powerflow-svg.ha-flow {{ height:clamp(420px, 68vw, 560px); }}
     .compact-powerflow .pf-node circle,
     .compact-powerflow .pf-node rect {{ filter: drop-shadow(0 12px 22px rgba(0,0,0,.22)); }}
-    .compact-powerflow .pf-edge {{ stroke-width:5.5; stroke-dasharray:9 12; opacity:.9; }}
+    .compact-powerflow .pf-edge {{ stroke-width:7; stroke-dasharray:10 13; opacity:.92; }}
+    .pf-backbone {{ fill:none; stroke:rgba(130,150,165,.22); stroke-width:4; stroke-linecap:round; }}
+    .pf-junction {{ fill:#f7fbff; opacity:.85; filter:drop-shadow(0 0 10px rgba(255,255,255,.55)); }}
     .compact-powerflow .pf-dot {{ fill:#f7fbff; filter:drop-shadow(0 0 7px rgba(255,255,255,.8)); }}
     .powerflow-summary-grid {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }}
     .powerflow-summary-grid div {{ border:1px solid var(--line); border-radius:16px; padding:11px 12px; background:rgba(255,255,255,.035); }}
@@ -882,6 +896,16 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .powerflow-summary-grid strong {{ display:block; margin-top:4px; color:#edf7fb; font-size:1rem; line-height:1.25; }}
     .powerflow-summary-grid small {{ display:block; margin-top:5px; color:var(--muted); line-height:1.3; }}
     @media (max-width: 900px) {{ .powerflow-summary-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
+    @media (max-width: 620px) {{
+      .compact-powerflow {{ padding:18px; }}
+      .powerflow-head {{ flex-direction:column; }}
+      .powerflow-quality {{ white-space:normal; }}
+      .powerflow-svg.ha-flow {{ height:430px; }}
+      .pf-node text {{ font-size:24px; }}
+      .pf-node text + text {{ font-size:19px; }}
+      .powerflow-summary-grid div {{ padding:10px; border-radius:14px; }}
+      .powerflow-summary-grid strong {{ font-size:.95rem; }}
+    }}
     @keyframes eb-flow-dash {{ from {{ stroke-dashoffset:42; }} to {{ stroke-dashoffset:0; }} }}
     @media (prefers-reduced-motion: reduce) {{ .pf-edge.active {{ animation:none; }} .pf-dot animateMotion {{ display:none; }} }}
     .plain-dashboard {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }}
