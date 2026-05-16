@@ -285,12 +285,16 @@ def _pf_get_number(source: dict[str, Any], keys: list[str], fallback: float = 0.
 def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     source = payload if isinstance(payload, dict) else {}
     flow = source.get("flow") if isinstance(source.get("flow"), dict) else {}
+    energy_flow = source.get("energy_flow") if isinstance(source.get("energy_flow"), dict) else {}
     summary = source.get("summary") if isinstance(source.get("summary"), dict) else {}
+    battery_soc_card = source.get("battery_soc_card") if isinstance(source.get("battery_soc_card"), dict) else {}
 
     merged: dict[str, Any] = {}
     merged.update(source)
     merged.update(flow)
+    merged.update(energy_flow)
     merged.update(summary)
+    merged.update(battery_soc_card)
 
     pv_kw = _pf_get_number(merged, ["pv_kw", "solar_kw", "pv_power_kw", "expected_pv_kw"], 0.0)
     load_kw = _pf_get_number(merged, ["load_kw", "house_kw", "household_load_kw", "expected_load_kw"], 0.0)
