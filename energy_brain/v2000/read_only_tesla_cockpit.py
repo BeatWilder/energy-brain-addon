@@ -359,7 +359,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       </div>
     </section>
   </main>
-  <script id="cockpit-payload" type="application/json">{_esc(payload_json)}</script>
+  <script id="cockpit-payload" type="application/json">{_json_for_script_tag(payload_json)}</script>
   <script>
     const payload = JSON.parse(document.getElementById('cockpit-payload').textContent);
     const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
@@ -448,6 +448,15 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
 </html>
 """
 
+
+
+def _json_for_script_tag(json_text: str) -> str:
+    """Return raw JSON safe for an application/json script tag.
+
+    Quotes must remain real JSON quotes. HTML-escaping JSON inside a script tag
+    produces &quot; text and can break JSON.parse before click handlers attach.
+    """
+    return str(json_text).replace("</", "<\\/")
 
 def _cycle_row(step: Any, snapshot: dict[str, Any]) -> dict[str, Any]:
     item = _dict(step)
