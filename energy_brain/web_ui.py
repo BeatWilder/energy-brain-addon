@@ -3948,3 +3948,229 @@ if "render_tesla_cockpit_html" in globals():
             _eb_v47c_original_render_tesla_cockpit_html(payload)
         )
 
+
+# EB_PATCH_V49_REAL_POWERFLOW_COMPACT
+# Read-only visual overlay. No service calls, no writes.
+# Goal: HA-like plus-shaped powerflow with sane PV display.
+
+def _eb49_float(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _eb49_kw(value):
+    try:
+        return f"{float(value):.1f} kW"
+    except (TypeError, ValueError):
+        return "bron controleren"
+
+
+def _eb49_pct(value):
+    try:
+        return f"{float(value):.1f}%"
+    except (TypeError, ValueError):
+        return "-"
+
+
+def _eb49_payload(summary):
+    if isinstance(summary, dict):
+        if isinstance(summary.get("cockpit_payload"), dict):
+            return summary["cockpit_payload"]
+        if isinstance(summary.get("payload"), dict):
+            return summary["payload"]
+        if isinstance(summary.get("energy_flow"), dict):
+            return summary
+    return {}
+
+
+def _eb49_flow(payload):
+    flow = payload.get("energy_flow") if isinstance(payload, dict) else {}
+    return flow if isinstance(flow, dict) else {}
+
+
+def _eb49_soc(payload):
+    card = payload.get("battery_soc_card") if isinstance(payload, dict) else {}
+    if isinstance(card, dict):
+        return _eb49_float(card.get("soc_percent"), None)
+    return None
+
+
+def _eb49_bad_pv_live_power(pv):
+    try:
+        pv = float(pv)
+    except (TypeError, ValueError):
+        return True
+
+    # Live PV power cannot be negative.
+    # On this system very high values are usually daily kWh / forecast totals
+    # accidentally shown as live kW.
+    return pv < 0 or pv > 12
+
+
+def _eb49_powerflow_html(summary):
+    payload = _eb49_payload(summary)
+    flow = _eb49_flow(payload)
+
+    raw_pv = _eb49_float(flow.get("pv_kw"), 0.0)
+    load = max(0.0, _eb49_float(flow.get("load_kw"), 0.0))
+    batt = _eb49_float(flow.get("battery_kw"), 0.0)
+    grid = _eb49_float(flow.get("grid_kw"), 0.0)
+    soc = _eb49_soc(payload)
+
+    pv_bad = _eb49_bad_pv_live_power(raw_pv)
+    pv = 0.0 if pv_bad else max(0.0, raw_pv)
+
+    grid_import = max(0.0, grid)
+    grid_export = max(0.0, -grid)
+    batt_charge = max(0.0, batt)
+    batt_discharge = max(0.0, -batt)
+
+    pv_label = "bron controleren" if pv_bad else _eb49_kw(pv)
+    soc_label = _eb49_pct(soc) if soc is not None else "-"
+
+    if pv_bad:
+        headline = (
+            f"Huis gebruikt {_eb49_kw(load)}. "
+            f"PV-bron controleren: deze waarde lijkt geen live kW-bron. "
+            f"Netwaarde is {_eb49_kw(abs(grid))}."
+        )
+        pv_card_note = "geen betrouwbare live kW-bron"
+    else:
+        if batt_charge > 0.05:
+            batt_sentence = f"Batterij wordt geladen met {_eb49_kw(batt_charge)}."
+        elif batt_discharge > 0.05:
+            batt_sentence = f"Batterij helpt het huis met {_eb49_kw(batt_discharge)}."
+        else:
+            batt_sentence = "Batterij staat praktisch stil."
+
+        if grid_import > 0.05:
+            grid_sentence = f"Het net vult {_eb49_kw(grid_import)} bij."
+        elif grid_export > 0.05:
+            grid_sentence = f"Er gaat {_eb49_kw(grid_export)} terug naar het net."
+        else:
+            grid_sentence = "Er is bijna geen netverbruik of teruglevering."
+
+        headline = (
+            f"Huis gebruikt {_eb49_kw(load)}. "
+            f"Zon levert {_eb49_kw(pv)}. "
+            f"{batt_sentence} {grid_sentence}"
+        )
+        pv_card_note = "live vermogen"
+
+    grid_value = grid_import if grid_import > 0.05 else grid_export
+    grid_note = "net vult bij" if grid_import > 0.05 else ("terug naar net" if grid_export > 0.05 else "bijna nul")
+
+    if batt_charge > 0.05:
+        batt_value = f"Laden: {_eb49_kw(batt_charge)}"
+    elif batt_discharge > 0.05:
+        batt_value = f"Helpt huis: {_eb49_kw(batt_discharge)}"
+    else:
+        batt_value = "Batterij stil"
+
+    pv_opacity = "1" if (not pv_bad and pv > 0.05) else ".18"
+    grid_in_opacity = "1" if grid_import > 0.05 else ".18"
+    grid_out_opacity = "1" if grid_export > 0.05 else ".18"
+    batt_in_opacity = "1" if batt_charge > 0.05 else ".18"
+    batt_out_opacity = "1" if batt_discharge > 0.05 else ".18"
+
+    return (
+        '<style id="eb49-powerflow-style">'
+        '.eb49{margin:24px 0;padding:22px 14px;border:1px solid rgba(238,244,248,.12);border-radius:26px;'
+        'background:radial-gradient(circle at 50% 45%,rgba(74,132,180,.22),transparent 38%),linear-gradient(180deg,rgba(15,23,31,.94),rgba(7,10,14,.96));}'
+        '.eb49 h2{margin:0 0 14px;font-size:1.25rem}.eb49-summary{max-width:640px;margin:0 auto 24px;padding:16px 18px;'
+        'border:1px solid rgba(130,160,190,.32);border-radius:18px;background:rgba(18,29,39,.72)}'
+        '.eb49-summary strong{display:block;font-size:1.05rem;line-height:1.45}.eb49-summary span{display:block;margin-top:10px;color:#9eacb8}'
+        '.eb49-cross{position:relative;width:min(680px,100%);height:430px;margin:0 auto}.eb49-node{position:absolute;display:grid;place-items:center;'
+        'text-align:center;border:2px solid rgba(238,244,248,.22);background:rgba(9,14,20,.9);color:#eef4f8;box-shadow:0 0 24px rgba(0,0,0,.28)}'
+        '.eb49-node b{display:block;font-size:.95rem}.eb49-node small{display:block;margin-top:5px;color:#c6d0d8;font-size:.82rem}'
+        '.eb49-sun{left:50%;top:4px;transform:translateX(-50%);width:112px;height:112px;border-radius:999px;border-color:rgba(255,165,0,.9)}'
+        '.eb49-grid{left:14px;top:165px;width:112px;height:112px;border-radius:999px;border-color:rgba(176,114,255,.9)}'
+        '.eb49-home{right:14px;top:165px;width:122px;height:122px;border-radius:999px;border-color:rgba(255,165,0,.9)}'
+        '.eb49-battery{left:50%;bottom:6px;transform:translateX(-50%);width:122px;height:122px;border-radius:999px;border-color:rgba(55,205,180,.9)}'
+        '.eb49-center{left:50%;top:212px;transform:translate(-50%,-50%);width:108px;min-height:64px;padding:10px;border-radius:16px;border-color:rgba(120,160,190,.78)}'
+        '.eb49-line{position:absolute;pointer-events:none}.eb49-line svg{width:100%;height:100%;overflow:visible}.eb49-line path{fill:none;'
+        'stroke:rgba(105,190,225,.86);stroke-width:5;stroke-linecap:round;stroke-dasharray:10 12;animation:eb49dash 1.6s linear infinite}'
+        '.eb49-dot{fill:#d8f3ff}.eb49-pv{left:50%;top:112px;width:220px;height:124px;transform:translateX(-18px);opacity:' + pv_opacity + '}'
+        '.eb49-grid-in{left:126px;top:198px;width:224px;height:38px;opacity:' + grid_in_opacity + '}'
+        '.eb49-grid-out{left:126px;top:230px;width:224px;height:38px;opacity:' + grid_out_opacity + '}'
+        '.eb49-batt-in{left:50%;top:254px;width:190px;height:92px;opacity:' + batt_in_opacity + '}'
+        '.eb49-batt-out{left:50%;top:250px;width:190px;height:96px;opacity:' + batt_out_opacity + '}'
+        '.eb49-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:20px}.eb49-card{padding:16px;border:1px solid rgba(238,244,248,.12);'
+        'border-radius:18px;background:rgba(255,255,255,.035)}.eb49-card span{display:block;color:#9eacb8;text-transform:uppercase;letter-spacing:.16em;font-size:.78rem}'
+        '.eb49-card strong{display:block;margin-top:9px;font-size:1.22rem}.eb49-card small{display:block;margin-top:7px;color:#aab6c0}'
+        '@keyframes eb49dash{to{stroke-dashoffset:-44}}@media(max-width:720px){.eb49-cross{height:370px}.eb49-sun,.eb49-grid{width:96px;height:96px}'
+        '.eb49-home,.eb49-battery{width:104px;height:104px}.eb49-grid{left:0}.eb49-home{right:0}.eb49-center{width:92px}.eb49-cards{grid-template-columns:1fr 1fr}}'
+        '</style>'
+        '<section class="eb49" aria-label="Stroom door het huis">'
+        '<h2>Stroom door het huis</h2>'
+        '<div class="eb49-summary"><strong>' + headline + '</strong><span>Batterij nu ' + soc_label + '. Alleen meekijken.</span></div>'
+        '<div class="eb49-cross" aria-label="HA-stijl energieflow plusvorm">'
+        '<div class="eb49-line eb49-pv"><svg viewBox="0 0 220 124"><path d="M0 0 C52 6 62 90 124 91 C158 92 182 86 220 82"/><circle class="eb49-dot" cx="124" cy="91" r="4"/></svg></div>'
+        '<div class="eb49-line eb49-grid-in"><svg viewBox="0 0 224 38"><path d="M0 19 L224 19"/><circle class="eb49-dot" cx="114" cy="19" r="4"/></svg></div>'
+        '<div class="eb49-line eb49-grid-out"><svg viewBox="0 0 224 38"><path d="M224 19 L0 19"/><circle class="eb49-dot" cx="104" cy="19" r="4"/></svg></div>'
+        '<div class="eb49-line eb49-batt-in"><svg viewBox="0 0 190 96"><path d="M190 18 C145 42 112 36 95 0 C72 44 35 60 0 96"/><circle class="eb49-dot" cx="95" cy="0" r="4"/></svg></div>'
+        '<div class="eb49-line eb49-batt-out"><svg viewBox="0 0 190 96"><path d="M0 96 C35 60 72 44 95 0 C112 36 145 42 190 18"/><circle class="eb49-dot" cx="95" cy="0" r="4"/></svg></div>'
+        '<div class="eb49-node eb49-sun"><b>Zon</b><small>' + pv_label + '</small></div>'
+        '<div class="eb49-node eb49-grid"><b>Net</b><small>' + _eb49_kw(grid_value) + '</small></div>'
+        '<div class="eb49-node eb49-center"><b>Huis</b><small>' + _eb49_kw(load) + '</small></div>'
+        '<div class="eb49-node eb49-home"><b>Home</b><small>' + _eb49_kw(load) + '</small></div>'
+        '<div class="eb49-node eb49-battery"><b>Batterij</b><small>' + soc_label + '</small></div>'
+        '</div>'
+        '<div class="eb49-cards">'
+        '<div class="eb49-card"><span>Zon</span><strong>' + pv_label + '</strong><small>' + pv_card_note + '</small></div>'
+        '<div class="eb49-card"><span>Huis</span><strong>' + _eb49_kw(load) + '</strong><small>actueel verbruik</small></div>'
+        '<div class="eb49-card"><span>Batterij</span><strong>' + batt_value + '</strong><small>Batterij nu ' + soc_label + '</small></div>'
+        '<div class="eb49-card"><span>Net</span><strong>' + _eb49_kw(grid_value) + '</strong><small>' + grid_note + '</small></div>'
+        '</div>'
+        '<p class="note">PV-bron controleren betekent: Energy Brain ziet geen betrouwbare live kW-bron voor zonnevermogen.</p>'
+        '</section>'
+    )
+
+
+def _eb49_insert(rendered, summary):
+    block = _eb49_powerflow_html(summary)
+    targets = [
+        '<section class="flow"',
+        '<section class="eb-v47',
+        '<section class="eb-v46',
+        '<section class="plain-dashboard"',
+    ]
+    for target in targets:
+        index = rendered.find(target)
+        if index >= 0:
+            return rendered[:index] + block + rendered[index:]
+
+    index = rendered.find("</main>")
+    if index >= 0:
+        return rendered[:index] + block + rendered[index:]
+
+    return rendered + block
+
+
+def _eb49_clean(rendered):
+    return rendered.replace("NO CONTROL OUTPUT", "NO CONTROL OUTPUT").replace("no control output", "no control output")
+
+
+try:
+    _eb49_previous_render_dashboard_html = render_dashboard_html
+
+    def render_dashboard_html(summary):
+        rendered = _eb49_previous_render_dashboard_html(summary)
+        return _eb49_clean(_eb49_insert(rendered, summary))
+except NameError:
+    pass
+
+
+try:
+    _eb49_previous_render_tesla_cockpit_html = render_tesla_cockpit_html
+
+    def render_tesla_cockpit_html(summary):
+        rendered = _eb49_previous_render_tesla_cockpit_html(summary)
+        return _eb49_clean(_eb49_insert(rendered, summary))
+except NameError:
+    pass
+
