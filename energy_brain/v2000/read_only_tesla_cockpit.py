@@ -8,7 +8,7 @@ from typing import Any
 
 from energy_brain.v1969.tesla_style_cockpit_spec import REQUIRED_SECTIONS, build_tesla_style_cockpit_spec
 
-SCHEMA_VERSION = "v2032_v2063.interactive_read_only_cockpit.1"
+SCHEMA_VERSION = "v2064_v2095.usable_interactive_read_only_cockpit.1"
 
 
 def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
@@ -54,6 +54,12 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
             "active": degraded,
             "reason": "No valid local cycle available" if degraded else "Inputs currently usable for display",
             "fallback_mode": "deterministic shadow sample" if degraded else "latest local cycle",
+            "missing_source": "latest local planner cycle" if degraded else "none",
+            "explanation": (
+                "Values shown below are display fallback values because the latest local planner cycle is missing or invalid."
+                if degraded
+                else "Values shown below come from the latest local display cycle."
+            ),
         },
         "energy_flow": {
             "pv_kw": _num(snapshot.get("pv_power_kw"), 3.2),
@@ -97,6 +103,9 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
             "quality_notes": [
                 "Energy Brain expected cost is compared with a baseline display metric.",
                 "Predbat-inspired conceptual comparison is benchmark/reference only, not a runtime dependency.",
+                "These windows are conceptual comparison labels.",
+                "Energy Brain does not depend on Predbat at runtime.",
+                "No commands are sent from this cockpit.",
             ],
         },
         "safety_panel": {
@@ -172,8 +181,10 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       border: 1px solid var(--line); border-radius: 8px; background: rgba(21,31,41,.78); color: var(--text);
       cursor: pointer; font-weight: 760;
     }}
-    .tab-button {{ min-height: 38px; padding: 8px 13px; }}
-    .tab-button[aria-selected="true"] {{ border-color: rgba(105,167,255,.65); background: rgba(105,167,255,.18); }}
+    .tab-button {{ min-height: 38px; padding: 8px 13px; position: relative; }}
+    .tab-button::after {{ content: "inspect"; color: var(--muted); font-size: .66rem; margin-left: 8px; text-transform: uppercase; }}
+    .tab-button[aria-selected="true"] {{ border-color: rgba(105,167,255,.82); background: rgba(105,167,255,.24); box-shadow: inset 0 -2px 0 var(--blue); }}
+    .tab-button:focus-visible, .step-button:focus-visible, .json-toggle:focus-visible {{ outline: 2px solid var(--green); outline-offset: 2px; }}
     .tab-panel {{ display: none; }}
     .tab-panel.active {{ display: block; }}
     .banner {{ margin-top: 14px; border: 1px solid rgba(242,184,75,.42); border-radius: 8px; background: rgba(242,184,75,.1); padding: 13px 15px; color: #ffe0a3; }}
@@ -188,11 +199,25 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .mini {{ color: var(--muted); font-size: .82rem; }}
     .flow {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }}
     .flow .card {{ min-height: 116px; }}
-    .chart {{ width: 100%; height: 270px; display: block; margin-top: 16px; }}
+    .chart {{ width: 100%; height: 330px; display: block; margin-top: 12px; }}
+    .chart-head {{ display: flex; justify-content: space-between; gap: 14px; align-items: start; flex-wrap: wrap; }}
+    .chart-title {{ font-size: 1.28rem; font-weight: 760; }}
+    .legend {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
+    .legend-item {{ align-items: center; border: 1px solid var(--line); border-radius: 999px; display: inline-flex; gap: 7px; padding: 6px 9px; color: var(--muted); font-size: .78rem; }}
+    .swatch {{ width: 18px; height: 4px; border-radius: 999px; background: var(--green); }}
+    .swatch.reserve {{ background: var(--warn); }}
+    .swatch.max {{ background: var(--red); }}
+    .swatch.price {{ background: var(--sun); }}
+    .swatch.overlay {{ background: var(--blue); }}
+    .swatch.charge {{ background: var(--green); }}
+    .swatch.clamp {{ background: var(--warn); }}
+    .chart-layout {{ display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }}
+    .chart-explain {{ border: 1px solid var(--line); border-radius: 8px; background: rgba(21,31,41,.78); padding: 14px; margin-top: 12px; }}
     .timeline-grid {{ display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; }}
     .steps {{ display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }}
-    .step-button {{ min-height: 74px; padding: 9px; text-align: left; }}
-    .step-button.active {{ outline: 2px solid rgba(67,214,166,.7); background: rgba(67,214,166,.13); }}
+    .step-button {{ min-height: 84px; padding: 10px; text-align: left; box-shadow: inset 0 0 0 1px rgba(255,255,255,.02); transition: border-color .12s ease, transform .12s ease, background .12s ease; }}
+    .step-button:hover {{ border-color: rgba(67,214,166,.62); transform: translateY(-1px); background: rgba(67,214,166,.09); }}
+    .step-button.active {{ outline: 2px solid rgba(67,214,166,.78); background: rgba(67,214,166,.15); }}
     .step-index {{ color: var(--muted); display: flex; justify-content: space-between; font-size: .76rem; font-weight: 760; }}
     .step-soc {{ font-size: 1.2rem; font-weight: 780; margin-top: 5px; }}
     .step-reason {{ color: var(--muted); font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
@@ -219,7 +244,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .json-toggle {{ margin-top: 14px; padding: 9px 12px; }}
     .json-viewer {{ display: none; max-height: 420px; overflow: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: #070a0e; padding: 14px; color: #d9e6ef; white-space: pre-wrap; }}
     .json-viewer.open {{ display: block; }}
-    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .three, .four, .flow {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
+    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
     @media (max-width: 620px) {{ main {{ padding: 14px; }} .hero {{ padding: 22px; }} .steps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .window-row {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -245,12 +270,33 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       {_tab_button("safety", "Safety", False)}
     </div>
     {_banner(payload["degraded_mode_banner"])}
-    <section id="tab-overview" class="tab-panel active" role="tabpanel">
+    <section id="tab-overview" class="tab-panel active" role="tabpanel" data-tab-panel="overview">
       <div class="grid top">
         <article class="card">
-          <h2>SOC Trajectory · Integrated Horizon Chart</h2>
-          <p class="note">SOC trajectory with price, PV/load overlays, and reserve/min SOC band.</p>
-          {_horizon_chart(payload)}
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title">SOC Trajectory · Integrated Horizon Chart</h2>
+              <p class="note">How to read this chart: the green line is battery SOC by step/hour, amber bars are Price, blue/yellow lines are PV/load overlay, and shaded bands show the reserve band and decision windows.</p>
+            </div>
+            <span class="badge safe">read-only inspect</span>
+          </div>
+          <div class="legend" aria-label="Chart legend">
+            <span class="legend-item"><span class="swatch"></span>SOC trajectory</span>
+            <span class="legend-item"><span class="swatch reserve"></span>Reserve / min SOC</span>
+            <span class="legend-item"><span class="swatch max"></span>Max SOC</span>
+            <span class="legend-item"><span class="swatch price"></span>Price</span>
+            <span class="legend-item"><span class="swatch overlay"></span>PV/load overlay</span>
+            <span class="legend-item"><span class="swatch charge"></span>charge_from_pv_surplus</span>
+            <span class="legend-item"><span class="swatch clamp"></span>max_soc_clamped_charge / max_soc_hold</span>
+          </div>
+          <div class="chart-layout">
+            {_horizon_chart(payload)}
+            <aside class="chart-explain" id="chart-selected-step-panel">
+              <h3>Current/selected step details</h3>
+              {_chart_step_summary(payload["planner_timeline"][0] if payload["planner_timeline"] else {})}
+              <p class="note">Klik op een stap om details te bekijken. The vertical marker moves to the selected step.</p>
+            </aside>
+          </div>
         </article>
         <article class="card soft">
           <h2>Battery SOC Card</h2>
@@ -259,11 +305,11 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       </div>
       <section class="flow" aria-label="Energy Flow Overview">{_energy_flow(payload["energy_flow"])}</section>
     </section>
-    <section id="tab-plan" class="tab-panel" role="tabpanel">
+    <section id="tab-plan" class="tab-panel" role="tabpanel" data-tab-panel="plan">
       <div class="timeline-grid">
         <article class="card">
           <h2>Planner Timeline</h2>
-          <p class="note">First 24 planner steps. Step tiles are inspect-only selections.</p>
+          <p class="note">Klik op een stap om details te bekijken. First 24 planner steps are inspect-only selections.</p>
           {_timeline_html(payload["planner_timeline"])}
           <h2 style="margin-top:18px">Predbat-Inspired Plan Windows</h2>
           {_window_html(payload["plan_windows"])}
@@ -274,7 +320,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
         </article>
       </div>
     </section>
-    <section id="tab-forecast" class="tab-panel" role="tabpanel">
+    <section id="tab-forecast" class="tab-panel" role="tabpanel" data-tab-panel="forecast">
       <div class="grid three">
         {_forecast_card("Price Forecast Panel", payload["price_forecast"])}
         {_forecast_card("PV Forecast Panel", payload["pv_forecast"])}
@@ -285,7 +331,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
         {_cycle_table(payload["latest_cycle_table"])}
       </article>
     </section>
-    <section id="tab-benchmark" class="tab-panel" role="tabpanel">
+    <section id="tab-benchmark" class="tab-panel" role="tabpanel" data-tab-panel="benchmark">
       <div class="grid top">
         <article class="card">
           <h2>Benchmark Comparison Panel</h2>
@@ -293,11 +339,11 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
         </article>
         <article class="card">
           <h2>Predbat Benchmark/Reference Notice</h2>
-          <p class="note">Predbat is benchmark/reference only, not runtime dependency. This cockpit uses local display payloads and conceptual comparison labels.</p>
+          <p class="note">Predbat is benchmark/reference only, not runtime dependency. These windows are conceptual comparison labels. Energy Brain does not depend on Predbat at runtime. No commands are sent from this cockpit.</p>
         </article>
       </div>
     </section>
-    <section id="tab-safety" class="tab-panel" role="tabpanel">
+    <section id="tab-safety" class="tab-panel" role="tabpanel" data-tab-panel="safety">
       <div class="grid top">
         <article class="card">
           <h2>Plan Explainability Panel</h2>
@@ -322,7 +368,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       button.addEventListener('click', () => {{
         const target = button.dataset.tab;
         tabButtons.forEach((item) => item.setAttribute('aria-selected', String(item === button)));
-        panels.forEach((panel) => panel.classList.toggle('active', panel.id === `tab-${{target}}`));
+        panels.forEach((panel) => panel.classList.toggle('active', panel.dataset.tabPanel === target));
       }});
     }});
     const detail = document.getElementById('step-detail-panel');
@@ -332,11 +378,12 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     }}
     function showStep(index) {{
       const step = payload.planner_timeline[index] || payload.planner_timeline[0] || {{}};
-      document.querySelectorAll('.step-button').forEach((item) => item.classList.toggle('active', Number(item.dataset.index) === index));
+      document.querySelectorAll('.step-button').forEach((item) => item.classList.toggle('active', Number(item.dataset.step) === index));
       const reason = step.reason_code || 'shadow_hold';
+      const constraint = step.constraint || 'display-only planner boundary';
       detail.innerHTML = `
         <div class="list">
-          <div><span>step index</span><strong>${{safeValue(step.step)}}</strong></div>
+          <div><span>selected step index/time</span><strong>#${{safeValue(step.step)}} / +${{index}}h</strong></div>
           <div><span>SOC %</span><strong>${{safeValue(step.soc_percent, '%')}}</strong></div>
           <div><span>battery setpoint kW</span><strong>${{safeValue(step.setpoint_kw)}}</strong></div>
           <div><span>reason code</span><strong>${{reason}}</strong></div>
@@ -345,12 +392,45 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
           <div><span>load forecast</span><strong>${{safeValue(step.load_forecast)}}</strong></div>
           <div><span>grid estimate</span><strong>${{safeValue(step.grid_estimate)}}</strong></div>
           <div><span>validation/display-only status</span><strong>${{safeValue(step.validity)}}</strong></div>
+          <div><span>safety status</span><strong>${{safeValue(step.validity)}} / no dispatch</strong></div>
+          <div><span>constraint applied</span><strong>${{constraint}}</strong></div>
         </div>
         <p class="note" id="selected-reason-explanation">${{reasonMap[reason] || reasonMap.shadow_hold || 'Display-only planner interval.'}}</p>
       `;
+      const chartPanel = document.getElementById('chart-selected-step-panel');
+      if (chartPanel) {{
+        chartPanel.innerHTML = `
+          <h3>Current/selected step details</h3>
+          <div class="list">
+            <div><span>step/hour</span><strong>#${{safeValue(step.step)}} / +${{index}}h</strong></div>
+            <div><span>SOC</span><strong>${{safeValue(step.soc_percent, '%')}}</strong></div>
+            <div><span>reason</span><strong>${{reason}}</strong></div>
+            <div><span>constraint</span><strong>${{constraint}}</strong></div>
+          </div>
+          <p class="note">${{reasonMap[reason] || reasonMap.shadow_hold || 'Display-only planner interval.'}}</p>
+          <p class="note">Klik op een stap om details te bekijken. The vertical marker moves to the selected step.</p>
+        `;
+      }}
+      const marker = document.getElementById('selected-step-marker');
+      const markerLabel = document.getElementById('selected-step-marker-label');
+      if (marker && marker.dataset.stepWidth) {{
+        const x = Number(marker.dataset.chartPad) + index * Number(marker.dataset.stepWidth);
+        marker.setAttribute('x1', String(x));
+        marker.setAttribute('x2', String(x));
+        if (markerLabel) {{
+          markerLabel.setAttribute('x', String(x + 6));
+          markerLabel.textContent = `selected step #${{safeValue(step.step)}}`;
+        }}
+      }}
     }}
     document.querySelectorAll('.step-button').forEach((button) => {{
       button.addEventListener('click', () => showStep(Number(button.dataset.index)));
+      button.addEventListener('keydown', (event) => {{
+        if (event.key === 'Enter' || event.key === ' ') {{
+          event.preventDefault();
+          showStep(Number(button.dataset.index));
+        }}
+      }});
     }});
     const jsonToggle = document.getElementById('json-toggle');
     const jsonViewer = document.getElementById('json-viewer');
@@ -386,11 +466,12 @@ def _cycle_row(step: Any, snapshot: dict[str, Any]) -> dict[str, Any]:
         "load_forecast": load,
         "grid_estimate": _num(grid, round(load - pv - _num(setpoint, 0.0), 2)),
         "validity": "display-only",
+        "constraint": _constraint_for_reason(_text(item.get("reason"), "shadow_hold")),
     }
 
 
 def _shadow_rows(current_soc: float, snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    reasons = ["shadow_hold", "charge_from_pv_surplus", "reserve_hold", "max_soc_clamp", "baseline_compare"]
+    reasons = ["shadow_hold", "charge_from_pv_surplus", "reserve_hold", "max_soc_clamped_charge", "max_soc_hold", "baseline_compare"]
     rows = []
     for index in range(24):
         setpoint = 1.1 if index in (2, 3, 4, 13) else (-0.5 if index in (18, 19) else 0.0)
@@ -406,6 +487,7 @@ def _shadow_rows(current_soc: float, snapshot: dict[str, Any]) -> list[dict[str,
                 "load_forecast": round(max(0.2, _num(snapshot.get("household_load_kw"), 1.4) + ((index % 4) - 1) * 0.16), 2),
                 "grid_estimate": round(_num(snapshot.get("household_load_kw"), 1.4) - _num(snapshot.get("pv_power_kw"), 3.2) - setpoint, 2),
                 "validity": "display-only fallback",
+                "constraint": _constraint_for_reason(reasons[index % len(reasons)]),
             }
         )
     return rows
@@ -464,8 +546,23 @@ def _reason_explanations() -> dict[str, str]:
         "charge_from_pv_surplus": "PV surplus charging is a display label for forecasted local solar surplus.",
         "discharge_to_load": "Discharge-to-load marks a shadow interval where stored energy offsets household demand.",
         "max_soc_clamp": "Max-SOC clamp marks an interval constrained by an upper SOC boundary.",
+        "max_soc_clamped_charge": "Charge is visually clamped by the max-SOC boundary; this is an inspection label only.",
+        "max_soc_hold": "The plan is holding near the max-SOC boundary to avoid exceeding the visual ceiling.",
         "baseline_compare": "Baseline comparison marks an interval used for cost comparison against a non-optimized path.",
     }
+
+
+def _constraint_for_reason(reason: str) -> str:
+    lowered = reason.lower()
+    if "reserve" in lowered:
+        return "reserve/min SOC boundary"
+    if "max_soc" in lowered or "clamp" in lowered:
+        return "max SOC boundary"
+    if "charge" in lowered:
+        return "PV surplus and price window"
+    if "baseline" in lowered:
+        return "baseline comparison window"
+    return "display-only planner boundary"
 
 
 def _badges(values: list[str]) -> str:
@@ -478,7 +575,11 @@ def _tab_button(tab_id: str, label: str, selected: bool) -> str:
 
 def _banner(data: dict[str, Any]) -> str:
     label = "Degraded-Mode Banner"
-    return f'<section class="banner"><strong>{label}:</strong> {_esc(data.get("reason"))} · fallback {_esc(data.get("fallback_mode"))}</section>'
+    return (
+        f'<section class="banner"><strong>{label}:</strong> {_esc(data.get("reason"))} · '
+        f'fallback {_esc(data.get("fallback_mode"))} · missing source {_esc(data.get("missing_source"))}. '
+        f'{_esc(data.get("explanation"))}</section>'
+    )
 
 
 def _energy_flow(flow: dict[str, Any]) -> str:
@@ -504,7 +605,7 @@ def _timeline_html(rows: list[dict[str, Any]]) -> str:
         reason = _text(row.get("reason_code"), "shadow_hold")
         active = " active" if index == 0 else ""
         parts.append(
-            f'<button type="button" class="step-button{active}" data-index="{index}" aria-label="inspect only planner step {index}">'
+            f'<button type="button" class="step-button{active}" data-index="{index}" data-step="{index}" aria-label="inspect only planner step {index}">'
             f'<span class="step-index"><span>#{_esc(row.get("step"))}</span><span>{_esc(row.get("validity"))}</span></span>'
             f'<span class="step-soc">{_fmt(row.get("soc_percent"), "%")}</span>'
             f'<span class="step-reason">{_esc(reason)}</span>'
@@ -556,16 +657,31 @@ def _cycle_table(rows: list[dict[str, Any]]) -> str:
 
 
 def _step_detail(step: dict[str, Any]) -> str:
+    reason = _text(step.get("reason_code"), "shadow_hold")
     fields = {
-        "step index": step.get("step"),
+        "selected step index/time": f"#{_text(step.get('step'), '0')} / +0h",
         "SOC %": step.get("soc_percent"),
         "battery setpoint kW": step.get("setpoint_kw"),
-        "reason code": step.get("reason_code"),
+        "reason code": reason,
         "price": step.get("price"),
         "PV forecast": step.get("pv_forecast"),
         "load forecast": step.get("load_forecast"),
         "grid estimate": step.get("grid_estimate"),
         "validation/display-only status": step.get("validity"),
+        "safety status": f"{_text(step.get('validity'), 'display-only')} / no dispatch",
+        "constraint applied": _text(step.get("constraint"), _constraint_for_reason(reason)),
+    }
+    explanation = _reason_explanations().get(reason, _reason_explanations()["shadow_hold"])
+    return _kv(fields) + f'<p class="note" id="selected-reason-explanation">{_esc(explanation)}</p>'
+
+
+def _chart_step_summary(step: dict[str, Any]) -> str:
+    reason = _text(step.get("reason_code"), "shadow_hold")
+    fields = {
+        "step/hour": f"#{_text(step.get('step'), '0')} / +0h",
+        "SOC": _fmt(step.get("soc_percent"), "%"),
+        "reason": reason,
+        "constraint": _text(step.get("constraint"), _constraint_for_reason(reason)),
     }
     return _kv(fields)
 
@@ -576,42 +692,71 @@ def _horizon_chart(payload: dict[str, Any]) -> str:
     if not points:
         return '<p class="note">SOC trajectory placeholder chart area</p>'
     width = 900
-    height = 270
-    pad = 30
+    height = 330
+    pad = 52
     values = [_num(point.get("soc_percent"), 0.0) for point in points]
     reserve = _num(points[0].get("reserve_floor"), 20.0)
+    max_soc = _num(_dict(payload.get("battery_soc_card")).get("max_forecast_soc"), max(values or [reserve]))
     lower = max(0.0, min(values + [reserve]) - 4.0)
-    upper = min(100.0, max(values + [reserve]) + 4.0)
+    upper = min(100.0, max(values + [reserve, max_soc]) + 4.0)
     span = max(1.0, upper - lower)
     x_step = (width - pad * 2) / max(1, len(points) - 1)
     soc_pairs = []
     pv_pairs = []
     load_pairs = []
     price_bars = []
+    decision_bands = []
+    x_labels = []
     max_price = max([_num(row.get("price"), 0.0) for row in rows] or [1.0]) or 1.0
     for index, point in enumerate(points):
         x = pad + index * x_step
         y = pad + (upper - _num(point.get("soc_percent"), 0.0)) / span * (height - pad * 2)
         soc_pairs.append(f"{x:.1f},{y:.1f}")
         row = rows[min(index, len(rows) - 1)] if rows else {}
+        reason = _text(row.get("reason_code"), "")
+        decision_class = ""
+        if reason == "charge_from_pv_surplus":
+            decision_class = "#43d6a6"
+        elif reason in ("max_soc_clamped_charge", "max_soc_hold", "max_soc_clamp") or "max_soc" in reason:
+            decision_class = "#f2b84b"
+        if decision_class:
+            decision_bands.append(f'<rect x="{x - x_step / 2:.1f}" y="{pad:.1f}" width="{max(6.0, x_step):.1f}" height="{height - pad * 2:.1f}" fill="{decision_class}" opacity=".14"/>')
         pv_y = height - pad - min(1.0, _num(row.get("pv_forecast"), 0.0) / 6.0) * 54
         load_y = height - pad - min(1.0, _num(row.get("load_forecast"), 0.0) / 4.0) * 54
         pv_pairs.append(f"{x:.1f},{pv_y:.1f}")
         load_pairs.append(f"{x:.1f},{load_y:.1f}")
         bar_h = 10 + (_num(row.get("price"), 0.0) / max_price) * 58
         price_bars.append(f'<rect x="{x - 4:.1f}" y="{height - pad - bar_h:.1f}" width="8" height="{bar_h:.1f}" rx="3" fill="rgba(255,209,102,.38)"/>')
+        if index in (0, 6, 12, 18, len(points) - 1):
+            x_labels.append(f'<text x="{x:.1f}" y="{height - 14}" fill="#9eacb8" font-size="11" text-anchor="middle">+{index}h</text>')
     reserve_y = pad + (upper - reserve) / span * (height - pad * 2)
+    max_y = pad + (upper - max_soc) / span * (height - pad * 2)
+    y_mid_value = (upper + lower) / 2
+    y_mid = pad + (upper - y_mid_value) / span * (height - pad * 2)
     return (
         f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="SOC trajectory placeholder chart area">'
+        f'<title>SOC trajectory, price, PV/load overlay, reserve and max SOC horizon</title>'
+        f'<rect x="{pad}" y="{pad}" width="{width - pad * 2}" height="{height - pad * 2}" fill="rgba(255,255,255,.018)" stroke="rgba(238,244,248,.12)"/>'
         f'<rect x="{pad}" y="{reserve_y:.1f}" width="{width - pad * 2}" height="{height - pad - reserve_y:.1f}" fill="rgba(242,184,75,.08)"/>'
+        f'{"".join(decision_bands)}'
         f'<line x1="{pad}" x2="{width-pad}" y1="{reserve_y:.1f}" y2="{reserve_y:.1f}" stroke="#f2b84b" stroke-dasharray="6 6"/>'
+        f'<text x="{width - pad - 118}" y="{reserve_y - 6:.1f}" fill="#f2b84b" font-size="12">Reserve / min SOC</text>'
+        f'<line x1="{pad}" x2="{width-pad}" y1="{max_y:.1f}" y2="{max_y:.1f}" stroke="#ff7777" stroke-dasharray="4 5"/>'
+        f'<text x="{width - pad - 62}" y="{max_y - 6:.1f}" fill="#ff9999" font-size="12">Max SOC</text>'
         f'{"".join(price_bars)}'
         f'<polyline points="{" ".join(pv_pairs)}" fill="none" stroke="#ffd166" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>'
         f'<polyline points="{" ".join(load_pairs)}" fill="none" stroke="#69a7ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>'
         f'<polyline points="{" ".join(soc_pairs)}" fill="none" stroke="#43d6a6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'
-        f'<text x="{pad}" y="18" fill="#9eacb8" font-size="12">{upper:.1f}%</text>'
-        f'<text x="{pad}" y="{height - 6}" fill="#9eacb8" font-size="12">{lower:.1f}%</text>'
-        f'<text x="{width - 278}" y="18" fill="#9eacb8" font-size="12">SOC line · price bars · PV/load overlays · reserve band</text>'
+        f'<line id="selected-step-marker" data-chart-pad="{pad}" data-step-width="{x_step:.4f}" x1="{pad}" x2="{pad}" y1="{pad}" y2="{height - pad}" stroke="#eef4f8" stroke-width="2" opacity=".86"/>'
+        f'<text id="selected-step-marker-label" x="{pad + 6}" y="{pad + 16}" fill="#eef4f8" font-size="12">selected step #0</text>'
+        f'<text x="14" y="{pad + 4}" fill="#9eacb8" font-size="12">{upper:.1f}%</text>'
+        f'<text x="14" y="{y_mid + 4:.1f}" fill="#9eacb8" font-size="12">{y_mid_value:.1f}%</text>'
+        f'<text x="14" y="{height - pad + 4}" fill="#9eacb8" font-size="12">{lower:.1f}%</text>'
+        f'<text x="10" y="{height / 2:.1f}" fill="#9eacb8" font-size="12" transform="rotate(-90 10 {height / 2:.1f})">SOC %</text>'
+        f'{"".join(x_labels)}'
+        f'<text x="{width / 2:.1f}" y="{height - 2}" fill="#9eacb8" font-size="12" text-anchor="middle">step / hour</text>'
+        f'<text x="{width - 326}" y="39" fill="#9eacb8" font-size="12">SOC line · price bars · PV/load overlays · reserve band</text>'
+        f'<text x="{width - 414}" y="22" fill="#9eacb8" font-size="12">Decision bands: charge_from_pv_surplus, max_soc_clamped_charge, max_soc_hold</text>'
         "</svg>"
     )
 
