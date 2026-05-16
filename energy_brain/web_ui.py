@@ -1490,5 +1490,129 @@ def main() -> None:
     server.serve_forever()
 
 
+# ENERGY_BRAIN_TIME_LABEL_WRAPPER_V1
+#
+# UI-only wrapper.
+# Converts internal planner step numbers (#0..#23) into readable horizon labels:
+#   #0 -> Nu
+#   #1 -> +1 uur
+#   #2 -> +2 uur
+#
+# The original step index remains available as a small technical hint.
+# This does not change planner data, controller approval, service behavior,
+# Home Assistant entities, battery limits, SOC math, or runtime decisions.
+
+_original_render_dashboard_html_time_labels_v1 = render_dashboard_html
+
+
+def render_dashboard_html(summary: dict[str, Any]) -> str:
+    page = _original_render_dashboard_html_time_labels_v1(summary)
+    return _eb_time_label_rendered_page(page)
+
+
+def _eb_time_label_rendered_page(page: str) -> str:
+    if not isinstance(page, str) or not page:
+        return page
+
+    page = _eb_insert_time_label_explainer(page)
+
+    # Replace the visible labels in the plan-inspect step buttons.
+    # Keep data-index/data-step unchanged for the existing JavaScript.
+    for index in range(0, 96):
+        label = _eb_time_label(index)
+        hint = _eb_time_hint(index)
+
+        page = page.replace(
+            f"<span>#{index}</span><span>display-only fallback</span>",
+            f"<span>{_escape(label)}</span><span>{_escape(hint)}</span>",
+        )
+        page = page.replace(
+            f"<span>#{index}</span><span>display-only</span>",
+            f"<span>{_escape(label)}</span><span>{_escape(hint)}</span>",
+        )
+        page = page.replace(
+            f"<span>#{index}</span><span>shadow</span>",
+            f"<span>{_escape(label)}</span><span>{_escape(hint)}</span>",
+        )
+        page = page.replace(
+            f"<span>#{index}</span><span>inspect only</span>",
+            f"<span>{_escape(label)}</span><span>{_escape(hint)}</span>",
+        )
+
+        # Make accessibility labels clearer too.
+        page = page.replace(
+            f'aria-label="inspect only planner step {index}"',
+            f'aria-label="inspect only planner time slot {index}: {_escape(label)}"',
+        )
+
+    # Selected step panel: make the visible selected step understandable.
+    for index in range(0, 96):
+        label = _eb_time_label(index)
+        page = page.replace(
+            f"<strong>#{index} · nu</strong>",
+            f"<strong>{_escape(label)} · interne stap {index}</strong>",
+        )
+        page = page.replace(
+            f"<strong>#{index} / +{index}h</strong>",
+            f"<strong>{_escape(label)} · interne stap {index}</strong>",
+        )
+        page = page.replace(
+            f"<strong>#{index}</strong>",
+            f"<strong>{_escape(label)}</strong>",
+        )
+
+    # Chart label text is technical; clarify it without changing the SVG math.
+    page = page.replace(
+        "step / hour",
+        "tijd vanaf nu",
+    )
+    page = page.replace(
+        "selected step #0",
+        "geselecteerd: Nu",
+    )
+
+    return page
+
+
+def _eb_insert_time_label_explainer(page: str) -> str:
+    if "Wat betekenen Nu, +1 uur en +2 uur?" in page:
+        return page
+
+    explainer = """
+    <section class="human-card" aria-label="Uitleg plan tijdslots">
+      <h2>Wat betekenen Nu, +1 uur en +2 uur?</h2>
+      <p><strong>Dit zijn tijdslots in de vooruitblik.</strong></p>
+      <p class="note">Nu is het eerste tijdslot. +1 uur is het volgende tijdslot. +23 uur is het laatste getoonde tijdslot in deze plan-inspectie.</p>
+      <p class="note">De oude nummers #0 tot en met #23 zijn alleen interne planner-indexen. Voorbeeld: interne stap 0 is Nu, interne stap 1 is +1 uur. Die technische nummers blijven nuttig voor debuggen, maar staan niet meer voorop.</p>
+    </section>
+    """
+
+    anchors = [
+        '<section id="tab-plan"',
+        '<div class="steps">',
+        '<section class="human-grid"',
+    ]
+
+    for anchor in anchors:
+        if anchor in page:
+            return page.replace(anchor, explainer + "\n" + anchor, 1)
+
+    return page.replace("</main>", explainer + "\n</main>", 1)
+
+
+def _eb_time_label(index: int) -> str:
+    if index == 0:
+        return "Nu"
+    if index == 1:
+        return "+1 uur"
+    return f"+{index} uur"
+
+
+def _eb_time_hint(index: int) -> str:
+    if index == 0:
+        return "interne stap 0 · huidige periode"
+    return f"interne stap {index} · vooruitblik"
+
+
 if __name__ == "__main__":
     main()
