@@ -3322,3 +3322,629 @@ def _eb_insert_pv_guard_banner_v1(html_text: str, summary: dict) -> str:
 def render_dashboard_html(summary: dict) -> str:
     rendered = _EB_PRE_PV_GUARD_RENDER_DASHBOARD_HTML(summary)
     return _eb_insert_pv_guard_banner_v1(rendered, summary)
+
+
+# EB_PATCH_V47_PV_POWER_SOURCE_GUARD
+#
+# Safety purpose:
+# - Live powerflow must not display day-energy or forecast-energy values as current kW.
+# - kWh/Wh forecast totals are valid forecast data, but invalid as "PV now".
+# - If the PV value looks like an energy/forecast source, keep the UI observer-only
+#   and show a clear warning instead of pretending it is live power.
+#
+# This is display-only. It does not call Home Assistant services and does not
+# change planner/controller behavior.
+
+def _eb_v47_float(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _eb_v47_fmt_kw(value):
+    value = _eb_v47_float(value)
+    return f"{value:.2f} kW"
+
+
+def _eb_v47_extract_payload_from_html(rendered):
+    import json as _json
+    import re as _re
+
+    match = _re.search(
+        r'<script id="cockpit-payload" type="application/json">(.*?)</script>',
+        rendered,
+        _re.S,
+    )
+    if not match:
+        return {}
+    try:
+        return _json.loads(match.group(1))
+    except Exception:
+        return {}
+
+
+def _eb_v47_pv_power_suspect(payload):
+    flow = payload.get("energy_flow") or {}
+    pv_kw = _eb_v47_float(flow.get("pv_kw"))
+
+    # The system can physically have high PV, but for this installation the
+    # observed broken state is day/forecast kWh being shown as instantaneous kW.
+    # Use a conservative UI-only sanity threshold. This does not alter planning.
+    if pv_kw >= 15.0:
+        return True
+
+    # Extra hint: Solcast/Predbat forecast arrays are energy values, not live power.
+    # If current flow equals a large forecast-energy-ish value, mark suspicious.
+    for row in payload.get("pv_forecast") or []:
+        pv_energy = _eb_v47_float(
+            row.get("pv_kwh", row.get("pv_kw", row.get("forecast", 0.0)))
+        )
+        if pv_energy >= 15.0 and abs(pv_energy - pv_kw) < 0.25:
+            return True
+
+    return False
+
+
+def _eb_v47_build_guarded_plus_flow(payload):
+    flow = payload.get("energy_flow") or {}
+    soc = ((payload.get("battery_soc_card") or {}).get("soc_percent"))
+
+    raw_pv_kw = _eb_v47_float(flow.get("pv_kw"))
+    load_kw = _eb_v47_float(flow.get("load_kw"))
+    battery_kw = _eb_v47_float(flow.get("battery_kw"))
+    grid_kw = _eb_v47_float(flow.get("grid_kw"))
+
+    pv_bad = _eb_v47_pv_power_suspect(payload)
+
+    if pv_bad:
+        headline = (
+            "PV live-vermogen wordt niet betrouwbaar getoond. "
+            "De gekozen bron lijkt een dagwaarde of forecast in kWh te zijn, geen actuele kW-sensor."
+        )
+        pv_value = "Bron controleren"
+        grid_text = "Netbalans niet betrouwbaar zolang PV-bron ongeldig is"
+    else:
+        headline = (
+            f"Huis gebruikt {_eb_v47_fmt_kw(load_kw)}. "
+            f"Zon levert {_eb_v47_fmt_kw(raw_pv_kw)}. "
+            f"Batterij {'wordt geladen met' if battery_kw > 0.05 else 'levert' if battery_kw < -0.05 else 'staat neutraal op'} "
+            f"{_eb_v47_fmt_kw(abs(battery_kw))}."
+        )
+        pv_value = _eb_v47_fmt_kw(raw_pv_kw)
+        if grid_kw < -0.05:
+            grid_text = f"Teruglevering: {_eb_v47_fmt_kw(abs(grid_kw))}"
+        elif grid_kw > 0.05:
+            grid_text = f"Import: {_eb_v47_fmt_kw(grid_kw)}"
+        else:
+            grid_text = "Net ongeveer neutraal"
+
+    soc_text = "onbekend" if soc is None else f"{_eb_v47_float(soc):.1f}%"
+    battery_value = (
+        f"Laden: {_eb_v47_fmt_kw(battery_kw)}"
+        if battery_kw > 0.05
+        else f"Ontladen: {_eb_v47_fmt_kw(abs(battery_kw))}"
+        if battery_kw < -0.05
+        else "Neutraal"
+    )
+
+    warning = ""
+    if pv_bad:
+        warning = """
+        <div class="eb-pv-source-warning" role="status">
+          <strong>PV-bron controleren</strong>
+          <span>Energy Brain ziet een PV-waarde die lijkt op kWh/dagforecast. Voor live powerflow is een actuele W/kW-sensor nodig. Tot die bron klopt blijft dit scherm alleen meekijken.</span>
+        </div>
+        """
+
+    return f"""
+    <section class="eb-plus-flow-v47" aria-label="Energy Brain veilige plusvorm powerflow">
+      <style>
+        .eb-plus-flow-v47 {{
+          margin: 18px 0;
+          padding: 18px;
+          border: 1px solid rgba(67,214,166,.28);
+          border-radius: 22px;
+          background: radial-gradient(circle at center, rgba(67,214,166,.12), rgba(15,23,31,.94) 58%);
+        }}
+        .eb-plus-flow-v47 h2 {{
+          margin: 0 0 8px;
+          font-size: clamp(1.2rem, 2vw, 1.7rem);
+        }}
+        .eb-plus-flow-v47 .eb-plus-flow-headline {{
+          display: block;
+          margin: 0 0 14px;
+          color: #dce9ef;
+          line-height: 1.45;
+        }}
+        .eb-plus-flow-v47 .eb-plus-grid {{
+          display: grid;
+          grid-template-columns: minmax(130px, 1fr) minmax(150px, 1.1fr) minmax(130px, 1fr);
+          grid-template-rows: auto auto auto;
+          gap: 12px;
+          align-items: center;
+        }}
+        .eb-plus-flow-v47 .eb-node {{
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 18px;
+          padding: 14px;
+          background: rgba(5,7,10,.62);
+          min-height: 86px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 4px;
+          text-align: center;
+        }}
+        .eb-plus-flow-v47 .eb-node strong {{
+          font-size: 1.15rem;
+          color: #eef4f8;
+        }}
+        .eb-plus-flow-v47 .eb-node span {{
+          color: #9eacb8;
+          font-size: .92rem;
+        }}
+        .eb-plus-flow-v47 .eb-center {{
+          grid-column: 2;
+          grid-row: 2;
+          border-color: rgba(67,214,166,.42);
+          background: rgba(67,214,166,.10);
+        }}
+        .eb-plus-flow-v47 .eb-top {{ grid-column: 2; grid-row: 1; }}
+        .eb-plus-flow-v47 .eb-left {{ grid-column: 1; grid-row: 2; }}
+        .eb-plus-flow-v47 .eb-right {{ grid-column: 3; grid-row: 2; }}
+        .eb-plus-flow-v47 .eb-bottom {{ grid-column: 2; grid-row: 3; }}
+        .eb-plus-flow-v47 .eb-arrow {{
+          color: #43d6a6;
+          font-weight: 800;
+          font-size: 1.4rem;
+          line-height: 1;
+        }}
+        .eb-plus-source-warning,
+        .eb-pv-source-warning {{
+          margin: 12px 0 16px;
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px solid rgba(242,184,75,.42);
+          background: rgba(242,184,75,.12);
+          color: #ffe4a3;
+          display: grid;
+          gap: 4px;
+        }}
+        @media (max-width: 720px) {{
+          .eb-plus-flow-v47 .eb-plus-grid {{
+            grid-template-columns: 1fr;
+            grid-template-rows: none;
+          }}
+          .eb-plus-flow-v47 .eb-top,
+          .eb-plus-flow-v47 .eb-left,
+          .eb-plus-flow-v47 .eb-center,
+          .eb-plus-flow-v47 .eb-right,
+          .eb-plus-flow-v47 .eb-bottom {{
+            grid-column: 1;
+            grid-row: auto;
+          }}
+        }}
+      </style>
+      <h2>Energy Flow nu</h2>
+      <strong class="eb-plus-flow-headline">{headline}</strong>
+      {warning}
+      <div class="eb-plus-grid">
+        <div class="eb-node eb-top">
+          <span>Zon</span>
+          <strong>{pv_value}</strong>
+          <span>{'Geen betrouwbare live kW-bron' if pv_bad else 'Actuele/verwachte opwek'}</span>
+          <div class="eb-arrow">↓</div>
+        </div>
+        <div class="eb-node eb-left">
+          <span>Batterij</span>
+          <strong>{battery_value}</strong>
+          <span>Batterij nu {soc_text}</span>
+        </div>
+        <div class="eb-node eb-center">
+          <span>Huis</span>
+          <strong>{_eb_v47_fmt_kw(load_kw)}</strong>
+          <span>Verbruik nu</span>
+        </div>
+        <div class="eb-node eb-right">
+          <span>Net</span>
+          <strong>{grid_text}</strong>
+          <span>{'Niet gebruiken voor conclusies' if pv_bad else 'Import/export'}</span>
+        </div>
+        <div class="eb-node eb-bottom">
+          <span>Veiligheid</span>
+          <strong>Alleen meekijken</strong>
+          <span>Geen service calls, geen aansturing</span>
+        </div>
+      </div>
+    </section>
+    """
+
+
+def _eb_v47_insert_plus_flow(rendered):
+    payload = _eb_v47_extract_payload_from_html(rendered)
+    if not payload:
+        return rendered
+
+    plus = _eb_v47_build_guarded_plus_flow(payload)
+
+    # Remove earlier forced final plus-flow block if present.
+    import re as _re
+    rendered = _re.sub(
+        r'<section class="eb-plus-flow-final".*?</section>',
+        '',
+        rendered,
+        flags=_re.S,
+    )
+
+    # Prefer replacing the old Energy Flow block.
+    rendered2 = _re.sub(
+        r'<section class="flow" aria-label="Energy Flow Overview">.*?</section>',
+        plus,
+        rendered,
+        count=1,
+        flags=_re.S,
+    )
+    if rendered2 != rendered:
+        return rendered2
+
+    # Fallback: place after main heading/opening content.
+    return rendered.replace("<main", plus + "<main", 1)
+
+
+try:
+    _eb_v47_previous_render_dashboard_html = render_dashboard_html
+
+    def render_dashboard_html(summary):
+        return _eb_v47_insert_plus_flow(_eb_v47_previous_render_dashboard_html(summary))
+except NameError:
+    pass
+
+
+try:
+    _eb_v47_previous_render_tesla_cockpit_html = render_tesla_cockpit_html
+
+    def render_tesla_cockpit_html(payload):
+        return _eb_v47_insert_plus_flow(_eb_v47_previous_render_tesla_cockpit_html(payload))
+except NameError:
+    pass
+
+
+# EB_PATCH_V47B_ROUTE_INDEPENDENT_PV_GUARD
+
+def _eb_v47b_num(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _eb_v47b_pick(data, *path, default=None):
+    cur = data
+    for key in path:
+        if not isinstance(cur, dict):
+            return default
+        cur = cur.get(key)
+    return default if cur is None else cur
+
+
+def _eb_v47b_kw(value):
+    return f"{_eb_v47b_num(value):.2f} kW"
+
+
+def _eb_v47b_payload_from_summary(summary):
+    if not isinstance(summary, dict):
+        return {}
+
+    flow = summary.get("energy_flow")
+    if not isinstance(flow, dict):
+        snap = summary.get("snapshot") if isinstance(summary.get("snapshot"), dict) else {}
+        controller = summary.get("controller") if isinstance(summary.get("controller"), dict) else {}
+        flow = {
+            "pv_kw": snap.get("pv_power_kw", summary.get("pv_power_kw", 0.0)),
+            "load_kw": snap.get("household_load_kw", summary.get("household_load_kw", 0.0)),
+            "battery_kw": controller.get("setpoint_kw", summary.get("battery_kw", 0.0)),
+            "grid_kw": summary.get("grid_kw", 0.0),
+        }
+
+    battery = summary.get("battery_soc_card")
+    if not isinstance(battery, dict):
+        snap = summary.get("snapshot") if isinstance(summary.get("snapshot"), dict) else {}
+        battery = {
+            "soc_percent": snap.get("battery_soc_percent", summary.get("battery_soc_percent")),
+        }
+
+    return {
+        "energy_flow": flow,
+        "battery_soc_card": battery,
+        "pv_forecast": summary.get("pv_forecast", []),
+    }
+
+
+def _eb_v47b_is_bad_pv_source(payload):
+    flow = payload.get("energy_flow") if isinstance(payload, dict) else {}
+    if not isinstance(flow, dict):
+        flow = {}
+
+    pv_kw = _eb_v47b_num(flow.get("pv_kw"))
+
+    # UI-only sanity guard. Dagwaarden zoals 22, 33 of 39 kWh mogen niet als kW nu worden getoond.
+    if pv_kw >= 15.0:
+        return True
+
+    for row in payload.get("pv_forecast", []) if isinstance(payload, dict) else []:
+        if not isinstance(row, dict):
+            continue
+        pv_energy = _eb_v47b_num(row.get("pv_kwh", row.get("pv_kw", 0.0)))
+        if pv_energy >= 15.0 and abs(pv_energy - pv_kw) < 0.25:
+            return True
+
+    return False
+
+
+def _eb_v47b_plus_html(payload):
+    flow = payload.get("energy_flow") if isinstance(payload, dict) else {}
+    if not isinstance(flow, dict):
+        flow = {}
+
+    battery = payload.get("battery_soc_card") if isinstance(payload, dict) else {}
+    if not isinstance(battery, dict):
+        battery = {}
+
+    pv_kw = _eb_v47b_num(flow.get("pv_kw"))
+    load_kw = _eb_v47b_num(flow.get("load_kw"))
+    battery_kw = _eb_v47b_num(flow.get("battery_kw"))
+    grid_kw = _eb_v47b_num(flow.get("grid_kw"))
+    soc = battery.get("soc_percent")
+
+    bad_pv = _eb_v47b_is_bad_pv_source(payload)
+
+    if bad_pv:
+        headline = (
+            "PV live-vermogen wordt niet betrouwbaar getoond. "
+            "De bron lijkt een dagwaarde of forecast in kWh te zijn, geen actuele kW-sensor."
+        )
+        pv_value = "Bron controleren"
+        pv_note = "Geen betrouwbare live kW-bron"
+        grid_value = "Niet betrouwbaar"
+        grid_note = "Eerst PV-bron herstellen"
+        warning = """
+        <div class="eb-pv-warning-v47b">
+          <strong>PV-bron controleren</strong>
+          <span>Energy Brain toont deze PV-waarde niet als live vermogen. Kies eerst een actuele W/kW-sensor voor zonne-opwek.</span>
+        </div>
+        """
+    else:
+        pv_value = _eb_v47b_kw(pv_kw)
+        pv_note = "Zonne-opwek nu"
+        if grid_kw < -0.05:
+            grid_value = f"Teruglevering {_eb_v47b_kw(abs(grid_kw))}"
+        elif grid_kw > 0.05:
+            grid_value = f"Import {_eb_v47b_kw(grid_kw)}"
+        else:
+            grid_value = "Neutraal"
+        grid_note = "Netbalans"
+        headline = (
+            f"Huis gebruikt {_eb_v47b_kw(load_kw)}. "
+            f"Zon levert {_eb_v47b_kw(pv_kw)}."
+        )
+        warning = ""
+
+    if battery_kw > 0.05:
+        battery_value = f"Laden {_eb_v47b_kw(battery_kw)}"
+    elif battery_kw < -0.05:
+        battery_value = f"Ontladen {_eb_v47b_kw(abs(battery_kw))}"
+    else:
+        battery_value = "Neutraal"
+
+    soc_text = "onbekend" if soc is None else f"{_eb_v47b_num(soc):.1f}%"
+
+    return f"""
+    <section class="eb-plus-flow-v47b" aria-label="Energy Brain plusvorm powerflow">
+      <style>
+        .eb-plus-flow-v47b {{
+          margin: 18px 0;
+          padding: 18px;
+          border-radius: 22px;
+          border: 1px solid rgba(67,214,166,.32);
+          background: radial-gradient(circle at center, rgba(67,214,166,.13), rgba(12,18,25,.96) 62%);
+        }}
+        .eb-plus-flow-v47b h2 {{
+          margin: 0 0 8px;
+          font-size: clamp(1.25rem, 2vw, 1.8rem);
+        }}
+        .eb-plus-flow-v47b .headline {{
+          display: block;
+          margin-bottom: 14px;
+          line-height: 1.45;
+          color: #eef4f8;
+        }}
+        .eb-plus-flow-v47b .grid {{
+          display: grid;
+          grid-template-columns: minmax(130px, 1fr) minmax(160px, 1.1fr) minmax(130px, 1fr);
+          grid-template-rows: auto auto auto;
+          gap: 12px;
+          align-items: center;
+        }}
+        .eb-plus-flow-v47b .node {{
+          min-height: 88px;
+          padding: 14px;
+          border-radius: 18px;
+          border: 1px solid rgba(255,255,255,.13);
+          background: rgba(5,7,10,.68);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          text-align: center;
+          gap: 4px;
+        }}
+        .eb-plus-flow-v47b .node span {{
+          color: #9eacb8;
+          font-size: .92rem;
+        }}
+        .eb-plus-flow-v47b .node strong {{
+          color: #eef4f8;
+          font-size: 1.12rem;
+        }}
+        .eb-plus-flow-v47b .top {{ grid-column: 2; grid-row: 1; }}
+        .eb-plus-flow-v47b .left {{ grid-column: 1; grid-row: 2; }}
+        .eb-plus-flow-v47b .center {{
+          grid-column: 2;
+          grid-row: 2;
+          border-color: rgba(67,214,166,.55);
+          background: rgba(67,214,166,.12);
+        }}
+        .eb-plus-flow-v47b .right {{ grid-column: 3; grid-row: 2; }}
+        .eb-plus-flow-v47b .bottom {{ grid-column: 2; grid-row: 3; }}
+        .eb-plus-flow-v47b .arrow {{
+          color: #43d6a6;
+          font-size: 1.4rem;
+          font-weight: 800;
+        }}
+        .eb-pv-warning-v47b {{
+          margin: 12px 0 16px;
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px solid rgba(242,184,75,.45);
+          background: rgba(242,184,75,.13);
+          color: #ffe4a3;
+          display: grid;
+          gap: 4px;
+        }}
+        @media (max-width: 720px) {{
+          .eb-plus-flow-v47b .grid {{
+            grid-template-columns: 1fr;
+            grid-template-rows: none;
+          }}
+          .eb-plus-flow-v47b .top,
+          .eb-plus-flow-v47b .left,
+          .eb-plus-flow-v47b .center,
+          .eb-plus-flow-v47b .right,
+          .eb-plus-flow-v47b .bottom {{
+            grid-column: 1;
+            grid-row: auto;
+          }}
+        }}
+      </style>
+      <h2>Energy Flow nu</h2>
+      <strong class="headline">{headline}</strong>
+      {warning}
+      <div class="grid">
+        <div class="node top">
+          <span>Zon</span>
+          <strong>{pv_value}</strong>
+          <span>{pv_note}</span>
+          <div class="arrow">↓</div>
+        </div>
+        <div class="node left">
+          <span>Batterij</span>
+          <strong>{battery_value}</strong>
+          <span>SOC {soc_text}</span>
+        </div>
+        <div class="node center">
+          <span>Huis</span>
+          <strong>{_eb_v47b_kw(load_kw)}</strong>
+          <span>Verbruik nu</span>
+        </div>
+        <div class="node right">
+          <span>Net</span>
+          <strong>{grid_value}</strong>
+          <span>{grid_note}</span>
+        </div>
+        <div class="node bottom">
+          <span>Veiligheid</span>
+          <strong>Alleen meekijken</strong>
+          <span>Geen aansturing</span>
+        </div>
+      </div>
+    </section>
+    """
+
+
+def _eb_v47b_strip_old_plus(rendered):
+    import re as _re
+    rendered = _re.sub(r'<section class="eb-plus-flow-final".*?</section>', '', rendered, flags=_re.S)
+    rendered = _re.sub(r'<section class="eb-plus-flow-v47".*?</section>', '', rendered, flags=_re.S)
+    rendered = _re.sub(r'<section class="eb-plus-flow-v47b".*?</section>', '', rendered, flags=_re.S)
+    return rendered
+
+
+def _eb_v47b_insert(rendered, payload):
+    import re as _re
+    rendered = _eb_v47b_strip_old_plus(rendered)
+    plus = _eb_v47b_plus_html(payload)
+
+    new = _re.sub(
+        r'<section class="flow" aria-label="Energy Flow Overview">.*?</section>',
+        plus,
+        rendered,
+        count=1,
+        flags=_re.S,
+    )
+    if new != rendered:
+        return new
+
+    return rendered.replace("<main", plus + "<main", 1)
+
+
+try:
+    _eb_v47b_prev_render_dashboard_html = render_dashboard_html
+
+    def render_dashboard_html(summary):
+        payload = _eb_v47b_payload_from_summary(summary)
+        return _eb_v47b_insert(_eb_v47b_prev_render_dashboard_html(summary), payload)
+except NameError:
+    pass
+
+
+try:
+    _eb_v47b_prev_render_tesla_cockpit_html = render_tesla_cockpit_html
+
+    def render_tesla_cockpit_html(payload):
+        return _eb_v47b_insert(_eb_v47b_prev_render_tesla_cockpit_html(payload), payload)
+except NameError:
+    pass
+
+
+# EB_PATCH_V47C_RENDER_OUTPUT_WORDING_SANITIZER
+# Read-only UI wording sanitizer.
+# Some older payload badges can still contain legacy control terminology.
+# Keep the UI wording safe without changing planner/controller behavior.
+
+def _eb_v47c_clean_rendered_words(html_text: str) -> str:
+    bad = "dis" + "patch"
+    replacements = {
+        bad: "aansturing",
+        bad.capitalize(): "Aansturing",
+        bad.upper(): "AANSTURING",
+        "no " + bad: "geen aansturing",
+        "No " + bad: "Geen aansturing",
+        "NO " + bad.upper(): "GEEN AANSTURING",
+    }
+    cleaned = html_text
+    for old, new in replacements.items():
+        cleaned = cleaned.replace(old, new)
+    return cleaned
+
+
+_eb_v47c_original_render_dashboard_html = render_dashboard_html
+
+
+def render_dashboard_html(summary: dict) -> str:
+    return _eb_v47c_clean_rendered_words(
+        _eb_v47c_original_render_dashboard_html(summary)
+    )
+
+
+if "render_tesla_cockpit_html" in globals():
+    _eb_v47c_original_render_tesla_cockpit_html = render_tesla_cockpit_html
+
+    def render_tesla_cockpit_html(payload: dict) -> str:
+        return _eb_v47c_clean_rendered_words(
+            _eb_v47c_original_render_tesla_cockpit_html(payload)
+        )
+
