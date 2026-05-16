@@ -11,6 +11,63 @@ from energy_brain.v1969.tesla_style_cockpit_spec import REQUIRED_SECTIONS, build
 SCHEMA_VERSION = "v2064_v2095.usable_interactive_read_only_cockpit.1"
 
 
+def human_action_for_step(step: dict[str, Any]) -> str:
+    """Return a plain-Dutch action summary for one planner step."""
+
+    reason = _text(step.get("reason_code") or step.get("reason"), "shadow_hold")
+    setpoint = _num(step.get("setpoint_kw", step.get("battery_setpoint_kw")), 0.0)
+    if reason == "charge_from_pv_surplus" or setpoint > 0.05:
+        return "batterij laden met zonne-overschot"
+    if reason == "max_soc_clamped_charge":
+        return "laden begrenzen omdat de batterij bijna vol is"
+    if reason == "max_soc_hold":
+        return "batterij vol genoeg houden"
+    if reason == "reserve_hold":
+        return "energie bewaren als reserve"
+    if reason == "baseline_compare":
+        return "alleen vergelijken met een simpele basisstrategie"
+    if reason == "shadow_hold":
+        return "geen actie nodig"
+    return "Energy Brain kijkt mee en verandert niets"
+
+
+def human_reason_for_step(step: dict[str, Any]) -> str:
+    """Return a plain-Dutch reason for one planner step."""
+
+    reason = _text(step.get("reason_code") or step.get("reason"), "shadow_hold")
+    reasons = {
+        "charge_from_pv_surplus": "Er wordt meer zonne-energie verwacht dan het huis nodig heeft. Het overschot kan in de batterij.",
+        "max_soc_clamped_charge": "De batterij raakt bijna vol. Laden wordt daarom begrensd.",
+        "max_soc_hold": "De batterij is vol genoeg. Energy Brain houdt hem vast en voorkomt overladen.",
+        "reserve_hold": "Energy Brain bewaart energie als reserve.",
+        "baseline_compare": "Dit is alleen een vergelijking met een simpele basisstrategie.",
+        "shadow_hold": "Er is geen duidelijke betere actie of de data is alleen voorbeeld-/schaduwdata.",
+        "hold": "Er is nu geen duidelijke actie nodig. Energy Brain blijft meekijken.",
+    }
+    return reasons.get(reason, reasons["shadow_hold"])
+
+
+def human_safety_summary() -> list[str]:
+    return [
+        "Ja. Deze cockpit stuurt niets aan.",
+        "Geen service calls.",
+        "Geen dispatch.",
+        "Geen batterijcommando.",
+        "Alleen lezen en uitleggen.",
+    ]
+
+
+def human_chart_legend() -> list[str]:
+    return [
+        "Groene lijn = verwachte batterijvulling.",
+        "Gele balkjes = stroomprijs.",
+        "Blauwe/geelachtige lijnen = verwachte zon en verbruik.",
+        "Onderste gele lijn = reservegrens.",
+        "Rode streep = maximale batterijgrens.",
+        "Gekleurde vlakken = perioden waarin Energy Brain iets zou overwegen.",
+    ]
+
+
 def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
     """Build display-only cockpit data from a summarized local cycle."""
 
@@ -25,6 +82,9 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
     max_soc = _num(plan.get("max_soc_percent"), min(100.0, soc_now + 8.0))
     cycle_rows = raw_rows if raw_rows else _shadow_rows(soc_now, snapshot)
     reason_counts = _reason_counts(cycle_rows)
+    selected_step = cycle_rows[0] if cycle_rows else {}
+    next_step = _next_interesting_step(cycle_rows)
+    next_step_index = int(_num(next_step.get("step"), 0.0)) if next_step else 0
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -49,6 +109,10 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
             "NO DISPATCH",
             "NO SERVICE CALLS",
             "DISPLAY ONLY",
+            "Alleen meekijken",
+            "Geen aansturing",
+            "Veilig",
+            "Schaduwplanning",
         ],
         "degraded_mode_banner": {
             "active": degraded,
@@ -76,6 +140,27 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
         "soc_trajectory": _soc_points(cycle_rows, soc_now, min_soc),
         "planner_timeline": _timeline(cycle_rows),
         "plan_windows": _plan_windows(cycle_rows),
+        "human_summary": {
+            "current_state": [
+                "Energy Brain kijkt alleen mee.",
+                "Er wordt niets aangestuurd.",
+                f"De batterij staat rond {_fmt_plain(soc_now)}%.",
+                (
+                    "Er is nu ongeveer "
+                    f"{_fmt_plain(_num(snapshot.get('pv_power_kw'), 3.2))} kW zonne-opwek, "
+                    f"{_fmt_plain(_num(snapshot.get('household_load_kw'), 1.4))} kW huisverbruik en "
+                    f"{_fmt_plain(round(_num(snapshot.get('household_load_kw'), 1.4) - _num(snapshot.get('pv_power_kw'), 3.2), 2))} kW netbalans."
+                ),
+            ],
+            "next_step": _human_next_step(next_step, next_step_index),
+            "next_step_action": human_action_for_step(next_step),
+            "why": human_reason_for_step(next_step),
+            "safety": human_safety_summary(),
+            "chart_legend": human_chart_legend(),
+            "selected_step_heading": f"Stap #{_text(selected_step.get('step'), '0')} · over 0 uur",
+            "selected_step_advice": f"Advies: {human_action_for_step(selected_step)}",
+            "selected_step_why": f"Waarom: {_human_reason_fragment(selected_step)}",
+        },
         "price_forecast": _forecast("import_price", _num(snapshot.get("grid_price"), 0.31), [0.02, 0.01, -0.03, 0.04]),
         "pv_forecast": _forecast("pv_kwh", _num(snapshot.get("pv_power_kw"), 3.2), [-0.4, 0.2, 0.6, -0.7]),
         "load_forecast": _forecast("load_kwh", _num(snapshot.get("household_load_kw"), 1.4), [0.1, 0.3, -0.2, 0.2]),
@@ -95,6 +180,7 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
                 else "Latest local cycle data is available; fallback shadow values are not active."
             ),
             "reason_explanations": _reason_explanations(),
+            "human_reason_explanations": _human_reason_explanations(),
         },
         "benchmark_comparison": {
             "baseline_cost": plan.get("baseline_cost"),
@@ -199,6 +285,16 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .mini {{ color: var(--muted); font-size: .82rem; }}
     .flow {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }}
     .flow .card {{ min-height: 116px; }}
+    .human-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }}
+    .human-card {{ border: 1px solid var(--line); border-radius: 8px; background: rgba(21,31,41,.88); padding: 16px; }}
+    .human-card h2 {{ font-size: 1.06rem; }}
+    .human-card ul {{ margin: 12px 0 0; padding-left: 18px; color: #d9e6ef; }}
+    .human-card li + li {{ margin-top: 7px; }}
+    .human-card strong {{ display: block; margin-top: 12px; font-size: 1.05rem; line-height: 1.34; }}
+    .technical-toggle {{ margin-top: 14px; }}
+    .technical-area {{ margin-top: 14px; }}
+    .technical-area summary {{ cursor: pointer; color: var(--text); font-weight: 780; }}
+    .technical-area[open] {{ border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: rgba(7,10,14,.48); }}
     .chart {{ width: 100%; height: 330px; display: block; margin-top: 12px; }}
     .chart-head {{ display: flex; justify-content: space-between; gap: 14px; align-items: start; flex-wrap: wrap; }}
     .chart-title {{ font-size: 1.28rem; font-weight: 760; }}
@@ -244,7 +340,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .json-toggle {{ margin-top: 14px; padding: 9px 12px; }}
     .json-viewer {{ display: none; max-height: 420px; overflow: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: #070a0e; padding: 14px; color: #d9e6ef; white-space: pre-wrap; }}
     .json-viewer.open {{ display: block; }}
-    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
+    @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow, .human-grid {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
     @media (max-width: 620px) {{ main {{ padding: 14px; }} .hero {{ padding: 22px; }} .steps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .window-row {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -271,23 +367,24 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     </div>
     {_banner(payload["degraded_mode_banner"])}
     <section id="tab-overview" class="tab-panel active" role="tabpanel" data-tab-panel="overview">
+      {_human_summary_html(payload["human_summary"])}
       <div class="grid top">
         <article class="card">
           <div class="chart-head">
             <div>
-              <h2 class="chart-title">SOC Trajectory · Integrated Horizon Chart</h2>
-              <p class="note">How to read this chart: the green line is battery SOC by step/hour, amber bars are Price, blue/yellow lines are PV/load overlay, and shaded bands show the reserve band and decision windows.</p>
+              <h2 class="chart-title">Batterijvulling · SOC Trajectory · Integrated Horizon Chart</h2>
+              <p class="note">How to read this chart: zie "Hoe lees ik deze grafiek?" hierboven voor de korte uitleg in gewone taal.</p>
             </div>
             <span class="badge safe">read-only inspect</span>
           </div>
           <div class="legend" aria-label="Chart legend">
-            <span class="legend-item"><span class="swatch"></span>SOC trajectory</span>
-            <span class="legend-item"><span class="swatch reserve"></span>Reserve / min SOC</span>
-            <span class="legend-item"><span class="swatch max"></span>Max SOC</span>
-            <span class="legend-item"><span class="swatch price"></span>Price</span>
-            <span class="legend-item"><span class="swatch overlay"></span>PV/load overlay</span>
-            <span class="legend-item"><span class="swatch charge"></span>charge_from_pv_surplus</span>
-            <span class="legend-item"><span class="swatch clamp"></span>max_soc_clamped_charge / max_soc_hold</span>
+            <span class="legend-item"><span class="swatch"></span>Batterijvulling</span>
+            <span class="legend-item"><span class="swatch reserve"></span>Reservegrens</span>
+            <span class="legend-item"><span class="swatch max"></span>Maximale batterijgrens</span>
+            <span class="legend-item"><span class="swatch price"></span>Stroomprijs</span>
+            <span class="legend-item"><span class="swatch overlay"></span>Zon/verbruik</span>
+            <span class="legend-item"><span class="swatch charge"></span>laden met zonne-overschot</span>
+            <span class="legend-item"><span class="swatch clamp"></span>bijna vol / vasthouden</span>
           </div>
           <div class="chart-layout">
             {_horizon_chart(payload)}
@@ -299,7 +396,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
           </div>
         </article>
         <article class="card soft">
-          <h2>Battery SOC Card</h2>
+          <h2>Battery SOC Card · Batterijvulling</h2>
           {_kv(payload["battery_soc_card"], "%")}
         </article>
       </div>
@@ -373,6 +470,22 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     }});
     const detail = document.getElementById('step-detail-panel');
     const reasonMap = payload.plan_explainability.reason_explanations || {{}};
+    const humanReasons = payload.plan_explainability.human_reason_explanations || {{}};
+    function humanAction(step) {{
+      const reason = step.reason_code || 'shadow_hold';
+      const power = Number(step.setpoint_kw || 0);
+      if (reason === 'charge_from_pv_surplus' || power > 0.05) return 'batterij laden met zonne-overschot';
+      if (reason === 'max_soc_clamped_charge') return 'laden begrenzen omdat de batterij bijna vol is';
+      if (reason === 'max_soc_hold') return 'batterij vol genoeg houden';
+      if (reason === 'reserve_hold') return 'energie bewaren als reserve';
+      if (reason === 'baseline_compare') return 'alleen vergelijken met een simpele basisstrategie';
+      if (reason === 'shadow_hold') return 'geen actie nodig';
+      return 'Energy Brain kijkt mee en verandert niets';
+    }}
+    function reasonFragment(step) {{
+      const text = humanReasons[step.reason_code || 'shadow_hold'] || humanReasons.shadow_hold || 'er is geen duidelijke betere actie';
+      return text.charAt(0).toLowerCase() + text.slice(1).replace(/\\.$/, '');
+    }}
     function safeValue(value, suffix = '') {{
       return value === null || value === undefined || value === '' ? 'n/a' : `${{value}}${{suffix}}`;
     }}
@@ -383,31 +496,47 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       const constraint = step.constraint || 'display-only planner boundary';
       detail.innerHTML = `
         <div class="list">
+          <div><span>Stap</span><strong>#${{safeValue(step.step)}} · over ${{index}} uur</strong></div>
+          <div><span>Advies</span><strong>${{humanAction(step)}}</strong></div>
+          <div><span>Waarom</span><strong>${{reasonFragment(step)}}</strong></div>
+        </div>
+        <details class="technical-area">
+          <summary>Technische details tonen/verbergen</summary>
+        <div class="list">
           <div><span>selected step index/time</span><strong>#${{safeValue(step.step)}} / +${{index}}h</strong></div>
-          <div><span>SOC %</span><strong>${{safeValue(step.soc_percent, '%')}}</strong></div>
-          <div><span>battery setpoint kW</span><strong>${{safeValue(step.setpoint_kw)}}</strong></div>
-          <div><span>reason code</span><strong>${{reason}}</strong></div>
+          <div><span>Batterijvulling (SOC %)</span><strong>${{safeValue(step.soc_percent, '%')}}</strong></div>
+          <div><span>Gewenst batterijvermogen (battery setpoint kW)</span><strong>${{safeValue(step.setpoint_kw)}}</strong></div>
+          <div><span>Reden (reason code)</span><strong>${{reason}}</strong></div>
           <div><span>price</span><strong>${{safeValue(step.price)}}</strong></div>
           <div><span>PV forecast</span><strong>${{safeValue(step.pv_forecast)}}</strong></div>
           <div><span>load forecast</span><strong>${{safeValue(step.load_forecast)}}</strong></div>
-          <div><span>grid estimate</span><strong>${{safeValue(step.grid_estimate)}}</strong></div>
-          <div><span>validation/display-only status</span><strong>${{safeValue(step.validity)}}</strong></div>
+          <div><span>Verwachte netbalans (grid estimate)</span><strong>${{safeValue(step.grid_estimate)}}</strong></div>
+          <div><span>Alleen tonen (validation/display-only status)</span><strong>${{safeValue(step.validity)}}</strong></div>
           <div><span>safety status</span><strong>${{safeValue(step.validity)}} / no dispatch</strong></div>
-          <div><span>constraint applied</span><strong>${{constraint}}</strong></div>
+          <div><span>Begrenzing (constraint applied)</span><strong>${{constraint}}</strong></div>
         </div>
         <p class="note" id="selected-reason-explanation">${{reasonMap[reason] || reasonMap.shadow_hold || 'Display-only planner interval.'}}</p>
+        </details>
       `;
       const chartPanel = document.getElementById('chart-selected-step-panel');
       if (chartPanel) {{
         chartPanel.innerHTML = `
           <h3>Current/selected step details</h3>
           <div class="list">
-            <div><span>step/hour</span><strong>#${{safeValue(step.step)}} / +${{index}}h</strong></div>
-            <div><span>SOC</span><strong>${{safeValue(step.soc_percent, '%')}}</strong></div>
-            <div><span>reason</span><strong>${{reason}}</strong></div>
-            <div><span>constraint</span><strong>${{constraint}}</strong></div>
+            <div><span>Stap</span><strong>#${{safeValue(step.step)}} · over ${{index}} uur</strong></div>
+            <div><span>Advies</span><strong>${{humanAction(step)}}</strong></div>
+            <div><span>Waarom</span><strong>${{reasonFragment(step)}}</strong></div>
           </div>
-          <p class="note">${{reasonMap[reason] || reasonMap.shadow_hold || 'Display-only planner interval.'}}</p>
+          <details class="technical-area">
+            <summary>Technische details tonen/verbergen</summary>
+            <div class="list">
+              <div><span>step/hour</span><strong>#${{safeValue(step.step)}} / +${{index}}h</strong></div>
+              <div><span>Batterijvulling (SOC)</span><strong>${{safeValue(step.soc_percent, '%')}}</strong></div>
+              <div><span>Reden (reason)</span><strong>${{reason}}</strong></div>
+              <div><span>Begrenzing (constraint)</span><strong>${{constraint}}</strong></div>
+            </div>
+            <p class="note">${{reasonMap[reason] || reasonMap.shadow_hold || 'Display-only planner interval.'}}</p>
+          </details>
           <p class="note">Klik op een stap om details te bekijken. The vertical marker moves to the selected step.</p>
         `;
       }}
@@ -547,6 +676,43 @@ def _reason_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
     return counts or {"shadow_hold": 1}
 
 
+def _next_interesting_step(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    for row in rows:
+        reason = _text(row.get("reason_code"), "shadow_hold")
+        if reason not in ("hold", "shadow_hold", "baseline_compare") or abs(_num(row.get("setpoint_kw"), 0.0)) > 0.05:
+            return row
+    return rows[0] if rows else {}
+
+
+def _human_next_step(step: dict[str, Any], index: int) -> str:
+    if not step:
+        return "Er is geen actie nodig."
+    action = human_action_for_step(step)
+    if action == "geen actie nodig":
+        return "Er is geen actie nodig."
+    if action == "batterij laden met zonne-overschot":
+        return f"Over ongeveer {index} uur zou Energy Brain de batterij laden met zonne-overschot."
+    if action == "laden begrenzen omdat de batterij bijna vol is":
+        return "De batterij blijft vol omdat de maximumgrens bijna bereikt is."
+    if action == "batterij vol genoeg houden":
+        return "Energy Brain houdt de batterij vast voor later."
+    if action == "energie bewaren als reserve":
+        return "Energy Brain bewaart energie als reserve voor later."
+    return f"Over ongeveer {index} uur: {action}."
+
+
+def _human_reason_fragment(step: dict[str, Any]) -> str:
+    reason = human_reason_for_step(step)
+    return reason[:1].lower() + reason[1:].rstrip(".")
+
+
+def _fmt_plain(value: Any) -> str:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        text = f"{float(value):.1f}"
+        return text[:-2] if text.endswith(".0") else text
+    return str(value)
+
+
 def _reason_explanations() -> dict[str, str]:
     return {
         "shadow_hold": "Holding is shown when the shadow plan has no beneficial move or fallback data is active.",
@@ -558,6 +724,18 @@ def _reason_explanations() -> dict[str, str]:
         "max_soc_clamped_charge": "Charge is visually clamped by the max-SOC boundary; this is an inspection label only.",
         "max_soc_hold": "The plan is holding near the max-SOC boundary to avoid exceeding the visual ceiling.",
         "baseline_compare": "Baseline comparison marks an interval used for cost comparison against a non-optimized path.",
+    }
+
+
+def _human_reason_explanations() -> dict[str, str]:
+    return {
+        "charge_from_pv_surplus": human_reason_for_step({"reason_code": "charge_from_pv_surplus"}),
+        "max_soc_clamped_charge": human_reason_for_step({"reason_code": "max_soc_clamped_charge"}),
+        "max_soc_hold": human_reason_for_step({"reason_code": "max_soc_hold"}),
+        "reserve_hold": human_reason_for_step({"reason_code": "reserve_hold"}),
+        "baseline_compare": human_reason_for_step({"reason_code": "baseline_compare"}),
+        "shadow_hold": human_reason_for_step({"reason_code": "shadow_hold"}),
+        "hold": human_reason_for_step({"reason_code": "hold"}),
     }
 
 
@@ -591,8 +769,33 @@ def _banner(data: dict[str, Any]) -> str:
     )
 
 
+def _human_summary_html(data: dict[str, Any]) -> str:
+    current = "".join(f"<li>{_esc(item)}</li>" for item in _list(data.get("current_state")))
+    safety = "".join(f"<li>{_esc(item)}</li>" for item in _list(data.get("safety")))
+    legend = "".join(f"<li>{_esc(item)}</li>" for item in _list(data.get("chart_legend")))
+    return (
+        '<section class="human-grid" aria-label="Uitleg in gewone taal">'
+        '<article class="human-card"><h2>Wat gebeurt er nu?</h2>'
+        f"<ul>{current}</ul></article>"
+        '<article class="human-card"><h2>Volgende slimme stap</h2>'
+        f'<strong>{_esc(data.get("next_step"))}</strong></article>'
+        '<article class="human-card"><h2>Waarom?</h2>'
+        f'<strong>{_esc(data.get("why"))}</strong></article>'
+        '<article class="human-card"><h2>Is dit veilig?</h2>'
+        f"<ul>{safety}</ul></article>"
+        '<article class="human-card" style="grid-column:1/-1"><h2>Hoe lees ik deze grafiek?</h2>'
+        f"<ul>{legend}</ul></article>"
+        "</section>"
+    )
+
+
 def _energy_flow(flow: dict[str, Any]) -> str:
-    labels = [("PV", "pv_kw", "Solar production"), ("Battery", "battery_kw", "Shadow setpoint"), ("Load", "load_kw", "House demand"), ("Grid", "grid_kw", "Import/export estimate")]
+    labels = [
+        ("Zonne-opwek", "pv_kw", "Verwachte zon"),
+        ("Batterij", "battery_kw", "Gewenst batterijvermogen"),
+        ("Huisverbruik", "load_kw", "Verwacht verbruik"),
+        ("Verwachte netbalans", "grid_kw", "Import/export estimate"),
+    ]
     return "".join(f'<article class="card"><h3>{label}</h3><div class="value">{_fmt(flow.get(key), " kW")}</div><p class="note">{note}</p></article>' for label, key, note in labels)
 
 
@@ -667,32 +870,52 @@ def _cycle_table(rows: list[dict[str, Any]]) -> str:
 
 def _step_detail(step: dict[str, Any]) -> str:
     reason = _text(step.get("reason_code"), "shadow_hold")
-    fields = {
+    human_fields = {
+        "Stap": f"#{_text(step.get('step'), '0')} · over 0 uur",
+        "Advies": human_action_for_step(step),
+        "Waarom": _human_reason_fragment(step),
+    }
+    technical_fields = {
         "selected step index/time": f"#{_text(step.get('step'), '0')} / +0h",
-        "SOC %": step.get("soc_percent"),
-        "battery setpoint kW": step.get("setpoint_kw"),
-        "reason code": reason,
+        "Batterijvulling (SOC %)": step.get("soc_percent"),
+        "Gewenst batterijvermogen (battery setpoint kW)": step.get("setpoint_kw"),
+        "Reden (reason code)": reason,
         "price": step.get("price"),
         "PV forecast": step.get("pv_forecast"),
         "load forecast": step.get("load_forecast"),
-        "grid estimate": step.get("grid_estimate"),
-        "validation/display-only status": step.get("validity"),
+        "Verwachte netbalans (grid estimate)": step.get("grid_estimate"),
+        "Alleen tonen (validation/display-only status)": step.get("validity"),
         "safety status": f"{_text(step.get('validity'), 'display-only')} / no dispatch",
-        "constraint applied": _text(step.get("constraint"), _constraint_for_reason(reason)),
+        "Begrenzing (constraint applied)": _text(step.get("constraint"), _constraint_for_reason(reason)),
     }
     explanation = _reason_explanations().get(reason, _reason_explanations()["shadow_hold"])
-    return _kv(fields) + f'<p class="note" id="selected-reason-explanation">{_esc(explanation)}</p>'
+    return (
+        _kv(human_fields)
+        + '<details class="technical-area"><summary>Technische details tonen/verbergen</summary>'
+        + _kv(technical_fields)
+        + f'<p class="note" id="selected-reason-explanation">{_esc(explanation)}</p></details>'
+    )
 
 
 def _chart_step_summary(step: dict[str, Any]) -> str:
     reason = _text(step.get("reason_code"), "shadow_hold")
-    fields = {
-        "step/hour": f"#{_text(step.get('step'), '0')} / +0h",
-        "SOC": _fmt(step.get("soc_percent"), "%"),
-        "reason": reason,
-        "constraint": _text(step.get("constraint"), _constraint_for_reason(reason)),
+    human_fields = {
+        "Stap": f"#{_text(step.get('step'), '0')} · over 0 uur",
+        "Advies": human_action_for_step(step),
+        "Waarom": _human_reason_fragment(step),
     }
-    return _kv(fields)
+    technical_fields = {
+        "step/hour": f"#{_text(step.get('step'), '0')} / +0h",
+        "Batterijvulling (SOC)": _fmt(step.get("soc_percent"), "%"),
+        "Reden (reason)": reason,
+        "Begrenzing (constraint)": _text(step.get("constraint"), _constraint_for_reason(reason)),
+    }
+    return (
+        _kv(human_fields)
+        + '<details class="technical-area"><summary>Technische details tonen/verbergen</summary>'
+        + _kv(technical_fields)
+        + "</details>"
+    )
 
 
 def _horizon_chart(payload: dict[str, Any]) -> str:
