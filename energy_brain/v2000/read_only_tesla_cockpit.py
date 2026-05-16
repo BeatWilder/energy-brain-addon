@@ -303,7 +303,23 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         pv_kw = abs(pv_raw_kw)
     load_kw = _pf_get_number(merged, ["load_kw", "house_kw", "household_load_kw", "expected_load_kw"], 0.0)
     battery_kw = _pf_get_number(merged, ["battery_kw", "battery_setpoint_kw", "battery_power_kw", "planned_battery_kw"], 0.0)
-    grid_kw = _pf_get_number(merged, ["grid_kw", "grid_balance_kw", "net_kw", "estimated_grid_kw"], load_kw - pv_kw)
+    grid_raw_kw = _pf_get_number(merged, ["grid_kw", "grid_balance_kw", "net_kw", "estimated_grid_kw"], load_kw - pv_kw)
+
+    # Display-only physical balance guard.
+    # Convention used by this cockpit:
+    #   battery_kw > 0  => battery charging, extra demand
+    #   battery_kw < 0  => battery discharging, helps the house
+    #   grid_kw > 0     => import from grid
+    #   grid_kw < 0     => export to grid
+    #
+    # Expected grid = house load + battery charging - PV - battery discharging.
+    charge_kw = max(battery_kw, 0.0)
+    discharge_kw = max(-battery_kw, 0.0)
+    grid_balanced_kw = load_kw + charge_kw - pv_kw - discharge_kw
+    grid_balance_delta_kw = grid_raw_kw - grid_balanced_kw
+    grid_balance_corrected = abs(grid_balance_delta_kw) > 0.35
+
+    grid_kw = grid_balanced_kw if grid_balance_corrected else grid_raw_kw
     soc = _pf_get_number(merged, ["soc_percent", "battery_soc_percent", "battery_soc"], 0.0)
 
     quality = "live/schaduwdata"
@@ -318,8 +334,13 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         first_step = timeline[0] if isinstance(timeline[0], dict) else {}
         planner_soc = _pf_float(first_step.get("soc_percent"), soc)
 
+    quality_notes = []
     if pv_sign_normalized:
-        quality = f"{quality} · PV teken genormaliseerd"
+        quality_notes.append("PV teken genormaliseerd")
+    if grid_balance_corrected:
+        quality_notes.append("netwaarde gebalanceerd voor weergave")
+    if quality_notes:
+        quality = f"{quality} · " + " · ".join(quality_notes)
 
     return {
         "pv_kw": round(pv_kw, 1),
@@ -328,6 +349,10 @@ def powerflow_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         "load_kw": round(load_kw, 1),
         "battery_kw": round(battery_kw, 1),
         "grid_kw": round(grid_kw, 1),
+        "grid_raw_kw": round(grid_raw_kw, 1),
+        "grid_balanced_kw": round(grid_balanced_kw, 1),
+        "grid_balance_delta_kw": round(grid_balance_delta_kw, 1),
+        "grid_balance_corrected": bool(grid_balance_corrected),
         "battery_soc_percent": round(soc),
         "battery_soc_live_percent": round(soc, 1),
         "planner_step_soc_percent": round(planner_soc, 1) if planner_soc is not None else None,
@@ -462,6 +487,10 @@ def powerflow_plain_status(snapshot: dict[str, Any]) -> dict[str, str]:
     solar_text = f"Zon levert {_pf_kw(pv_kw)}."
     if bool(snap.get("pv_sign_normalized")):
         solar_text += " PV-teken is genormaliseerd."
+
+    if bool(snap.get("grid_balance_corrected")):
+        grid_text += " De ruwe netwaarde paste niet bij zon, huis en batterij; daarom toont de cockpit de gebalanceerde weergave."
+        grid_badge += " · gebalanceerd"
     house_text = f"Huis gebruikt {_pf_kw(load_kw)}."
 
     if isinstance(planner_soc, (int, float)) and abs(float(planner_soc) - live_soc) >= 1.0:

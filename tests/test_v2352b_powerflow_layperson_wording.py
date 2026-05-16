@@ -26,9 +26,11 @@ def test_powerflow_plain_status_explains_import_and_battery_help():
     assert "Huis gebruikt 4.0 kW" in plain["headline"]
     assert "Zon levert 2.3 kW" in plain["headline"]
     assert "Batterij helpt het huis met 1.7 kW" in plain["headline"]
-    assert "Het net vult nog 1.7 kW bij" in plain["headline"]
+    assert "Het net vult nog 1.7 kW bij" not in plain["headline"]
+    assert "bijna geen netverbruik" in plain["headline"]
+    assert "gebalanceerde weergave" in plain["headline"]
     assert plain["battery_badge"] == "Helpt huis: 1.7 kW"
-    assert plain["grid_badge"] == "Net vult bij: 1.7 kW"
+    assert plain["grid_badge"] == "Net bijna nul · gebalanceerd"
     assert "Batterij nu 88.8%" in plain["soc"]
     assert "Planner stap 0 rekent met 84.3%" in plain["soc"]
 

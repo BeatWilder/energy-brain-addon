@@ -27,9 +27,13 @@ def test_powerflow_reads_current_api_energy_flow_shape():
     assert snapshot["pv_kw"] == 3.4
     assert snapshot["load_kw"] == 0.7
     assert snapshot["battery_kw"] == 2.6
-    assert snapshot["grid_kw"] == -2.6
+    assert snapshot["grid_raw_kw"] == -2.6
+    assert snapshot["grid_balanced_kw"] == 0.0
+    assert snapshot["grid_kw"] == 0.0
+    assert snapshot["grid_balance_corrected"] is True
     assert snapshot["battery_soc_percent"] == 87
-    assert snapshot["data_quality"] == "live/schaduwdata"
+    assert "live/schaduwdata" in snapshot["data_quality"]
+    assert "netwaarde gebalanceerd voor weergave" in snapshot["data_quality"]
     assert snapshot["read_only"] is True
     assert snapshot["control_allowed"] is False
 
@@ -41,7 +45,7 @@ def test_powerflow_edges_from_current_api_shape_show_solar_battery_and_export():
 
     assert "zon_naar_huis" in directions
     assert "zon_naar_batterij" in directions
-    assert "net_export" in directions
+    assert "net_export" not in directions
 
 
 def test_direct_powerflow_svg_uses_current_api_values_and_labels():
@@ -55,8 +59,10 @@ def test_direct_powerflow_svg_uses_current_api_values_and_labels():
     assert "2.6 kW" in html
     assert "87%" in html
     assert "Batterij wordt geladen met 2.6 kW" in html
-    assert "Er gaat 2.6 kW terug naar het net" in html
-    assert "Teruglevering: 2.6 kW" in html
+    assert "Er gaat 2.6 kW terug naar het net" not in html
+    assert "Teruglevering: 2.6 kW" not in html
+    assert "Net bijna nul" in html
+    assert "netwaarde gebalanceerd voor weergave" in html
     assert "beperkte data" not in html
     assert 'data-read-only="true"' in html
 
