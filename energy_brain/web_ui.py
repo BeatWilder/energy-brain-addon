@@ -2452,3 +2452,353 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     except Exception:
         return rendered
     return rendered
+
+# Energy Brain visual-only plus-shaped energy flow final.
+_previous_render_tesla_cockpit_html_plus_cross_final = render_tesla_cockpit_html
+
+
+def _eb_flow_float_final(value: object, fallback: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return fallback
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _eb_flow_kw_final(value: object) -> str:
+    return f"{_eb_flow_float_final(value):.1f} kW"
+
+
+def _eb_flow_pct_final(value: object) -> str:
+    return f"{_eb_flow_float_final(value):.0f}%"
+
+
+def _eb_flow_get_final(data: object, key: str) -> object:
+    if isinstance(data, dict):
+        value = data.get(key)
+        if value is not None:
+            return value
+    return 0.0
+
+
+def _eb_plus_cross_style_final() -> str:
+    return """
+<style id="eb-plus-cross-flow-final-style">
+  .eb-plus-cross-flow-final {
+    margin: 18px 0 22px;
+    padding: 18px 14px 20px;
+    border: 1px solid rgba(148, 163, 184, 0.20);
+    border-radius: 26px;
+    background:
+      radial-gradient(circle at 50% 46%, rgba(103, 167, 255, 0.18), transparent 15rem),
+      rgba(10, 16, 23, 0.78);
+  }
+
+  .eb-flow-summary-final {
+    width: min(100%, 660px);
+    margin: 0 auto 20px;
+    padding: 18px 20px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 22px;
+    background: rgba(15, 23, 31, 0.88);
+  }
+
+  .eb-flow-summary-final strong {
+    display: block;
+    color: #e8eef6;
+    font-size: clamp(1.18rem, 4.8vw, 1.9rem);
+    line-height: 1.28;
+    letter-spacing: -0.035em;
+  }
+
+  .eb-flow-summary-final span {
+    display: block;
+    margin-top: 10px;
+    color: #9aa6b2;
+    font-size: clamp(0.95rem, 3.6vw, 1.18rem);
+  }
+
+  .eb-flow-cross-final {
+    position: relative;
+    width: min(100%, 680px);
+    height: clamp(390px, 76vw, 560px);
+    margin: 0 auto;
+  }
+
+  .eb-flow-lines-final {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 10px rgba(103, 167, 255, 0.28));
+  }
+
+  .eb-flow-line-final {
+    fill: none;
+    stroke-width: 1.35;
+    stroke-linecap: round;
+    stroke-dasharray: 3.2 2.4;
+    opacity: 0.95;
+  }
+
+  .eb-flow-line-sun-final { stroke: #f59e0b; }
+  .eb-flow-line-grid-final { stroke: #a855f7; }
+  .eb-flow-line-home-final { stroke: #2dd4bf; }
+  .eb-flow-line-battery-final { stroke: #36d399; }
+
+  .eb-flow-dot-sun-final { fill: #f59e0b; }
+  .eb-flow-dot-grid-final { fill: #a855f7; }
+  .eb-flow-dot-home-final { fill: #2dd4bf; }
+  .eb-flow-dot-battery-final { fill: #36d399; }
+
+  .eb-flow-hub-final {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translate(-50%, -50%);
+    border-radius: 999px;
+    background: #dbeafe;
+    box-shadow: 0 0 28px rgba(147, 197, 253, 0.68);
+    z-index: 3;
+  }
+
+  .eb-flow-node-final {
+    position: absolute;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    width: clamp(98px, 23vw, 144px);
+    height: clamp(98px, 23vw, 144px);
+    border-radius: 999px;
+    background: rgba(8, 13, 19, 0.92);
+    color: #e8eef6;
+    box-shadow: 0 18px 48px rgba(0,0,0,0.28);
+  }
+
+  .eb-flow-node-final strong {
+    font-size: clamp(1.05rem, 4vw, 1.65rem);
+    line-height: 1;
+  }
+
+  .eb-flow-node-final small {
+    color: #9aa6b2;
+    font-size: clamp(0.66rem, 2.6vw, 0.85rem);
+  }
+
+  .eb-node-title-final {
+    color: #cbd5e1;
+    font-weight: 850;
+    font-size: clamp(0.8rem, 3vw, 1.0rem);
+  }
+
+  .eb-flow-sun-final {
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    border: 3px solid #f59e0b;
+  }
+
+  .eb-flow-grid-final {
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 3px solid #a855f7;
+  }
+
+  .eb-flow-home-final {
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 3px solid #2dd4bf;
+  }
+
+  .eb-flow-battery-final {
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    border: 3px solid #36d399;
+  }
+
+  .eb-flow-metrics-final {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: min(100%, 680px);
+    margin: 18px auto 0;
+  }
+
+  .eb-flow-metrics-final article {
+    padding: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 20px;
+    background: rgba(15, 23, 31, 0.86);
+  }
+
+  .eb-flow-metrics-final span {
+    display: block;
+    color: #9aa6b2;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 850;
+    font-size: 0.78rem;
+  }
+
+  .eb-flow-metrics-final strong {
+    display: block;
+    margin-top: 8px;
+    color: #e8eef6;
+    font-size: clamp(1.3rem, 5vw, 2rem);
+  }
+
+  .eb-flow-metrics-final small {
+    display: block;
+    margin-top: 4px;
+    color: #9aa6b2;
+    font-size: 0.92rem;
+  }
+
+  @media (max-width: 520px) {
+    .eb-flow-cross-final { height: 410px; }
+    .eb-flow-node-final { width: 100px; height: 100px; }
+  }
+</style>
+"""
+
+
+def _eb_plus_cross_flow_final(summary: dict[str, object]) -> str:
+    flow = summary.get("energy_flow")
+    battery_card = summary.get("battery_soc_card")
+
+    pv_kw = _eb_flow_get_final(flow, "pv_kw")
+    load_kw = _eb_flow_get_final(flow, "load_kw")
+    battery_kw = _eb_flow_get_final(flow, "battery_kw")
+    grid_kw = _eb_flow_get_final(flow, "grid_kw")
+    soc = _eb_flow_get_final(battery_card, "soc_percent")
+
+    pv = _eb_flow_float_final(pv_kw)
+    load = _eb_flow_float_final(load_kw)
+    battery = _eb_flow_float_final(battery_kw)
+    grid = _eb_flow_float_final(grid_kw)
+
+    if abs(grid) < 0.05:
+        grid_text = "bijna stil"
+    elif grid > 0:
+        grid_text = "import"
+    else:
+        grid_text = "teruglevering"
+
+    if abs(battery) < 0.05:
+        battery_text = "batterij stil"
+    elif battery > 0:
+        battery_text = "batterij laadt"
+    else:
+        battery_text = "batterij helpt"
+
+    if pv >= load and abs(grid) < 0.15:
+        sentence = f"Huis gebruikt {_eb_flow_kw_final(load_kw)}. Zon levert {_eb_flow_kw_final(pv_kw)}. Net is bijna stil."
+    elif pv >= load:
+        sentence = f"Huis gebruikt {_eb_flow_kw_final(load_kw)}. Zon levert {_eb_flow_kw_final(pv_kw)}. Net: {_eb_flow_kw_final(abs(grid))} {grid_text}."
+    else:
+        sentence = f"Huis gebruikt {_eb_flow_kw_final(load_kw)}. Zon levert {_eb_flow_kw_final(pv_kw)}. Net vult {_eb_flow_kw_final(abs(grid))} bij."
+
+    return f"""
+<section class="eb-plus-cross-flow-final" aria-label="Energy Flow Overview">
+  <div class="eb-plus-cross-flow-final-marker" hidden>eb-plus-cross-flow-final-marker</div>
+
+  <article class="eb-flow-summary-final">
+    <strong>{sentence}</strong>
+    <span>Batterij nu {_eb_flow_pct_final(soc)} - {battery_text}</span>
+  </article>
+
+  <div class="eb-flow-cross-final">
+    <div class="eb-flow-node-final eb-flow-sun-final">
+      <span class="eb-node-title-final">Zon</span>
+      <strong>{_eb_flow_kw_final(pv_kw)}</strong>
+    </div>
+
+    <div class="eb-flow-node-final eb-flow-grid-final">
+      <span class="eb-node-title-final">Net</span>
+      <strong>{_eb_flow_kw_final(abs(grid))}</strong>
+      <small>{grid_text}</small>
+    </div>
+
+    <div class="eb-flow-node-final eb-flow-home-final">
+      <span class="eb-node-title-final">Huis</span>
+      <strong>{_eb_flow_kw_final(load_kw)}</strong>
+    </div>
+
+    <div class="eb-flow-node-final eb-flow-battery-final">
+      <span class="eb-node-title-final">Batterij</span>
+      <strong>{_eb_flow_pct_final(soc)}</strong>
+      <small>{_eb_flow_kw_final(abs(battery))}</small>
+    </div>
+
+    <div class="eb-flow-hub-final"></div>
+
+    <svg class="eb-flow-lines-final" viewBox="0 0 100 100" aria-hidden="true">
+      <path class="eb-flow-line-final eb-flow-line-sun-final" d="M50 18 C50 32 50 38 50 50"/>
+      <path class="eb-flow-line-final eb-flow-line-grid-final" d="M18 50 C32 50 38 50 50 50"/>
+      <path class="eb-flow-line-final eb-flow-line-home-final" d="M50 50 C62 50 68 50 82 50"/>
+      <path class="eb-flow-line-final eb-flow-line-battery-final" d="M50 50 C50 62 50 68 50 82"/>
+      <circle class="eb-flow-dot-sun-final" cx="50" cy="30" r="1.8"/>
+      <circle class="eb-flow-dot-grid-final" cx="30" cy="50" r="1.8"/>
+      <circle class="eb-flow-dot-home-final" cx="70" cy="50" r="1.8"/>
+      <circle class="eb-flow-dot-battery-final" cx="50" cy="70" r="1.8"/>
+    </svg>
+  </div>
+
+  <div class="eb-flow-metrics-final">
+    <article><span>Zon</span><strong>{_eb_flow_kw_final(pv_kw)}</strong><small>naar huis of batterij</small></article>
+    <article><span>Huis</span><strong>{_eb_flow_kw_final(load_kw)}</strong><small>actueel verbruik</small></article>
+    <article><span>Batterij</span><strong>{_eb_flow_pct_final(soc)}</strong><small>{battery_text}</small></article>
+    <article><span>Net</span><strong>{_eb_flow_kw_final(abs(grid))}</strong><small>{grid_text}</small></article>
+  </div>
+</section>
+"""
+
+
+def _eb_replace_first_flow_final(rendered: str, replacement: str) -> str:
+    markers = [
+        '<section class="eb-plus-cross-flow-final"',
+        '<section class="eb-plus-cross-flow-v3"',
+        '<section class="eb-plus-cross-flow-v2"',
+        '<section class="eb-plus-flow"',
+        '<section class="flow" aria-label="Energy Flow Overview"',
+    ]
+
+    for marker_text in markers:
+        start = rendered.find(marker_text)
+        if start == -1:
+            continue
+
+        next_section = rendered.find("\n<section", start + len(marker_text))
+        next_article = rendered.find("\n<article", start + len(marker_text))
+        candidates = [x for x in [next_section, next_article] if x != -1]
+        end = min(candidates) if candidates else -1
+
+        if end == -1:
+            return rendered[:start] + replacement + rendered[start:]
+
+        return rendered[:start] + replacement + rendered[end:]
+
+    body = rendered.find("<body")
+    if body == -1:
+        return replacement + rendered
+
+    body_end = rendered.find(">", body)
+    if body_end == -1:
+        return replacement + rendered
+
+    return rendered[:body_end + 1] + replacement + rendered[body_end + 1:]
+
+
+def render_tesla_cockpit_html(summary: dict[str, object]) -> str:
+    rendered = _previous_render_tesla_cockpit_html_plus_cross_final(summary)
+    flow_html = _eb_plus_cross_style_final() + _eb_plus_cross_flow_final(summary)
+    if "eb-plus-cross-flow-final-marker" in rendered:
+        return rendered
+    return _eb_replace_first_flow_final(rendered, flow_html)
