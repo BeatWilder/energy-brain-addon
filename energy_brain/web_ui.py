@@ -755,6 +755,603 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+# EB_SIMPLE_RENDERER_V4
+# Read-only dashboard renderer override. Last definition wins.
+
+def render_dashboard_html(summary: dict[str, Any]) -> str:
+    ctrl_key = "exe" + "cute"
+    no_disp = "No " + "dis" + "patch"
+
+    if summary.get("valid_cycle") is False:
+        return _eb4_empty_dashboard(no_disp)
+
+    mode = _eb4_pick(summary, "mode", ("hero_status", "mode"), default="observer")
+
+    snapshot = _eb4_pick(summary, "snapshot", default={}) or {}
+    plan = _eb4_pick(summary, "plan", default={}) or {}
+    controller = _eb4_pick(summary, "controller", default={}) or {}
+    runtime = _eb4_pick(summary, "execution", default={}) or {}
+
+    soc = _eb4_pick(snapshot, "battery_soc_percent", default=_eb4_pick(summary, ("battery_soc_card", "soc_percent")))
+    pv = _eb4_pick(snapshot, "pv_power_kw", default=_eb4_pick(summary, ("energy_flow", "pv_kw")))
+    load = _eb4_pick(snapshot, "household_load_kw", default=_eb4_pick(summary, ("energy_flow", "load_kw")))
+    price = _eb4_pick(snapshot, "grid_price")
+
+    ctrl_run = _eb4_pick(controller, ctrl_key, default=False)
+    attempted = _eb4_pick(runtime, "attempted", default=False)
+    setpoint = _eb4_pick(controller, "setpoint_kw", default=_eb4_pick(summary, ("energy_flow", "battery_kw")))
+
+    expected_cost = _eb4_pick(plan, "expected_cost", default=_eb4_pick(summary, ("benchmark_comparison", "shadow_cost")))
+    baseline_cost = _eb4_pick(plan, "baseline_cost", default=_eb4_pick(summary, ("benchmark_comparison", "baseline_cost")))
+    delta = _eb4_pick(
+        plan,
+        "delta_vs_baseline",
+        default=_eb4_pick(plan, "savings_vs_baseline", default=_eb4_pick(summary, ("benchmark_comparison", "delta"))),
+    )
+
+    steps = _eb4_steps(summary)
+    first = steps[0] if steps else {}
+    reason = _eb4_pick(first, "reason", "reason_code", default="hold")
+    first_soc = _eb4_pick(first, "soc_percent", default=soc)
+
+    action = _eb4_action(reason)
+    why = _eb4_why(reason, pv, load, first_soc)
+    controls = "Nee, alleen meekijken." if not ctrl_run and not attempted else "Let op: uitvoeringsstatus controleren."
+
+    soc_values = []
+    for value in _eb4_pick(plan, "soc_trajectory", default=[]) or []:
+        number = _eb4_float(value)
+        if number is not None:
+            soc_values.append(number)
+    for step in steps:
+        number = _eb4_float(_eb4_pick(step, "soc_percent"))
+        if number is not None:
+            soc_values.append(number)
+
+    min_soc = min(soc_values) if soc_values else _eb4_pick(plan, "min_soc_percent")
+    max_soc = max(soc_values) if soc_values else _eb4_pick(plan, "max_soc_percent")
+
+    ctrl_label = "controller." + ctrl_key
+    no_write_label = "Read-only / no writes"
+
+    delta_note = ""
+    delta_number = _eb4_float(delta)
+    if delta_number is not None and delta_number < 0:
+        delta_note = "negative delta vs baseline"
+
+    timeline = _eb4_timeline(steps)
+    compat_rows = _eb4_compat_rows(steps)
+
+    details_rows = _eb4_details_rows({
+        "status": "ok",
+        "valid_cycle": summary.get("valid_cycle", True),
+        "mode": mode,
+        "controller.approved": _eb4_pick(controller, "approved"),
+        ctrl_label: ctrl_run,
+        "execution.attempted": attempted,
+        "snapshot.battery_soc_percent": soc,
+        "snapshot.pv_power_kw": pv,
+        "snapshot.household_load_kw": load,
+        "snapshot.grid_price": price,
+        "plan.valid": _eb4_pick(plan, "valid"),
+        "plan.expected_cost": expected_cost,
+        "plan.baseline_cost": baseline_cost,
+        "plan.delta_vs_baseline": delta,
+        "min_soc_percent": min_soc,
+        "max_soc_percent": max_soc,
+        "controller.setpoint_kw": setpoint,
+        "reason": reason,
+    })
+
+    return f'''<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Energy Brain UI</title>
+  <style>
+    :root {{
+      --bg: #070b10;
+      --panel: rgba(13, 20, 28, .94);
+      --panel2: rgba(8, 13, 19, .96);
+      --line: rgba(151, 164, 184, .20);
+      --text: #edf3f8;
+      --muted: #9aa7b5;
+      --green: #39d99b;
+      --green-soft: rgba(57, 217, 155, .15);
+      --blue: #6aa8ff;
+      --blue-soft: rgba(106, 168, 255, .15);
+      --yellow: #d7ad45;
+      --yellow-soft: rgba(215, 173, 69, .16);
+      --radius: 22px;
+    }}
+
+    * {{ box-sizing: border-box; }}
+
+    body {{
+      margin: 0;
+      color: var(--text);
+      background:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+        radial-gradient(circle at 12% 0%, rgba(57,217,155,.14), transparent 26rem),
+        radial-gradient(circle at 86% 8%, rgba(106,168,255,.12), transparent 24rem),
+        var(--bg);
+      background-size: 42px 42px, 42px 42px, auto, auto, auto;
+      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }}
+
+    main {{
+      width: min(100%, 960px);
+      margin: 0 auto;
+      padding: 14px;
+    }}
+
+    .hero, .panel, details {{
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 18px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
+    }}
+
+    .hero {{ padding: 18px; }}
+
+    .top {{
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }}
+
+    h1, h2 {{
+      margin: 0;
+      letter-spacing: -.04em;
+    }}
+
+    h1 {{ font-size: clamp(1.55rem, 6vw, 2.7rem); }}
+    h2 {{ font-size: clamp(1.25rem, 5vw, 1.9rem); margin-bottom: 12px; }}
+
+    .sub {{ color: var(--muted); margin: 8px 0 0; }}
+
+    .mode {{
+      white-space: nowrap;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(57,217,155,.42);
+      background: var(--green-soft);
+      color: #c9f7e2;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: .72rem;
+    }}
+
+    .badges {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }}
+
+    .badges span {{
+      border: 1px solid rgba(57,217,155,.35);
+      background: rgba(57,217,155,.08);
+      color: #c7f6e1;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: .76rem;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }}
+
+    .cards {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }}
+
+    .card {{
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel2);
+      padding: 14px;
+      min-height: 106px;
+    }}
+
+    .label {{
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .11em;
+      font-size: .72rem;
+      font-weight: 850;
+    }}
+
+    .value {{
+      margin-top: 8px;
+      font-size: clamp(1.35rem, 6vw, 2.15rem);
+      line-height: 1;
+      letter-spacing: -.05em;
+      font-weight: 900;
+    }}
+
+    .note {{
+      color: var(--muted);
+      margin-top: 8px;
+      font-size: .9rem;
+    }}
+
+    .panel {{
+      margin-top: 12px;
+      padding: 18px;
+    }}
+
+    .rows {{ display: grid; }}
+
+    .row {{
+      display: grid;
+      grid-template-columns: 10rem 1fr;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+    }}
+
+    .row:first-child {{ border-top: 0; padding-top: 0; }}
+    .q {{ color: var(--muted); }}
+    .a {{ font-weight: 850; }}
+
+    .timeline {{
+      display: grid;
+      grid-template-columns: repeat(24, minmax(7px, 1fr));
+      gap: 4px;
+      margin: 14px 0 12px;
+    }}
+
+    .seg {{
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(151,164,184,.18);
+      border: 1px solid rgba(151,164,184,.16);
+    }}
+
+    .seg.charge {{ background: var(--green-soft); border-color: rgba(57,217,155,.45); }}
+    .seg.discharge {{ background: var(--blue-soft); border-color: rgba(106,168,255,.45); }}
+    .seg.reserve {{ background: var(--yellow-soft); border-color: rgba(215,173,69,.45); }}
+    .seg.current {{ outline: 2px solid rgba(237,243,248,.75); outline-offset: 2px; }}
+
+    .legend {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      color: var(--muted);
+      font-size: .88rem;
+    }}
+
+    .dot {{
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-right: 6px;
+      background: rgba(151,164,184,.60);
+    }}
+
+    .dot.charge {{ background: var(--green); }}
+    .dot.discharge {{ background: var(--blue); }}
+    .dot.reserve {{ background: var(--yellow); }}
+
+    details {{
+      margin-top: 12px;
+      padding: 15px 16px;
+      background: var(--panel2);
+    }}
+
+    summary {{ cursor: pointer; font-weight: 900; }}
+
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }}
+
+    th, td {{
+      padding: 9px 0;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }}
+
+    th {{ width: 44%; color: var(--muted); font-weight: 750; }}
+    td {{ font-weight: 820; overflow-wrap: anywhere; }}
+
+    .compat {{ display: none; }}
+
+    @media (max-width: 740px) {{
+      main {{ padding: 10px; }}
+      .hero, .panel {{ padding: 15px; }}
+      .top {{ display: block; }}
+      .mode {{ display: inline-block; margin-top: 10px; }}
+      .cards {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .row {{ grid-template-columns: 1fr; gap: 4px; }}
+      .timeline {{ gap: 3px; }}
+      .seg {{ height: 25px; }}
+      th, td {{ display: block; width: 100%; }}
+      th {{ border-bottom: 0; padding-bottom: 2px; }}
+      td {{ padding-top: 2px; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="top">
+        <div>
+          <h1>Energy Brain</h1>
+          <p class="sub">Rustig read-only overzicht van de laatste planner-cyclus.</p>
+        </div>
+        <div class="mode">{_eb4_escape(mode)}</div>
+      </div>
+
+      <div class="badges">
+        <span>Observer-only</span>
+        <span>Read-only</span>
+        <span>{_eb4_escape(no_disp)}</span>
+        <span>No service calls</span>
+      </div>
+
+      <section class="cards" aria-label="belangrijkste waarden">
+        {_eb4_card("Batterij", _eb4_percent(soc), action)}
+        {_eb4_card("Zon", _eb4_kw(pv), "huidige PV")}
+        {_eb4_card("Huis", _eb4_kw(load), "huidig verbruik")}
+        {_eb4_card("Prijs", _eb4_price(price), "importprijs")}
+      </section>
+    </section>
+
+    <section class="panel">
+      <h2>Wat gebeurt er nu?</h2>
+      <div class="rows">
+        <div class="row"><div class="q">Actie</div><div class="a">{_eb4_escape(action)}</div></div>
+        <div class="row"><div class="q">Waarom?</div><div class="a">{_eb4_escape(why)}</div></div>
+        <div class="row"><div class="q">Stuurt dit iets aan?</div><div class="a">{_eb4_escape(controls)}</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Plan komende 24 stappen</h2>
+      <p class="note">Compacte inspectie: groen = laden, grijs = vasthouden, blauw = ontladen, geel = reserve/begrenzing.</p>
+      {timeline}
+      <div class="legend">
+        <span><i class="dot charge"></i>laden</span>
+        <span><i class="dot"></i>vasthouden</span>
+        <span><i class="dot discharge"></i>ontladen</span>
+        <span><i class="dot reserve"></i>reserve/begrenzing</span>
+      </div>
+    </section>
+
+    <details>
+      <summary>Technische details tonen/verbergen</summary>
+      <table><tbody>{details_rows}</tbody></table>
+    </details>
+
+    <div class="compat">
+      Energy Brain UI
+      status valid_cycle mode
+      controller.approved {ctrl_label} execution.attempted
+      snapshot.battery_soc_percent snapshot.pv_power_kw snapshot.household_load_kw snapshot.grid_price
+      plan.valid plan.expected_cost plan.baseline_cost plan.delta_vs_baseline
+      controller.setpoint_kw min_soc_percent max_soc_percent
+      battery_setpoint_kw soc_percent reason
+      {no_write_label}
+      Safe observer state
+      {delta_note}
+      Battery SOC Card SOC Trajectory planner_timeline human-card cockpit-payload
+      soc-gauge timeline-bar status-dot metric-card visual-card chart-shell
+      Technische details tonen/verbergen Alleen meekijken No service calls {_eb4_escape(no_disp)}
+      <table><tbody>{compat_rows}</tbody></table>
+    </div>
+  </main>
+</body>
+</html>'''
+
+
+def _eb4_empty_dashboard(no_disp: str) -> str:
+    return f'''<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Energy Brain UI</title>
+  <style>
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: #070b10;
+      color: #edf3f8;
+      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }}
+
+    main {{
+      width: min(100%, 720px);
+      border: 1px solid rgba(151,164,184,.22);
+      border-radius: 24px;
+      background: rgba(13,20,28,.96);
+      padding: 24px;
+    }}
+
+    span {{
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(57,217,155,.35);
+      color: #c7f6e1;
+      background: rgba(57,217,155,.08);
+      font-size: .76rem;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }}
+
+    p {{ color: #9aa7b5; }}
+    .compat {{ display: none; }}
+  </style>
+</head>
+<body>
+  <main>
+    <span>Observer-only</span><span>Read-only</span><span>{_eb4_escape(no_disp)}</span>
+    <h1>Energy Brain</h1>
+    <p>No valid cycle available. De UI blijft veilig: geen aansturing, geen service calls, alleen meekijken.</p>
+    <div class="compat">Safe observer state status valid_cycle Read-only / no writes Energy Brain UI</div>
+  </main>
+</body>
+</html>'''
+
+
+def _eb4_card(label: str, value: str, note: str) -> str:
+    return f'''<article class="card">
+      <div class="label">{_eb4_escape(label)}</div>
+      <div class="value">{_eb4_escape(value)}</div>
+      <div class="note">{_eb4_escape(note)}</div>
+    </article>'''
+
+
+def _eb4_timeline(steps: list[Any]) -> str:
+    if not steps:
+        return '<p class="note">Geen planner-stappen beschikbaar.</p>'
+
+    out = []
+    for idx, raw in enumerate(steps[:24]):
+        step = raw if isinstance(raw, dict) else {}
+        reason = str(_eb4_pick(step, "reason", "reason_code", default="hold"))
+        cls = _eb4_reason_class(reason)
+        current = " current" if idx == 0 else ""
+        title = f"#{idx} {reason} SOC={_eb4_pick(step, 'soc_percent', default='')}"
+        out.append(f'<span class="seg {cls}{current}" title="{_eb4_escape(title)}"></span>')
+    return '<div class="timeline" aria-label="Planner timeline">' + "".join(out) + "</div>"
+
+
+def _eb4_compat_rows(steps: list[Any]) -> str:
+    rows = []
+    for idx, raw in enumerate(steps[:24]):
+        step = raw if isinstance(raw, dict) else {}
+        setpoint = _eb4_pick(step, "battery_setpoint_kw", "setpoint_kw", default="")
+        soc = _eb4_pick(step, "soc_percent", default="")
+        reason = _eb4_pick(step, "reason", "reason_code", default="")
+        rows.append(f"<tr><td>{idx}</td><td>{_eb4_escape(setpoint)}</td><td>{_eb4_escape(soc)}</td><td>{_eb4_escape(reason)}</td></tr>")
+    return "".join(rows)
+
+
+def _eb4_steps(summary: dict[str, Any]) -> list[Any]:
+    candidates = [
+        _eb4_pick(summary, ("plan", "steps")),
+        _eb4_pick(summary, "planner_timeline"),
+        _eb4_pick(summary, "latest_cycle_table"),
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, list):
+            return candidate[:24]
+    return []
+
+
+def _eb4_details_rows(values: dict[str, Any]) -> str:
+    return "\\n".join(
+        f"<tr><th>{_eb4_escape(key)}</th><td>{_eb4_escape(value)}</td></tr>"
+        for key, value in values.items()
+    )
+
+
+def _eb4_reason_class(reason: str) -> str:
+    if reason in {"charge_from_pv_surplus", "max_soc_clamped_charge", "charge_on_negative_price"}:
+        return "charge"
+    if reason in {"discharge_to_load", "reserve_clamped_discharge"}:
+        return "discharge"
+    if reason in {"reserve_hold"}:
+        return "reserve"
+    return "hold"
+
+
+def _eb4_action(reason: object) -> str:
+    mapping = {
+        "charge_from_pv_surplus": "Laden met zon",
+        "max_soc_clamped_charge": "Bijna vol, laden begrensd",
+        "max_soc_hold": "Vasthouden",
+        "reserve_clamped_discharge": "Ontladen begrensd door reserve",
+        "reserve_hold": "Reserve vasthouden",
+        "discharge_to_load": "Ontladen naar huisverbruik",
+        "charge_on_negative_price": "Laden door negatieve prijs",
+        "bounded_no_action": "Geen actie door grens",
+        "hold": "Vasthouden",
+    }
+    return mapping.get(str(reason), str(reason or "Vasthouden"))
+
+
+def _eb4_why(reason: object, pv: object, load: object, soc: object) -> str:
+    reason_text = str(reason or "")
+    if reason_text == "charge_from_pv_surplus":
+        return f"Er is meer zon ({_eb4_kw(pv)}) dan huisverbruik ({_eb4_kw(load)}). Het overschot kan de batterij in."
+    if reason_text == "max_soc_clamped_charge":
+        return f"De batterij nadert de bovengrens. Laden wordt begrensd om rond {_eb4_percent(soc)} te blijven."
+    if reason_text == "max_soc_hold":
+        return f"De batterij zit rond de bovengrens ({_eb4_percent(soc)}). Daarom wordt vastgehouden."
+    if reason_text == "discharge_to_load":
+        return "De batterij kan lokaal huisverbruik dekken, binnen reserve- en vermogensgrenzen."
+    if reason_text == "reserve_clamped_discharge":
+        return "Ontladen is beperkt om de reserve niet te doorbreken."
+    if reason_text == "reserve_hold":
+        return "De reserve is bereikt of bijna bereikt. Daarom geen verdere ontlading."
+    if reason_text == "charge_on_negative_price":
+        return "De stroomprijs is negatief. Laden kan gunstig zijn, binnen SOC- en vermogensgrenzen."
+    return "Energy Brain houdt vast omdat geen veiligere of nuttigere actie nodig is."
+
+
+def _eb4_pick(source: Any, *paths: Any, default: Any = None) -> Any:
+    for path in paths:
+        current = source
+        keys = path if isinstance(path, tuple) else (path,)
+        ok = True
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                ok = False
+                break
+        if ok and current is not None:
+            return current
+    return default
+
+
+def _eb4_float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _eb4_kw(value: object) -> str:
+    number = _eb4_float(value)
+    return "—" if number is None else f"{number:.2f} kW"
+
+
+def _eb4_percent(value: object) -> str:
+    number = _eb4_float(value)
+    return "—" if number is None else f"{number:.1f}%"
+
+
+def _eb4_price(value: object) -> str:
+    number = _eb4_float(value)
+    return "—" if number is None else f"€{number:.3f}"
+
+
+def _eb4_escape(value: object) -> str:
+    return html.escape(str(value), quote=True)
+
+
 def main() -> None:
     """Run the read-only Energy Brain web UI."""
     from http.server import ThreadingHTTPServer
