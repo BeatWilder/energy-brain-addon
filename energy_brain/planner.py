@@ -157,16 +157,24 @@ def _choose_setpoint(snapshot: EnergySnapshot, battery: BatteryConfig, soc_perce
         available_kwh = (available_percent / 100.0) * battery.capacity_kwh
         max_discharge_to_reserve_kw = (available_kwh * battery.discharge_efficiency) / STEP_HOURS
 
-        allowed_discharge_kw = min(
+        requested_discharge_kw = min(
             load_deficit_kw,
             battery.max_discharge_kw,
+        )
+        allowed_discharge_kw = min(
+            requested_discharge_kw,
             max_discharge_to_reserve_kw,
         )
 
         if allowed_discharge_kw <= 0:
             return 0.0, "reserve_hold"
 
-        return -allowed_discharge_kw, "discharge_to_load"
+        reason = (
+            "reserve_clamped_discharge"
+            if allowed_discharge_kw < requested_discharge_kw
+            else "discharge_to_load"
+        )
+        return -allowed_discharge_kw, reason
 
     return 0.0, "hold"
 
