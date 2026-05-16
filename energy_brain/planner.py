@@ -147,8 +147,30 @@ def _baseline_cost(snapshot: EnergySnapshot, horizon_steps: int) -> float:
 def _choose_setpoint(snapshot: EnergySnapshot, battery: BatteryConfig, soc_percent: float) -> tuple[float, str]:
     reserve = max(battery.reserve_percent, battery.soc_min_percent)
     pv_surplus_kw = max(0.0, snapshot.pv_power_kw - snapshot.household_load_kw)  # type: ignore[operator]
-    if pv_surplus_kw > 0 and soc_percent < battery.soc_max_percent:
-        return min(pv_surplus_kw, battery.max_charge_kw), "charge_from_pv_surplus"
+    if pv_surplus_kw > 0:
+        if soc_percent >= battery.soc_max_percent:
+            return 0.0, "max_soc_hold"
+
+        requested_charge_kw = min(pv_surplus_kw, battery.max_charge_kw)
+
+        available_percent = max(0.0, battery.soc_max_percent - soc_percent)
+        available_kwh = (available_percent / 100.0) * battery.capacity_kwh
+        max_charge_to_soc_max_kw = available_kwh / (battery.charge_efficiency * STEP_HOURS)
+
+        allowed_charge_kw = min(
+            requested_charge_kw,
+            max_charge_to_soc_max_kw,
+        )
+
+        if allowed_charge_kw <= 0:
+            return 0.0, "max_soc_hold"
+
+        reason = (
+            "max_soc_clamped_charge"
+            if allowed_charge_kw < requested_charge_kw
+            else "charge_from_pv_surplus"
+        )
+        return allowed_charge_kw, reason
     if snapshot.grid_price < 0 and soc_percent < battery.soc_max_percent:  # type: ignore[operator]
         return battery.max_charge_kw, "charge_on_negative_price"
     if snapshot.grid_price > 0 and snapshot.household_load_kw > snapshot.pv_power_kw:  # type: ignore[operator]
