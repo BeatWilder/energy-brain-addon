@@ -1381,6 +1381,103 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
     return rendered + hidden
 
 
+
+def _eb_plan_step_time_explanation() -> str:
+    return """
+<section class="plan-step-help" aria-label="Plan stap uitleg">
+  <h2>Wat betekenen #0 t/m #23?</h2>
+  <p><strong>#0 is nu.</strong> Daarna is elke volgende kaart één planner-stap vooruit.</p>
+  <p>Bij de huidige Energy Brain cyclus van 900 seconden is één stap ongeveer 15 minuten.</p>
+  <div class="plan-step-map">
+    <span><strong>#0</strong><small>nu</small></span>
+    <span><strong>#1</strong><small>+15 min</small></span>
+    <span><strong>#2</strong><small>+30 min</small></span>
+    <span><strong>#4</strong><small>+1 uur</small></span>
+    <span><strong>#12</strong><small>+3 uur</small></span>
+    <span><strong>#23</strong><small>+5u45</small></span>
+  </div>
+  <p class="mini">Dit zijn inspectiekaarten voor de planning. Ze zijn geen knoppen en sturen niets aan.</p>
+</section>
+<style>
+  .plan-step-help {
+    margin: 18px 0;
+    padding: 22px;
+    border-radius: 22px;
+    border: 1px solid rgba(103,167,255,.36);
+    background: linear-gradient(145deg, rgba(18,31,45,.92), rgba(8,13,20,.96));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .plan-step-help h2 {
+    margin: 0 0 10px;
+    font-size: clamp(1.35rem, 5vw, 2rem);
+    letter-spacing: -0.03em;
+  }
+  .plan-step-help p {
+    margin: 8px 0;
+    color: #aab6c3;
+  }
+  .plan-step-map {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .plan-step-map span {
+    display: block;
+    padding: 12px 10px;
+    border-radius: 16px;
+    border: 1px solid rgba(148,163,184,.22);
+    background: rgba(255,255,255,.035);
+  }
+  .plan-step-map strong {
+    display: block;
+    color: #e8eef6;
+    font-size: 1.05rem;
+  }
+  .plan-step-map small {
+    display: block;
+    color: #8ea0b2;
+    margin-top: 3px;
+  }
+  @media (max-width: 760px) {
+    .plan-step-map {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>
+"""
+
+def _eb_insert_plan_step_time_explanation(rendered: str) -> str:
+    if "Wat betekenen #0 t/m #23?" in rendered:
+        return rendered
+
+    help_html = _eb_plan_step_time_explanation()
+
+    anchors = [
+        '<section id="tab-plan"',
+        '<h2>Planner Timeline</h2>',
+        'Planner Timeline',
+        'Predbat-Inspired Plan Windows',
+    ]
+
+    for anchor in anchors:
+        index = rendered.find(anchor)
+        if index != -1:
+            return rendered[:index] + help_html + rendered[index:]
+
+    end_main = rendered.rfind("</main>")
+    if end_main != -1:
+        return rendered[:end_main] + help_html + rendered[end_main:]
+
+    return rendered + help_html
+
+
+_eb_original_render_dashboard_html_plan_step_help = render_dashboard_html
+
+def render_dashboard_html(summary: dict[str, Any]) -> str:
+    rendered = _eb_original_render_dashboard_html_plan_step_help(summary)
+    return _eb_insert_plan_step_time_explanation(rendered)
+
 def main() -> None:
     """Run the read-only Energy Brain web UI."""
     from http.server import ThreadingHTTPServer
