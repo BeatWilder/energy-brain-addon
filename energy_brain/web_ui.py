@@ -1835,7 +1835,12 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
 
-        if path == "/api/hillview/control" or path.endswith("/api/hillview/control"):
+        if (
+            path == "/api/hillview/control"
+            or path.endswith("/api/hillview/control")
+            or path.endswith("/hillview/control")
+            or "hillview/control" in path
+        ):
             length = int(self.headers.get("Content-Length", "0") or "0")
             body = self.rfile.read(length).decode("utf-8") if length > 0 else ""
             form = parse_qs(body)
@@ -1865,7 +1870,16 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             self._send_json(result, status=200 if result.get("ok") else 403)
             return
 
-        self._send_json({"status": "not_found", "read_only": True}, status=404)
+        self._send_json(
+            {
+                "status": "not_found",
+                "read_only": True,
+                "method": "POST",
+                "request_path": path,
+                "route_hint": "expected path containing hillview/control",
+            },
+            status=404,
+        )
 
     def log_message(self, format: str, *args: object) -> None:
         # Keep add-on logs clean; the EMS cycle logger remains the source of truth.

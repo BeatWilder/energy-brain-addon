@@ -163,7 +163,8 @@ def test_control_surface_is_limited_to_guarded_hillview_allowlist():
     ha_text = Path("energy_brain/ha_client.py").read_text(encoding="utf-8")
 
     # V2497 intentionally introduces one guarded control surface.
-    assert 'if path == "/api/hillview/control"' in web_text
+    assert 'path == "/api/hillview/control"' in web_text
+    assert '"hillview/control" in path' in web_text
     assert 'def build_hillview_control_result' in web_text
     assert 'def call_service_guarded' in ha_text
 
@@ -620,3 +621,12 @@ def test_hillview_post_route_accepts_ingress_prefixed_path():
     text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
 
     assert 'path.endswith("/api/hillview/control")' in text
+
+def test_hillview_post_route_accepts_broad_ingress_variants_and_reports_path():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert 'path.endswith("/api/hillview/control")' in text
+    assert 'path.endswith("/hillview/control")' in text
+    assert '"hillview/control" in path' in text
+    assert '"request_path": path' in text
+    assert "expected path containing hillview/control" in text
