@@ -590,3 +590,19 @@ def test_hillview_inline_failure_notice_includes_compact_debug_json():
     assert "failed_entity_id" in text
     assert "failed_value" in text
     assert '"debug: " + compactDebug' in text
+
+def test_hillview_inline_debug_includes_raw_backend_response_and_http_status():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert "const responseText = await response.text()" in text
+    assert "JSON.parse(responseText)" in text
+    assert "non_json_response" in text
+    assert "result.http_status = response.status" in text
+    assert "result.http_ok = response.ok" in text
+    assert "raw: result" in text
+
+
+def test_hillview_control_backend_results_have_route_marker():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert text.count('"route": "hillview_control"') >= 5

@@ -1136,6 +1136,7 @@ def build_hillview_control_result(action: str, fields: dict[str, Any] | None = N
 
     if not hillview_controls_enabled():
         return {
+            "route": "hillview_control",
             "ok": False,
             "reason": "hillview_controls_disabled",
             "entity_id": "input_boolean.alphaess_helper_" + dkey,
@@ -1145,6 +1146,7 @@ def build_hillview_control_result(action: str, fields: dict[str, Any] | None = N
 
     if action not in {"save", "on", "off"}:
         return {
+            "route": "hillview_control",
             "ok": False,
             "reason": "invalid_action",
             "entity_id": "input_boolean.alphaess_helper_" + dkey,
@@ -1155,6 +1157,7 @@ def build_hillview_control_result(action: str, fields: dict[str, Any] | None = N
         client = HomeAssistantClient()
     except Exception as exc:
         return {
+            "route": "hillview_control",
             "ok": False,
             "reason": "ha_control_failed",
             "action": action,
@@ -1217,6 +1220,7 @@ def build_hillview_control_result(action: str, fields: dict[str, Any] | None = N
         results.append(result)
         if not result.get("ok"):
             return {
+                "route": "hillview_control",
                 "ok": False,
                 "reason": "guarded_write_failed",
                 "action": action,
@@ -1230,6 +1234,7 @@ def build_hillview_control_result(action: str, fields: dict[str, Any] | None = N
             }
 
     return {
+        "route": "hillview_control",
         "ok": True,
         "reason": "hillview_guarded_control_applied",
         "action": action,
@@ -1526,7 +1531,19 @@ def _hillview_inline_control_script() -> str:
             }
           });
 
-          const result = await response.json();
+          const responseText = await response.text();
+          let result = {};
+          try {
+            result = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            result = {
+              ok: false,
+              reason: "non_json_response",
+              response_text: responseText.slice(0, 500)
+            };
+          }
+          result.http_status = response.status;
+          result.http_ok = response.ok;
           const ok = Boolean(result.ok);
           const nestedFailed = Array.isArray(result.failed) ? result.failed[0] : result.failed;
           const reason =
@@ -1559,11 +1576,18 @@ def _hillview_inline_control_script() -> str:
           } else {
             const shownReason = failedReason || reason || "controle geweigerd of onvolledige invoer";
             const compactDebug = JSON.stringify({
+              http_status: result.http_status || "",
+              http_ok: result.http_ok,
+              ok: result.ok,
+              route: result.route || "",
               reason: result.reason || "",
+              status: result.status || "",
+              message: result.message || "",
               failed_reason: result.failed_reason || "",
               failed_service: result.failed_service || "",
               failed_entity_id: result.failed_entity_id || "",
-              failed_value: result.failed_value || ""
+              failed_value: result.failed_value || "",
+              raw: result
             });
             const details = [
               "actie: " + action,
