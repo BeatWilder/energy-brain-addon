@@ -798,6 +798,102 @@ def render_powerflow_panel(payload: dict[str, Any]) -> str:
     snapshot = powerflow_snapshot(payload)
     return render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
+
+def _build_powerflow_energy_flow(summary: dict[str, Any], snapshot: dict[str, Any], controller: dict[str, Any]) -> dict[str, float]:
+    """Build display-only live-ish powerflow values without inventing PV/load data.
+
+    Priority:
+    1. summary["energy_flow"] or summary["flow"] when already supplied by the caller.
+    2. snapshot live keys.
+    3. deterministic zero fallback, not forecast/demo defaults.
+
+    This function is display-only. It does not read or write Home Assistant.
+    """
+
+    supplied = summary.get("energy_flow") if isinstance(summary.get("energy_flow"), dict) else {}
+    supplied_flow = summary.get("flow") if isinstance(summary.get("flow"), dict) else {}
+
+    merged: dict[str, Any] = {}
+    merged.update(supplied_flow)
+    merged.update(supplied)
+    merged.update(snapshot)
+
+    pv_kw = _pf_get_number(
+        merged,
+        [
+            "pv_kw",
+            "solar_kw",
+            "pv_power_kw",
+            "current_pv_kw",
+            "current_pv_production_kw",
+            "pv_production_kw",
+            "alphaess_current_pv_production_kw",
+        ],
+        0.0,
+    )
+
+    load_kw = _pf_get_number(
+        merged,
+        [
+            "load_kw",
+            "house_kw",
+            "household_load_kw",
+            "current_house_load_kw",
+            "house_load_kw",
+            "alphaess_current_house_load_kw",
+        ],
+        0.0,
+    )
+
+    battery_kw = _pf_get_number(
+        merged,
+        [
+            "battery_kw",
+            "battery_power_kw",
+            "battery_setpoint_kw",
+            "planned_battery_kw",
+        ],
+        _num(controller.get("setpoint_kw"), 0.0),
+    )
+
+    grid_present = any(
+        key in merged
+        for key in [
+            "grid_kw",
+            "grid_balance_kw",
+            "net_kw",
+            "estimated_grid_kw",
+            "grid_power_kw",
+            "alphaess_power_grid_kw",
+        ]
+    )
+    grid_kw = _pf_get_number(
+        merged,
+        [
+            "grid_kw",
+            "grid_balance_kw",
+            "net_kw",
+            "estimated_grid_kw",
+            "grid_power_kw",
+            "alphaess_power_grid_kw",
+        ],
+        0.0,
+    )
+
+    # Only derive grid when no explicit grid source was supplied.
+    if not grid_present:
+        charge_kw = max(battery_kw, 0.0)
+        discharge_kw = max(-battery_kw, 0.0)
+        grid_kw = load_kw + charge_kw - pv_kw - discharge_kw
+
+    return {
+        "pv_kw": round(max(pv_kw, 0.0), 3),
+        "battery_kw": round(battery_kw, 3),
+        "load_kw": round(max(load_kw, 0.0), 3),
+        "grid_kw": round(grid_kw, 3),
+    }
+
+
 def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
     """Build display-only cockpit data from a summarized local cycle."""
 
@@ -855,12 +951,7 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
                 else "Values shown below come from the latest local display cycle."
             ),
         },
-        "energy_flow": {
-            "pv_kw": _num(snapshot.get("pv_power_kw"), 3.2),
-            "battery_kw": _num(controller.get("setpoint_kw"), 0.0),
-            "load_kw": _num(snapshot.get("household_load_kw"), 1.4),
-            "grid_kw": round(_num(snapshot.get("household_load_kw"), 1.4) - _num(snapshot.get("pv_power_kw"), 3.2), 2),
-        },
+        "energy_flow": _build_powerflow_energy_flow(summary, snapshot, controller),
         "battery_soc_card": {
             "soc_percent": soc_now,
             "reserve_percent": 20.0,
