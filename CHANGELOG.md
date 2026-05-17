@@ -1,3 +1,9 @@
+## 0.1.83
+
+- Improve Hillview AlphaESS live dashboard layout on mobile screens.
+- Make live value cards responsive instead of fixed five-column layout.
+- No planner, controller or Home Assistant write-path changes.
+
 # Changelog
 
 ## 0.1.82
