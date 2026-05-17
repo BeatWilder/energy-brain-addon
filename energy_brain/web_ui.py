@@ -1969,6 +1969,8 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 </html>"""
 
 
+
+
 # --- Energy Brain fresh home v1: UI-only helper ---
 # Safety: no HA service calls, no AlphaESS writes, no dispatch.
 def build_fresh_home_v1_display_data(summary=None):
@@ -2898,3 +2900,5 @@ if __name__ == "__main__":
 # HA_OPENS_DIRECTLY_IN_COCKPIT = True
 
 # FRESH_HOME_V1_HELPERS_BEFORE_DO_GET = True
+
+# FORCE_FRESH_HOME_AS_ROOT = True
