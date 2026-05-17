@@ -1649,6 +1649,12 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       }}
     }}
 
+  
+    /* --- V2352-S hide cockpit safety badge block --- */
+    .safety-rail {{
+      display: none !important;
+    }}
+
   </style>
 </head>
 <body>
