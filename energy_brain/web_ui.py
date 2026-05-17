@@ -1485,16 +1485,24 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
 
             if "text/html" in self.headers.get("Accept", ""):
                 status = "OK" if result.get("ok") else "BLOCKED"
-                html = (
+                result_json = html.escape(json.dumps(result, indent=2, sort_keys=True))
+                page = (
                     "<!doctype html><html><head><meta charset='utf-8'>"
                     "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-                    "<title>Hillview control result</title></head><body>"
+                    "<title>Hillview control result</title>"
+                    "<style>"
+                    "body{margin:0;background:#050b11;color:#f4f8fc;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;padding:22px}"
+                    "main{max-width:760px;margin:0 auto}"
+                    ".card{border:1px solid rgba(255,255,255,.12);border-radius:24px;background:#0c1620;padding:22px}"
+                    "a{color:#73d7ff}"
+                    "pre{white-space:pre-wrap;background:#07111a;border-radius:16px;padding:14px;overflow:auto}"
+                    "</style></head><body><main><section class='card'>"
                     f"<h1>{status}</h1>"
-                    f"<pre>{html.escape(json.dumps(result, indent=2, sort_keys=True))}</pre>"
+                    f"<pre>{result_json}</pre>"
                     "<p><a href='/hillview'>Terug naar AlphaESS</a></p>"
-                    "</body></html>"
+                    "</section></main></body></html>"
                 )
-                self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
+                self._send_response(200, page.encode("utf-8"), "text/html; charset=utf-8")
                 return
 
             self._send_json(result, status=200 if result.get("ok") else 403)
