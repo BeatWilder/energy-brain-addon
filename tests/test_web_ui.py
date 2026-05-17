@@ -550,3 +550,24 @@ def test_hillview_inline_copy_says_dispatch_on_saves_values_first():
     text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
 
     assert "Dispatch aan slaat deze waarden eerst op" in text
+
+def test_hillview_inline_blocked_notice_shows_exact_failed_guard_context():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert "failedService" in text
+    assert "failedEntity" in text
+    assert "failedValue" in text
+    assert "service: " in text
+    assert "entity: " in text
+    assert "waarde: " in text
+
+
+def test_hillview_backend_results_include_service_entity_value_context():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert 'result.setdefault("domain", domain)' in text
+    assert 'result.setdefault("service", service)' in text
+    assert 'result.setdefault("entity_id", payload.get("entity_id"))' in text
+    assert 'result.setdefault("payload", payload)' in text
+    assert 'result.setdefault("value", payload.get("value"))' in text
+    assert 'result.setdefault("option", payload.get("option"))' in text

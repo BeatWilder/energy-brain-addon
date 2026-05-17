@@ -1205,6 +1205,15 @@ def build_hillview_control_result(action: str, fields: dict[str, Any] | None = N
     results = []
     for domain, service, payload in writes:
         result = client.call_service_guarded(domain, service, payload)
+        result.setdefault("domain", domain)
+        result.setdefault("service", service)
+        result.setdefault("entity_id", payload.get("entity_id"))
+        result.setdefault("payload", payload)
+        if "value" in payload:
+            result.setdefault("value", payload.get("value"))
+        if "option" in payload:
+            result.setdefault("value", payload.get("option"))
+            result.setdefault("option", payload.get("option"))
         results.append(result)
         if not result.get("ok"):
             return {
@@ -1521,6 +1530,15 @@ def _hillview_inline_control_script() -> str:
             (result.result && result.result.reason) ||
             (result.error && result.error.reason) ||
             "";
+          const failedService = nestedFailed && nestedFailed.service ? nestedFailed.service : "";
+          const failedEntity =
+            (nestedFailed && nestedFailed.entity_id) ||
+            (nestedFailed && nestedFailed.payload && nestedFailed.payload.entity_id) ||
+            "";
+          const failedValue =
+            (nestedFailed && nestedFailed.value) ||
+            (nestedFailed && nestedFailed.payload && (nestedFailed.payload.value || nestedFailed.payload.option)) ||
+            "";
           const action = result.action || data.get("action") || "";
 
           if (ok) {
@@ -1529,7 +1547,14 @@ def _hillview_inline_control_script() -> str:
             showNotice(false, "Geblokkeerd", "Bediening staat nog uit in de add-on configuratie.", "actie: " + action + " · reden: " + reason);
           } else {
             const shownReason = reason || "controle geweigerd of onvolledige invoer";
-            showNotice(false, "Geblokkeerd", "De guarded control heeft de actie geweigerd.", "actie: " + action + " · reden: " + shownReason);
+            const details = [
+              "actie: " + action,
+              "reden: " + shownReason,
+              failedService ? "service: " + failedService : "",
+              failedEntity ? "entity: " + failedEntity : "",
+              failedValue ? "waarde: " + failedValue : ""
+            ].filter(Boolean).join(" · ");
+            showNotice(false, "Geblokkeerd", "De guarded control heeft de actie geweigerd.", details);
           }
         } catch (error) {
           showNotice(false, "Fout", "De actie kon niet worden verwerkt.", String(error));
