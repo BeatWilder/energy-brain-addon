@@ -682,27 +682,50 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     plain = powerflow_plain_status(snap)
 
     path_map = {
-        "zon_naar_huis": "M 380 178 C 380 215, 455 250, 512 250",
-        "zon_naar_batterij": "M 380 178 C 380 235, 380 310, 380 332",
-        "batterij_naar_huis": "M 380 332 C 380 310, 455 250, 512 250",
-        "net_import": "M 248 250 C 310 250, 390 250, 512 250",
-        "net_export": "M 512 250 C 390 250, 310 250, 248 250",
+        "zon_naar_huis": "M 380 178 C 418 190, 468 214, 512 236",
+        "zon_naar_batterij": "M 368 178 C 368 232, 368 284, 368 332",
+        "batterij_naar_huis": "M 392 332 C 430 326, 476 292, 512 264",
+        "net_import": "M 248 236 C 330 236, 430 236, 512 236",
+        "net_export": "M 512 264 C 430 264, 330 264, 248 264",
     }
 
     paths: list[str] = []
     dots: list[str] = []
 
-    for idx, edge in enumerate(edge_list):
-        direction = str(edge.get("direction", "geen_duidelijke_stroomrichting"))
+    flow = _pf_flow_breakdown(snap)
+    route_order = [
+        "zon_naar_huis",
+        "zon_naar_batterij",
+        "batterij_naar_huis",
+        "net_import",
+        "net_export",
+    ]
+    route_power = {
+        "zon_naar_huis": flow.get("solar_to_home", 0.0),
+        "zon_naar_batterij": flow.get("solar_to_battery", 0.0),
+        "batterij_naar_huis": flow.get("battery_to_home", 0.0),
+        "net_import": flow.get("grid_to_home", 0.0),
+        "net_export": flow.get("solar_to_grid", 0.0),
+    }
+    edge_by_direction = {
+        str(edge.get("direction", "geen_duidelijke_stroomrichting")): edge
+        for edge in edge_list
+        if isinstance(edge, dict)
+    }
+
+    for idx, direction in enumerate(route_order):
+        edge = edge_by_direction.get(direction, {})
         path_id = f"pf-path-{idx}"
-        d = path_map.get(direction, "M 248 250 C 330 250, 430 250, 512 250")
-        active = bool(edge.get("active"))
+        d = path_map[direction]
+        physically_active = max(_pf_float(route_power.get(direction, 0.0), 0.0), 0.0) > 0.02
+        edge_active = bool(edge.get("active", physically_active))
+        active = edge_active and physically_active
         cls = f"pf-edge pf-edge-{direction} active" if active else f"pf-edge pf-edge-{direction} idle"
         paths.append(f'<path id="{path_id}" class="{cls}" d="{d}" />')
         if active:
             dots.append(
-                f'<circle class="pf-dot" r="4.8">'
-                f'<animateMotion dur="2.2s" repeatCount="indefinite">'
+                f'<circle class="pf-dot" r="3.2">'
+                f'<animateMotion dur="2.8s" repeatCount="indefinite">'
                 f'<mpath href="#{path_id}" />'
                 f'</animateMotion></circle>'
             )
@@ -1274,6 +1297,30 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .json-viewer.open {{ display: block; }}
     @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow, .human-grid, .plain-dashboard, .plan-sections, .dayparts, .scenario-grid {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
     @media (max-width: 620px) {{ main {{ padding: 14px; }} .hero {{ padding: 22px; }} .steps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .window-row {{ grid-template-columns: 1fr; }} }}
+  
+    /* --- V2352-K clean HA-style lanes and idle flow routes --- */
+    .ha-powerflow-large .pf-edge {{
+      fill: none;
+      stroke-width: 3.2;
+      stroke-linecap: round;
+      opacity: .88;
+    }}
+
+    .ha-powerflow-large .pf-edge.idle {{
+      opacity: .20;
+      stroke-dasharray: 8 12;
+      animation: none;
+    }}
+
+    .ha-powerflow-large .pf-edge.active {{
+      opacity: .95;
+    }}
+
+    .ha-powerflow-large .pf-dot {{
+      fill: rgba(240,244,248,.96);
+      opacity: .96;
+    }}
+
   </style>
 </head>
 <body>
