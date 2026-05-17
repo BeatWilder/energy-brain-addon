@@ -533,7 +533,9 @@ def test_hillview_form_uses_inline_fetch_without_page_refresh():
     assert 'id="hillview-inline-notice"' in html
     assert "def _hillview_inline_control_script" in html
     assert 'event.preventDefault()' in html
-    assert 'fetch(form.action' in html
+    assert 'const endpoint = form.getAttribute("action") || "api/hillview/control"' in html
+    assert 'fetch(endpoint' in html
+    assert 'fetch(form.action' not in html
     assert '"Accept": "application/json"' in html
     assert "showNotice(true" in html
     assert "showNotice(false" in html
@@ -630,3 +632,11 @@ def test_hillview_post_route_accepts_broad_ingress_variants_and_reports_path():
     assert '"hillview/control" in path' in text
     assert '"request_path": path' in text
     assert "expected path containing hillview/control" in text
+
+def test_hillview_inline_fetch_does_not_use_shadowed_form_action_property():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert 'const endpoint = form.getAttribute("action") || "api/hillview/control"' in text
+    assert "fetch(endpoint" in text
+    assert "fetch(form.action" not in text
+    assert 'name="action"' in text

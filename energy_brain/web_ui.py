@@ -1522,7 +1522,8 @@ def _hillview_inline_control_script() -> str:
         buttons.forEach((button) => button.disabled = true);
 
         try {
-          const response = await fetch(form.action, {
+          const endpoint = form.getAttribute("action") || "api/hillview/control";
+          const response = await fetch(endpoint, {
             method: "POST",
             body: new URLSearchParams(data),
             headers: {
