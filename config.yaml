@@ -1,7 +1,7 @@
 name: Energy Brain EMS
 slug: energy_brain
 description: Deterministic, physics-aware Energy Management System for Home Assistant
-version: "0.1.88"
+version: "0.1.87"
 arch:
   - amd64
   - aarch64
