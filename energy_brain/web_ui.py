@@ -1823,17 +1823,55 @@ def render_hillview_alphaess_html(payload: dict[str, Any], notice: dict[str, str
     .card {{ padding: 20px; }}
     .section-head {{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; }}
     .section-head p {{ margin:.25rem 0 0; font-size:.95rem; }}
-    .value-grid {{ display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:12px; }}
+    .value-grid {{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap:12px;
+    }}
     .value-card {{
       border:1px solid var(--line);
       border-radius:18px;
       background:rgba(255,255,255,.045);
       padding:14px;
-      min-height:96px;
+      min-height:112px;
+      overflow:hidden;
     }}
-    .value-card span {{ display:block; color:var(--muted); font-weight:760; font-size:.82rem; }}
-    .value-card strong {{ display:block; margin-top:8px; font-size:1.35rem; letter-spacing:-.03em; }}
-    .value-card small {{ display:block; margin-top:7px; color:var(--muted); }}
+    .value-card span {{
+      display:block;
+      color:var(--muted);
+      font-weight:760;
+      font-size:.86rem;
+      overflow-wrap:anywhere;
+    }}
+    .value-card strong {{
+      display:block;
+      margin-top:8px;
+      font-size:clamp(1.45rem, 7vw, 2.2rem);
+      line-height:1.05;
+      letter-spacing:-.04em;
+      overflow-wrap:anywhere;
+    }}
+    .value-card small {{
+      display:block;
+      margin-top:7px;
+      color:var(--muted);
+      line-height:1.25;
+      overflow-wrap:anywhere;
+    }}
+    @media (max-width: 720px) {{
+      .value-grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }}
+      .value-card {{
+        min-height:132px;
+        padding:13px;
+      }}
+    }}
+    @media (max-width: 390px) {{
+      .value-grid {{
+        grid-template-columns: 1fr;
+      }}
+    }}
     details.technical {{ margin-top:16px; }}
     details.technical summary {{
       cursor:pointer;
