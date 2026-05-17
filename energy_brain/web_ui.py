@@ -1594,7 +1594,7 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 
     {_render_hillview_notice(notice)}
 
-    <section class="card" style="margin-top:16px">
+    <section id="hillview-dispatch-control" class="card" style="margin-top:16px; scroll-margin-top: 18px;">
       <h2>Hillview dispatch bediening</h2>
       <p>Kies eerst mode, tijd, vermogen en cutoff. Daarna kun je dispatch aanzetten. Alleen deze Hillview dispatch helpers staan op de allowlist.</p>
       {_render_hillview_dispatch_form(payload)}
@@ -1699,7 +1699,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
                     "control_status": status,
                     "action": action,
                     "reason": reason,
-                })
+                }) + "#hillview-dispatch-control"
                 self.send_response(303)
                 self.send_header("Location", location)
                 self.send_header("Cache-Control", "no-store")

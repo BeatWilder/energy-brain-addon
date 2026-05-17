@@ -517,3 +517,10 @@ def test_hillview_post_uses_redirect_not_result_page():
     assert 'self.send_header("Location", location)' in text
     assert "Hillview control result" not in text
     assert "result_json = html.escape" not in text
+
+def test_hillview_post_redirect_keeps_user_at_dispatch_control_card():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert 'id="hillview-dispatch-control"' in text
+    assert '#hillview-dispatch-control' in text
+    assert 'scroll-margin-top' in text
