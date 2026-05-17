@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlencode
 
 from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
 from energy_brain.ha_client import HomeAssistantClient
+from energy_brain.v2726.timeline_explainability import build_timeline_explainability
 
 
 DEFAULT_HISTORY_PATH = Path(os.environ.get("ENERGY_BRAIN_HISTORY_PATH", "/data/energy_brain_cycles.jsonl"))
@@ -96,6 +97,13 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_energy_brain_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
+
+    explainability = build_planner_explainability(summary)
+
+    timeline_explainability = build_timeline_explainability(
+        summary.get("plan") or {}
+    )
+
     """Build a read-only Energy Brain EMS cockpit payload for the add-on UI."""
     no_act_key = "dis" + "patch_allowed"
 
@@ -104,6 +112,9 @@ def build_energy_brain_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any
     controller = _dict(summary.get("controller"))
 
     return {
+        "plan_explainability_runtime": explainability,
+        "timeline_explainability": timeline_explainability,
+
         "schema_version": "energy_brain_ems.addon_cockpit.v1",
         "read_only": True,
         "writes_allowed": False,

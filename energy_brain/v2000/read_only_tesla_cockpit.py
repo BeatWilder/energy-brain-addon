@@ -1674,7 +1674,14 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
         <div class="badge safe">inspect only</div>
         <p class="note">Predbat-inspired planning views are display labels and comparisons only.</p>
       </div>
-    </header>
+    
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin:18px 0 8px 0">
+        <a href="/">Powerflow</a>
+        <a href="/hillview">Dispatch / AlphaESS</a>
+        <a href="/cockpit#tab-plan">Planner</a>
+        <a href="/api/tesla-cockpit">JSON payload</a>
+      </div>
+</header>
     <nav class="safety-rail" aria-label="Safety rail visible on every tab">{_badges(payload["read_only_badges"])}<span class="mini">Observer-only/read-only badges</span></nav>
     <div class="tabs" role="tablist" aria-label="Inspect only cockpit tabs">
       {_tab_button("overview", "Overview", True)}
@@ -2202,63 +2209,6 @@ def _plain_planner_html(data: dict[str, Any]) -> str:
     summary = _dict(data.get("today_summary"))
     plan_sections = "".join(
         '<article class="plan-section">'
-        f'<h3>{_esc(item.get("label"))}</h3>'
-        f'<p class="plan-action">{_esc(item.get("action"))}</p>'
-        f'<p>{_esc(item.get("reason"))}</p>'
-        f'<p class="note">{_esc(item.get("impact"))}</p>'
-        f'<span class="safety-label">{_esc(item.get("safety"))}</span>'
-        "</article>"
-        for item in _list(data.get("plan_card_sections"))
-    )
-    summary_rows = "".join(
-        f"<div><span>{_esc(key)}</span><strong>{_esc(value)}</strong></div>"
-        for key, value in summary.items()
-    )
-    dayparts = "".join(
-        '<article class="plain-tile">'
-        f'<h3>{_esc(item.get("label"))}</h3>'
-        f'<p><strong>{_esc(item.get("summary"))}</strong></p>'
-        f'<p class="mini">{_esc(item.get("why"))}</p>'
-        "</article>"
-        for item in _list(data.get("daypart_plan"))
-    )
-    scenarios = "".join(
-        '<article class="plain-tile">'
-        f'<h3>{_esc(item.get("title"))}</h3>'
-        f'<p>{_esc(item.get("value"))}</p>'
-        f'<p class="mini">{_esc(item.get("note"))}</p>'
-        "</article>"
-        for item in _list(data.get("scenarios"))
-    )
-    actual = _dict(data.get("actual_vs_predicted"))
-    return (
-        '<section class="plain-dashboard" aria-label="Predbat-inspired planner uitleg">'
-        '<article class="human-card plan-card"><div class="plan-card-head"><div>'
-        '<h2>Planning in gewone taal</h2>'
-        f'<p class="note">{_esc(confidence.get("explanation"))}</p></div>'
-        f'<span class="confidence-pill">{_esc(confidence.get("label"))}</span></div>'
-        f'<div class="plan-sections">{plan_sections}</div></article>'
-        '<article class="human-card"><h2>Vandaag samengevat</h2>'
-        f'<div class="summary-list">{summary_rows}</div></article>'
-        '<article class="human-card"><h2>Kort gezegd</h2>'
-        f'<strong>{_esc(data.get("short"))}</strong></article>'
-        '<article class="human-card"><h2>Wat betekent dit?</h2>'
-        f'<strong>{_esc(meaning.get("huis"))}</strong>'
-        f'<p class="note">Stuurt dit iets aan? {_esc(meaning.get("stuurt"))}</p></article>'
-        '<article class="human-card"><h2>Wat moet ik hiermee doen?</h2>'
-        f'<strong>{_esc(data.get("what_to_do"))}</strong></article>'
-        ''
-        '<article class="human-card"><h2>Kostenvergelijking</h2>'
-        f'<p class="note">{_esc(cost.get("energy_brain"))}</p>'
-        f'<p class="note">{_esc(cost.get("baseline"))}</p>'
-        f'<strong>{_esc(cost.get("difference"))}</strong></article>'
-        '<article class="human-card"><h2>Voorspelling vs werkelijkheid</h2>'
-        f'<strong>{_esc(actual.get("status"))}</strong></article>'
-        '<article class="human-card"><h2>Waarom lijkt dit op Predbat?</h2>'
-        f'<strong>{_esc(data.get("predbat_reference"))}</strong></article>'
-        '<article class="human-card plain-wide"><h2>Scenario&#x27;s</h2>'
-        f'<div class="scenario-grid">{scenarios}</div></article>'
-        "</section>"
     )
 
 
@@ -2457,194 +2407,31 @@ def _window_html(windows: list[dict[str, Any]]) -> str:
     return '<div class="windows" aria-label="visual plan window labels only">' + "".join(rows) + "</div>"
 
 
+
 def _reason_html(data: dict[str, Any]) -> str:
     counts = data.get("reason_counts", {})
-    rows = "".join(f"<div><span>{_esc(key)}</span><strong>{_esc(value)}</strong></div>" for key, value in _dict(counts).items())
-    constraints = "".join(f'<p class="note">{_esc(item)}</p>' for item in _list(data.get("constraints_applied")))
-    return (
-        f'<h3>Reason-Code Summary</h3><div class="list">{rows}</div>'
-        f'<h3 style="margin-top:16px">Selected Reason-Code Explanation</h3><p class="note" id="reason-code-explanation-area">{_esc(data.get("display_only_safety"))}</p>'
-        f'<h3 style="margin-top:16px">Constraints Applied</h3>{constraints}'
-        f'<h3 style="margin-top:16px">Degraded-Mode Explanation</h3><p class="note">{_esc(data.get("degraded_explanation"))}</p>'
+
+    rows = "".join(
+        f"<div><span>{_esc(key)}</span><strong>{_esc(value)}</strong></div>"
+        for key, value in _dict(counts).items()
     )
 
-
-def _benchmark(data: dict[str, Any]) -> str:
-    fields = {
-        "Energy Brain expected cost": data.get("shadow_cost"),
-        "baseline cost": data.get("baseline_cost"),
-        "delta": data.get("delta"),
-    }
-    notes = "".join(f'<p class="note">{_esc(note)}</p>' for note in _list(data.get("quality_notes")))
-    return _kv(fields) + notes
-
-
-def _safety(data: dict[str, Any]) -> str:
-    return _kv({key: value for key, value in data.items() if key != "buttons"})
-
-
-def _cycle_table(rows: list[dict[str, Any]]) -> str:
-    if not rows:
-        return '<p class="note">No latest cycle rows available; deterministic shadow data is active in visual panels.</p>'
-    head = "".join(f"<th>{_esc(key)}</th>" for key in rows[0])
-    body = "".join(f"<tr>{''.join(f'<td>{_esc(value)}</td>' for value in row.values())}</tr>" for row in rows)
-    return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
-
-
-def _step_detail(step: dict[str, Any]) -> str:
-    reason = _text(step.get("reason_code"), "shadow_hold")
-    plain = plain_step_summary(step)
-    human_fields = {
-        "Stap": f"#{_text(step.get('step'), '0')} · {human_step_time_label(step.get('step', 0))}",
-        "Wat gebeurt er?": plain.get("wat"),
-        "Waarom?": plain.get("waarom"),
-        "Wat betekent dit voor mijn huis?": plain.get("huis"),
-        "Stuurt dit iets aan?": plain.get("stuurt"),
-    }
-    technical_fields = {
-        "selected step index/time": f"#{_text(step.get('step'), '0')} / +0h",
-        "Batterijvulling (SOC %)": step.get("soc_percent"),
-        "Gewenst batterijvermogen (battery setpoint kW)": step.get("setpoint_kw"),
-        "Reden (reason code)": reason,
-        "price": step.get("price"),
-        "PV forecast": step.get("pv_forecast"),
-        "load forecast": step.get("load_forecast"),
-        "Verwachte netbalans (grid estimate)": step.get("grid_estimate"),
-        "Alleen tonen (validation/display-only status)": step.get("validity"),
-        "safety status": f"{_text(step.get('validity'), 'display-only')} / no dispatch",
-        "Begrenzing (constraint applied)": _text(step.get("constraint"), _constraint_for_reason(reason)),
-    }
-    explanation = _reason_explanations().get(reason, _reason_explanations()["shadow_hold"])
-    return (
-        _kv(human_fields)
-        + '<details class="technical-area"><summary>Technische details tonen/verbergen</summary>'
-        + _kv(technical_fields)
-        + f'<p class="note" id="selected-reason-explanation">{_esc(explanation)}</p></details>'
+    constraints = "".join(
+        f'<p class="note">{_esc(item)}</p>'
+        for item in _list(data.get("constraints_applied"))
     )
 
+    degraded = _esc(data.get("degraded_explanation"))
+    safety = _esc(data.get("display_only_safety"))
 
-def _chart_step_summary(step: dict[str, Any]) -> str:
-    reason = _text(step.get("reason_code"), "shadow_hold")
-    plain = plain_step_summary(step)
-    human_fields = {
-        "Stap": f"#{_text(step.get('step'), '0')} · {human_step_time_label(step.get('step', 0))}",
-        "Wat gebeurt er?": plain.get("wat"),
-        "Waarom?": plain.get("waarom"),
-        "Wat betekent dit voor mijn huis?": plain.get("huis"),
-        "Stuurt dit iets aan?": plain.get("stuurt"),
-    }
-    technical_fields = {
-        "step/hour": f"#{_text(step.get('step'), '0')} / +0h",
-        "Batterijvulling (SOC)": _fmt(step.get("soc_percent"), "%"),
-        "Reden (reason)": reason,
-        "Begrenzing (constraint)": _text(step.get("constraint"), _constraint_for_reason(reason)),
-    }
     return (
-        _kv(human_fields)
-        + '<details class="technical-area"><summary>Technische details tonen/verbergen</summary>'
-        + _kv(technical_fields)
-        + "</details>"
+        '<h3>Reason-Code Summary</h3>'
+        f'<div class="list">{rows}</div>'
+        '<h3 style="margin-top:16px">Selected Reason-Code Explanation</h3>'
+        f'<p class="note" id="reason-code-explanation-area">{safety}</p>'
+        '<h3 style="margin-top:16px">Constraints Applied</h3>'
+        f'{constraints}'
+        '<h3 style="margin-top:16px">Degraded-Mode Explanation</h3>'
+        f'<p class="note">{degraded}</p>'
     )
 
-
-def _horizon_chart(payload: dict[str, Any]) -> str:
-    points = _list(payload.get("soc_trajectory"))
-    rows = _list(payload.get("planner_timeline"))
-    if not points:
-        return '<p class="note">SOC trajectory placeholder chart area</p>'
-    width = 900
-    height = 330
-    pad = 52
-    values = [_num(point.get("soc_percent"), 0.0) for point in points]
-    reserve = _num(points[0].get("reserve_floor"), 20.0)
-    max_soc = _num(_dict(payload.get("battery_soc_card")).get("max_forecast_soc"), max(values or [reserve]))
-    lower = max(0.0, min(values + [reserve]) - 4.0)
-    upper = min(100.0, max(values + [reserve, max_soc]) + 4.0)
-    span = max(1.0, upper - lower)
-    x_step = (width - pad * 2) / max(1, len(points) - 1)
-    soc_pairs = []
-    pv_pairs = []
-    load_pairs = []
-    price_bars = []
-    decision_bands = []
-    x_labels = []
-    max_price = max([_num(row.get("price"), 0.0) for row in rows] or [1.0]) or 1.0
-    for index, point in enumerate(points):
-        x = pad + index * x_step
-        y = pad + (upper - _num(point.get("soc_percent"), 0.0)) / span * (height - pad * 2)
-        soc_pairs.append(f"{x:.1f},{y:.1f}")
-        row = rows[min(index, len(rows) - 1)] if rows else {}
-        reason = _text(row.get("reason_code"), "")
-        decision_class = ""
-        if reason == "charge_from_pv_surplus":
-            decision_class = "#43d6a6"
-        elif reason in ("max_soc_clamped_charge", "max_soc_hold", "max_soc_clamp") or "max_soc" in reason:
-            decision_class = "#f2b84b"
-        if decision_class:
-            decision_bands.append(f'<rect x="{x - x_step / 2:.1f}" y="{pad:.1f}" width="{max(6.0, x_step):.1f}" height="{height - pad * 2:.1f}" fill="{decision_class}" opacity=".14"/>')
-        pv_y = height - pad - min(1.0, _num(row.get("pv_forecast"), 0.0) / 6.0) * 54
-        load_y = height - pad - min(1.0, _num(row.get("load_forecast"), 0.0) / 4.0) * 54
-        pv_pairs.append(f"{x:.1f},{pv_y:.1f}")
-        load_pairs.append(f"{x:.1f},{load_y:.1f}")
-        bar_h = 10 + (_num(row.get("price"), 0.0) / max_price) * 58
-        price_bars.append(f'<rect x="{x - 4:.1f}" y="{height - pad - bar_h:.1f}" width="8" height="{bar_h:.1f}" rx="3" fill="rgba(255,209,102,.38)"/>')
-        if index in (0, 6, 12, 18, len(points) - 1):
-            x_labels.append(f'<text x="{x:.1f}" y="{height - 14}" fill="#9eacb8" font-size="11" text-anchor="middle">+{index}h</text>')
-    reserve_y = pad + (upper - reserve) / span * (height - pad * 2)
-    max_y = pad + (upper - max_soc) / span * (height - pad * 2)
-    y_mid_value = (upper + lower) / 2
-    y_mid = pad + (upper - y_mid_value) / span * (height - pad * 2)
-    return (
-        f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="SOC trajectory placeholder chart area">'
-        f'<title>SOC trajectory, price, PV/load overlay, reserve and max SOC horizon</title>'
-        f'<rect x="{pad}" y="{pad}" width="{width - pad * 2}" height="{height - pad * 2}" fill="rgba(255,255,255,.018)" stroke="rgba(238,244,248,.12)"/>'
-        f'<rect x="{pad}" y="{reserve_y:.1f}" width="{width - pad * 2}" height="{height - pad - reserve_y:.1f}" fill="rgba(242,184,75,.08)"/>'
-        f'{"".join(decision_bands)}'
-        f'<line x1="{pad}" x2="{width-pad}" y1="{reserve_y:.1f}" y2="{reserve_y:.1f}" stroke="#f2b84b" stroke-dasharray="6 6"/>'
-        f'<text x="{width - pad - 118}" y="{reserve_y - 6:.1f}" fill="#f2b84b" font-size="12">Reserve / min SOC</text>'
-        f'<line x1="{pad}" x2="{width-pad}" y1="{max_y:.1f}" y2="{max_y:.1f}" stroke="#ff7777" stroke-dasharray="4 5"/>'
-        f'<text x="{width - pad - 62}" y="{max_y - 6:.1f}" fill="#ff9999" font-size="12">Max SOC</text>'
-        f'{"".join(price_bars)}'
-        f'<polyline points="{" ".join(pv_pairs)}" fill="none" stroke="#ffd166" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>'
-        f'<polyline points="{" ".join(load_pairs)}" fill="none" stroke="#69a7ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>'
-        f'<polyline points="{" ".join(soc_pairs)}" fill="none" stroke="#43d6a6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'
-        f'<line id="selected-step-marker" data-chart-pad="{pad}" data-step-width="{x_step:.4f}" x1="{pad}" x2="{pad}" y1="{pad}" y2="{height - pad}" stroke="#eef4f8" stroke-width="2" opacity=".86"/>'
-        f'<text id="selected-step-marker-label" x="{pad + 6}" y="{pad + 16}" fill="#eef4f8" font-size="12">selected step #0</text>'
-        f'<text x="14" y="{pad + 4}" fill="#9eacb8" font-size="12">{upper:.1f}%</text>'
-        f'<text x="14" y="{y_mid + 4:.1f}" fill="#9eacb8" font-size="12">{y_mid_value:.1f}%</text>'
-        f'<text x="14" y="{height - pad + 4}" fill="#9eacb8" font-size="12">{lower:.1f}%</text>'
-        f'<text x="10" y="{height / 2:.1f}" fill="#9eacb8" font-size="12" transform="rotate(-90 10 {height / 2:.1f})">SOC %</text>'
-        f'{"".join(x_labels)}'
-        f'<text x="{width / 2:.1f}" y="{height - 2}" fill="#9eacb8" font-size="12" text-anchor="middle">step / hour</text>'
-        f'<text x="{width - 326}" y="39" fill="#9eacb8" font-size="12">SOC line · price bars · PV/load overlays · reserve band</text>'
-        f'<text x="{width - 256}" y="22" fill="#9eacb8" font-size="12">Gekleurde vlakken tonen controleperiodes</text>'
-        "</svg>"
-    )
-
-
-def _dict(value: Any) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
-def _list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
-
-
-def _num(value: Any, fallback: float) -> float:
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else fallback
-
-
-def _text(value: Any, fallback: str) -> str:
-    return str(value) if value not in (None, "") else fallback
-
-
-def _fmt(value: Any, suffix: str = "") -> str:
-    if isinstance(value, bool):
-        return "yes" if value else "no"
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return f"{float(value):.2f}{suffix}"
-    return _esc(value)
-
-
-def _esc(value: Any) -> str:
-    return html.escape(str(value), quote=True)
