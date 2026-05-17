@@ -665,6 +665,300 @@ def render_fresh_home_v1(display_data: dict[str, Any] | None = None) -> str:
         animation:none !important;
       }}
     }}
+
+
+    /* ENERGY_BRAIN_RESPONSIVE_POLISH_V2_START */
+
+    .hero {{
+      min-height: 258px;
+    }}
+
+    .hero .eyebrow,
+    .hero h1,
+    .hero-list,
+    .hero-text {{
+      position: relative;
+      z-index: 2;
+    }}
+
+    .eb-logo-hero {{
+      top: 0;
+      right: 20px;
+      width: 255px;
+      height: 255px;
+      opacity: .82;
+    }}
+
+    @media (min-width: 761px) and (max-width: 1180px) {{
+      .app {{
+        padding: 22px 22px 104px;
+      }}
+
+      .grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }}
+
+      .hero {{
+        min-height: 270px;
+        padding: 32px 34px;
+      }}
+
+      .eb-logo-hero {{
+        top: 4px;
+        right: 28px;
+        width: 265px;
+        height: 265px;
+      }}
+
+      .hero-list,
+      .hero-text {{
+        max-width: 62%;
+      }}
+    }}
+
+    @media (max-width: 760px) {{
+      .app {{
+        padding: 14px 12px 92px;
+      }}
+
+      .top {{
+        min-height: 74px;
+      }}
+
+      .brand {{
+        font-size: 22px;
+        letter-spacing: .14em;
+      }}
+
+      .eb-logo-small {{
+        width: 50px;
+        height: 50px;
+      }}
+
+      .chips {{
+        gap: 10px;
+        margin: 14px 0 16px;
+      }}
+
+      .chip {{
+        min-height: 46px;
+        padding: 10px 15px;
+        border-radius: 15px;
+        font-size: 18px;
+        letter-spacing: .12em;
+      }}
+
+      .grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px;
+      }}
+
+      .hero {{
+        grid-column: 1 / -1;
+        min-height: 320px;
+        padding: 26px 22px 24px;
+      }}
+
+      .hero h1 {{
+        font-size: 48px;
+        max-width: 58%;
+      }}
+
+      .hero-list {{
+        max-width: 58%;
+        font-size: 24px;
+        gap: 12px;
+      }}
+
+      .hero-text {{
+        max-width: 56%;
+        margin-top: 22px;
+        padding-right: 0;
+        font-size: 21px;
+        line-height: 1.42;
+      }}
+
+      .eb-logo-hero {{
+        width: 180px;
+        height: 180px;
+        right: 12px;
+        top: 42px;
+        opacity: .82;
+      }}
+
+      .metric {{
+        min-height: 152px;
+        grid-template-columns: 54px 1fr;
+        gap: 12px;
+        padding: 22px 18px;
+      }}
+
+      .metric .label {{
+        top: 18px;
+        left: 18px;
+        font-size: 16px;
+        letter-spacing: .20em;
+      }}
+
+      .metric .icon {{
+        margin-top: 34px;
+        font-size: 38px;
+      }}
+
+      .metric .value {{
+        margin-top: 34px;
+        font-size: 44px;
+        line-height: 1;
+      }}
+
+      .metric .unit {{
+        font-size: 24px;
+      }}
+
+      .socbar {{
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+      }}
+
+      .advice,
+      .plan,
+      .predbat,
+      .safety {{
+        min-height: 184px;
+        padding: 22px 18px;
+      }}
+
+      .advice h2 {{
+        font-size: 34px;
+      }}
+
+      .advice p,
+      .predbat p,
+      .safety p {{
+        font-size: 19px;
+      }}
+
+      .plan-row {{
+        grid-template-columns: 64px 1fr;
+        gap: 10px;
+        padding: 9px 10px;
+        font-size: 15px;
+      }}
+
+      .plan-row time {{
+        font-size: 19px;
+      }}
+
+      .bottom {{
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }}
+
+      .tab {{
+        font-size: 15px;
+      }}
+
+      .tab b {{
+        font-size: 27px;
+      }}
+    }}
+
+    @media (max-width: 430px) {{
+      .top {{
+        gap: 12px;
+      }}
+
+      .brand {{
+        font-size: 20px;
+        letter-spacing: .12em;
+      }}
+
+      .menu {{
+        font-size: 26px;
+      }}
+
+      .eb-logo-small {{
+        width: 46px;
+        height: 46px;
+      }}
+
+      .hero {{
+        min-height: 314px;
+        padding: 24px 20px 22px;
+      }}
+
+      .hero h1 {{
+        font-size: 45px;
+        max-width: 57%;
+      }}
+
+      .hero-list {{
+        max-width: 58%;
+        font-size: 22px;
+      }}
+
+      .hero-text {{
+        max-width: 56%;
+        font-size: 20px;
+      }}
+
+      .eb-logo-hero {{
+        width: 158px;
+        height: 158px;
+        right: 10px;
+        top: 48px;
+      }}
+
+      .metric {{
+        min-height: 146px;
+        grid-template-columns: 48px 1fr;
+        padding: 21px 16px;
+      }}
+
+      .metric .icon {{
+        font-size: 34px;
+      }}
+
+      .metric .value {{
+        font-size: 39px;
+      }}
+
+      .metric .unit {{
+        font-size: 22px;
+      }}
+    }}
+
+    @media (max-width: 370px) {{
+      .hero {{
+        min-height: 330px;
+      }}
+
+      .hero h1,
+      .hero-list,
+      .hero-text {{
+        max-width: 100%;
+      }}
+
+      .eb-logo-hero {{
+        width: 132px;
+        height: 132px;
+        top: 42px;
+        right: 4px;
+        opacity: .44;
+      }}
+
+      .metric .value {{
+        font-size: 34px;
+      }}
+
+      .metric .unit {{
+        font-size: 20px;
+      }}
+    }}
+
+    /* ENERGY_BRAIN_RESPONSIVE_POLISH_V2_END */
+
   </style>
 </head>
 <body>

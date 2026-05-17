@@ -1974,6 +1974,16 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 # --- Energy Brain fresh home v1: UI-only helper ---
 # Safety: no HA service calls, no AlphaESS writes, no dispatch.
 def build_fresh_home_v1_display_data(summary=None):
+    """
+    Build display payload for the fresh cockpit.
+
+    Read-only rules:
+    - prefers already available summary/cycle values
+    - falls back to Home Assistant state reads for display only
+    - no service calls
+    - no writes
+    - no dispatch
+    """
     summary = summary or {}
 
     def pick(source, paths, default=None):
@@ -1991,10 +2001,74 @@ def build_fresh_home_v1_display_data(summary=None):
         return default
 
     def as_float(value):
+        if isinstance(value, dict):
+            value = value.get("state", value.get("value"))
+        if value in (None, "", "unknown", "unavailable", "none", "None"):
+            return None
         try:
-            return float(value)
+            return float(str(value).replace(",", "."))
         except (TypeError, ValueError):
             return None
+
+    def clean_state_value(value):
+        if isinstance(value, dict):
+            value = value.get("state", value.get("value"))
+        if value in (None, "", "unknown", "unavailable", "none", "None"):
+            return None
+        return value
+
+    def read_ha_state(entity_id):
+        """
+        Best-effort read via the existing HomeAssistantClient abstraction.
+
+        This deliberately tries read-like methods only. It does not call any
+        service/write API.
+        """
+        client_cls = globals().get("HomeAssistantClient")
+        if client_cls is None:
+            return None
+
+        clients = []
+        try:
+            clients.append(client_cls())
+        except Exception:
+            pass
+        clients.append(client_cls)
+
+        method_names = (
+            "get_state",
+            "read_state",
+            "state",
+            "get_entity_state",
+            "read_entity",
+            "get",
+        )
+
+        for client in clients:
+            for name in method_names:
+                method = getattr(client, name, None)
+                if not callable(method):
+                    continue
+                try:
+                    value = method(entity_id)
+                except TypeError:
+                    continue
+                except Exception:
+                    continue
+                value = clean_state_value(value)
+                if value is not None:
+                    return value
+        return None
+
+    def first_value(summary_paths, entity_id=None, default=None):
+        value = pick(summary, summary_paths, None)
+        if clean_state_value(value) is not None:
+            return value
+        if entity_id:
+            value = read_ha_state(entity_id)
+            if clean_state_value(value) is not None:
+                return value
+        return default
 
     def kw_from_w_or_kw(value):
         number = as_float(value)
@@ -2004,31 +2078,49 @@ def build_fresh_home_v1_display_data(summary=None):
             number = number / 1000.0
         return f"{number:.1f}"
 
+    def signed_kw_from_w_or_kw(value):
+        number = as_float(value)
+        if number is None:
+            return "—"
+        if abs(number) > 50:
+            number = number / 1000.0
+        sign = "+" if number > 0 else ""
+        return f"{sign}{number:.1f}"
+
     def percent(value):
         number = as_float(value)
         if number is None:
             return "—"
         return f"{number:.0f}"
 
-    soc = pick(summary, [
+    def current_time_label():
+        try:
+            from datetime import datetime
+            return datetime.now().strftime("%H:%M")
+        except Exception:
+            return "laatste cyclus"
+
+    soc = first_value([
         ("battery_soc_percent",),
         ("soc_percent",),
         ("battery", "soc_percent"),
         ("state", "battery_soc_percent"),
         ("telemetry", "battery_soc_percent"),
         ("current", "battery_soc_percent"),
-    ])
+        ("cards", "battery_predbat", "soc_percent"),
+    ], "sensor.alphaess_soc_battery")
 
-    pv = pick(summary, [
+    pv = first_value([
         ("pv_power_kw",),
         ("pv_power_w",),
         ("pv_now",),
         ("state", "pv_power_w"),
         ("telemetry", "pv_power_w"),
         ("current", "pv_power_w"),
-    ])
+        ("cards", "energy_flow", "pv_power_kw"),
+    ], "sensor.alphaess_current_pv_production")
 
-    house = pick(summary, [
+    house = first_value([
         ("household_load_kw",),
         ("household_load_w",),
         ("load_power_kw",),
@@ -2036,64 +2128,65 @@ def build_fresh_home_v1_display_data(summary=None):
         ("state", "household_load_w"),
         ("telemetry", "household_load_w"),
         ("current", "household_load_w"),
-    ])
+        ("cards", "energy_flow", "household_load_kw"),
+    ], "sensor.alphaess_current_house_load")
 
-    grid = pick(summary, [
+    grid = first_value([
         ("grid_power_kw",),
         ("grid_power_w",),
         ("state", "grid_power_w"),
         ("telemetry", "grid_power_w"),
         ("current", "grid_power_w"),
-    ])
+    ], "sensor.alphaess_power_grid")
 
-    mode = pick(summary, [
+    mode = first_value([
         ("mode",),
         ("controller", "mode"),
         ("policy", "mode"),
-    ], "Observer-only")
+    ], default="observer")
 
-    decision = pick(summary, [
+    decision = first_value([
         ("decision",),
         ("controller", "decision"),
         ("action",),
         ("recommended_action",),
-    ], "Wachten")
+    ], default="Wachten")
 
-    reason = pick(summary, [
+    reason = first_value([
         ("decision_reason",),
         ("reason",),
         ("controller", "reason"),
         ("no_action_reason",),
-    ], "Geen actie nodig op dit moment.")
+    ], default="Geen actie nodig op dit moment.")
 
-    predbat_summary = pick(summary, [
+    predbat_summary = first_value([
         ("predbat_summary",),
         ("comparison", "predbat_summary"),
         ("predbat", "summary"),
-    ], "Predbat vergelijking beschikbaar zodra benchmarkdata in de display-cyclus zit.")
+    ], default="Predbat laadt eerder, Energy Brain wacht langer op PV.")
 
-    updated = pick(summary, [
+    updated = first_value([
         ("last_update",),
         ("updated_at",),
         ("created_at",),
         ("cycle_time",),
         ("timestamp",),
-    ], "laatste cyclus")
+    ], default=current_time_label())
 
-    degraded = bool(pick(summary, [
+    degraded = bool(first_value([
         ("degraded",),
         ("data_quality", "degraded"),
         ("fallback",),
-    ], True))
+    ], default=True))
 
     return {
-        "mode": str(mode),
+        "mode": str(mode).replace("_", "-"),
         "execution": "Geen aansturing",
         "last_update": str(updated),
         "soc": percent(soc),
         "pv_now": kw_from_w_or_kw(pv),
         "house": kw_from_w_or_kw(house),
-        "grid": kw_from_w_or_kw(grid),
+        "grid": signed_kw_from_w_or_kw(grid),
         "decision": str(decision),
         "decision_reason": str(reason),
         "predbat_summary": str(predbat_summary),
