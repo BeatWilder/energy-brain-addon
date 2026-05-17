@@ -105,7 +105,7 @@ def render_fresh_home_v1(data: dict[str, Any] | None = None) -> str:
     .app {{
       position:relative;
       width:min(100%, 960px);
-      margin:0 auto;
+      margin:0 auto; width:min(96vw,1600px);
       padding:22px 18px 96px;
     }}
 
@@ -519,11 +519,34 @@ def render_fresh_home_v1(data: dict[str, Any] | None = None) -> str:
   </main>
 
   <nav class="bottom-nav">
-    <a class="nav-item active" href="#"><div class="ico">⌂</div><div>Home</div></a>
-    <a class="nav-item" href="#"><div class="ico">□</div><div>Plan</div></a>
-    <a class="nav-item" href="#"><div class="ico">⌁</div><div>Forecast</div></a>
-    <a class="nav-item" href="#"><div class="ico">▥</div><div>Benchmark</div></a>
-    <a class="nav-item" href="#"><div class="ico">◇</div><div>Safety</div></a>
+    <a class="nav-item active" href="/"><div class="ico">⌂</div><div>Home</div></a>
+    <a class="nav-item" href="/"><div class="ico">□</div><div href="/plan">Plan</div></a>
+    <a class="nav-item" href="/"><div class="ico">⌁</div><div href="/forecast">Forecast</div></a>
+    <a class="nav-item" href="/"><div class="ico">▥</div><div href="/benchmark">Benchmark</div></a>
+    <a class="nav-item" href="/"><div class="ico">◇</div><div href="/safety">Safety</div></a>
   </nav>
 </body>
 </html>"""
+
+
+<style>
+.bottom-nav a{
+  text-decoration:none;
+  color:inherit;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  transition:all .18s ease;
+}
+
+.bottom-nav a:hover{
+  transform:translateY(-2px);
+  opacity:1;
+}
+
+.bottom-nav a.active{
+  color:var(--teal);
+}
+</style>
