@@ -1458,7 +1458,7 @@ def _render_hillview_dispatch_form(payload: dict[str, Any]) -> str:
         return f'<input type="number" name="{_escape(name)}" value="{_escape(value)}"{extra}>'
 
     return f"""
-      <form id="hillview-dispatch-form" method="post" action="/api/hillview/control" class="control-form">
+      <form id="hillview-dispatch-form" method="post" action="api/hillview/control" class="control-form">
         <div class="form-grid">
           <label><span>Mode</span>{mode_input}</label>
           <label><span>Duration</span>{number_input("duration", duration_value)}</label>
@@ -1835,7 +1835,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
 
-        if path == "/api/hillview/control":
+        if path == "/api/hillview/control" or path.endswith("/api/hillview/control"):
             length = int(self.headers.get("Content-Length", "0") or "0")
             body = self.rfile.read(length).decode("utf-8") if length > 0 else ""
             form = parse_qs(body)

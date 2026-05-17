@@ -402,7 +402,7 @@ def test_hillview_html_contains_control_buttons(monkeypatch):
     assert "Dispatch aan" in html
     assert "Dispatch uit" in html
     assert "Instellingen opslaan" in html
-    assert "/api/hillview/control" in html
+    assert "api/hillview/control" in html
 
 def test_hillview_dispatch_form_renders_mode_duration_power_cutoff(monkeypatch):
     from energy_brain import web_ui
@@ -606,3 +606,17 @@ def test_hillview_control_backend_results_have_route_marker():
     text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
 
     assert text.count('"route": "hillview_control"') >= 5
+
+def test_hillview_control_form_uses_ingress_safe_relative_action():
+    from energy_brain.web_ui import build_hillview_alphaess_payload, render_hillview_alphaess_html
+
+    html = render_hillview_alphaess_html(build_hillview_alphaess_payload())
+
+    assert 'action="api/hillview/control"' in html
+    assert 'action="/api/hillview/control"' not in html
+
+
+def test_hillview_post_route_accepts_ingress_prefixed_path():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert 'path.endswith("/api/hillview/control")' in text
