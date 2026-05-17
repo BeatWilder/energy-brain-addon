@@ -1090,6 +1090,124 @@ def hillview_controls_enabled() -> bool:
     return bool(options.get("hillview_controls_enabled") is True)
 
 
+
+def hillview_live_values() -> dict[str, Any]:
+    """Read useful Hillview/AlphaESS values for the UI.
+
+    Read-only only. Missing Home Assistant access returns unknown values.
+    """
+    entities = {
+        "pv_now": ("sensor.alphaess_current_pv_production", "PV nu"),
+        "pv_meter": ("sensor.alphaess_active_power_pv_meter", "PV meter"),
+        "grid_power": ("sensor.alphaess_power_grid", "Netvermogen"),
+        "grid_phase_a": ("sensor.alphaess_power_phase_a_grid", "Fase A"),
+        "grid_phase_b": ("sensor.alphaess_power_phase_b_grid", "Fase B"),
+        "grid_phase_c": ("sensor.alphaess_power_phase_c_grid", "Fase C"),
+        "dispatch_enabled": ("input_boolean.alphaess_helper_dispatch", "Dispatch"),
+        "dispatch_mode": ("sensor.alphaess_dispatch_mode", "Dispatch mode"),
+        "dispatch_active_power": ("sensor.alphaess_dispatch_active_power", "Dispatch vermogen"),
+        "dispatch_soc": ("sensor.alphaess_dispatch_soc", "Dispatch SOC"),
+        "dispatch_time": ("sensor.alphaess_dispatch_time", "Dispatch tijd"),
+        "dispatch_timer": ("timer.alphaess_helper_dispatch_timer", "Timer"),
+        "excess_power": ("sensor.alphaess_excess_power", "Excess power"),
+        "max_feed_to_grid": ("sensor.alphaess_max_feed_to_grid", "Max feed to grid"),
+        "grid_frequency": ("sensor.alphaess_inverter_grid_frequency", "Grid frequentie"),
+    }
+
+    result: dict[str, Any] = {
+        "available": False,
+        "values": {},
+        "entities": {key: entity_id for key, (entity_id, _label) in entities.items()},
+    }
+
+    try:
+        client = HomeAssistantClient()
+    except Exception as exc:
+        result["error"] = str(exc)
+        return result
+
+    for key, (entity_id, label) in entities.items():
+        state = client.get_state_object(entity_id)
+        if not isinstance(state, dict):
+            result["values"][key] = {
+                "label": label,
+                "entity_id": entity_id,
+                "state": "unknown",
+                "unit": "",
+                "available": False,
+            }
+            continue
+
+        attrs = state.get("attributes")
+        if not isinstance(attrs, dict):
+            attrs = {}
+
+        result["available"] = True
+        result["values"][key] = {
+            "label": label,
+            "entity_id": entity_id,
+            "state": state.get("state", "unknown"),
+            "unit": attrs.get("unit_of_measurement", ""),
+            "available": True,
+        }
+
+    return result
+
+
+def _hillview_value(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    live = _dict(payload.get("live_values"))
+    values = _dict(live.get("values"))
+    return _dict(values.get(key))
+
+
+def _hillview_value_text(payload: dict[str, Any], key: str) -> str:
+    value = _hillview_value(payload, key)
+    state = value.get("state")
+    unit = value.get("unit") or ""
+    if state in (None, "", "unknown", "unavailable"):
+        return "—"
+    return f"{state} {unit}".strip()
+
+
+def _render_hillview_value_card(title: str, value: str, note: str = "") -> str:
+    return (
+        '<div class="value-card">'
+        f'<span>{_escape(title)}</span>'
+        f'<strong>{_escape(value)}</strong>'
+        f'<small>{_escape(note)}</small>'
+        '</div>'
+    )
+
+
+def _render_hillview_live_overview(payload: dict[str, Any]) -> str:
+    live = _dict(payload.get("live_values"))
+    available = live.get("available") is True
+    status_note = "Live uit Home Assistant" if available else "Nog geen live HA waarden beschikbaar"
+
+    return f"""
+    <section class="card live-overview">
+      <div class="section-head">
+        <div>
+          <h2>AlphaESS live overzicht</h2>
+          <p>{_escape(status_note)}</p>
+        </div>
+      </div>
+      <div class="value-grid">
+        {_render_hillview_value_card("PV nu", _hillview_value_text(payload, "pv_now"), "actuele productie")}
+        {_render_hillview_value_card("Net", _hillview_value_text(payload, "grid_power"), "import/export")}
+        {_render_hillview_value_card("Dispatch", _hillview_value_text(payload, "dispatch_enabled"), "helper status")}
+        {_render_hillview_value_card("Mode", _hillview_value_text(payload, "dispatch_mode"), "actieve Hillview mode")}
+        {_render_hillview_value_card("Dispatch vermogen", _hillview_value_text(payload, "dispatch_active_power"), "actief vermogen")}
+        {_render_hillview_value_card("Dispatch SOC", _hillview_value_text(payload, "dispatch_soc"), "SOC tijdens dispatch")}
+        {_render_hillview_value_card("Dispatch tijd", _hillview_value_text(payload, "dispatch_time"), "resterend / actief")}
+        {_render_hillview_value_card("Excess power", _hillview_value_text(payload, "excess_power"), "overschot")}
+        {_render_hillview_value_card("Max feed to grid", _hillview_value_text(payload, "max_feed_to_grid"), "netlimiet")}
+        {_render_hillview_value_card("Grid frequentie", _hillview_value_text(payload, "grid_frequency"), "inverter/grid")}
+      </div>
+    </section>
+    """
+
+
 def hillview_dispatch_current_values() -> dict[str, Any]:
     """Read current Hillview helper states for form rendering."""
     ids = {
@@ -1264,6 +1382,7 @@ def build_hillview_alphaess_payload() -> dict[str, Any]:
         "service_calls_allowed": hillview_controls_enabled(),
         dkey + "_allowed": hillview_controls_enabled(),
         "control_values": hillview_dispatch_current_values(),
+        "live_values": hillview_live_values(),
         "control_intent": {
             "prepared": True,
             "active": False,
@@ -1702,6 +1821,30 @@ def render_hillview_alphaess_html(payload: dict[str, Any], notice: dict[str, str
     .nav {{ margin-top: 20px; display: flex; gap: 16px; flex-wrap: wrap; }}
     .grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }}
     .card {{ padding: 20px; }}
+    .section-head {{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; }}
+    .section-head p {{ margin:.25rem 0 0; font-size:.95rem; }}
+    .value-grid {{ display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:12px; }}
+    .value-card {{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:rgba(255,255,255,.045);
+      padding:14px;
+      min-height:96px;
+    }}
+    .value-card span {{ display:block; color:var(--muted); font-weight:760; font-size:.82rem; }}
+    .value-card strong {{ display:block; margin-top:8px; font-size:1.35rem; letter-spacing:-.03em; }}
+    .value-card small {{ display:block; margin-top:7px; color:var(--muted); }}
+    details.technical {{ margin-top:16px; }}
+    details.technical summary {{
+      cursor:pointer;
+      list-style:none;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:rgba(255,255,255,.045);
+      padding:14px 16px;
+      font-weight:820;
+    }}
+    details.technical summary::-webkit-details-marker {{ display:none; }}
     table {{ width: 100%; border-collapse: collapse; }}
     th, td {{ padding: 10px 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
     th {{ color: var(--text); font-weight: 760; padding-right: 16px; }}
@@ -1763,9 +1906,14 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
       <ul>{requirements}</ul>
     </section>
 
-    <div class="grid">
-      {''.join(group_html)}
-    </div>
+    {_render_hillview_live_overview(payload)}
+
+    <details class="technical">
+      <summary>Technische Hillview entities</summary>
+      <div class="grid">
+        {''.join(group_html)}
+      </div>
+    </details>
   </main>
   {_hillview_inline_control_script()}
 </body>

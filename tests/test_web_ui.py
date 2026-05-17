@@ -640,3 +640,37 @@ def test_hillview_inline_fetch_does_not_use_shadowed_form_action_property():
     assert "fetch(endpoint" in text
     assert "fetch(form.action" not in text
     assert 'name="action"' in text
+
+def test_hillview_payload_contains_live_values():
+    from energy_brain import web_ui
+
+    payload = web_ui.build_hillview_alphaess_payload()
+
+    assert "live_values" in payload
+    assert "control_values" in payload
+
+
+def test_hillview_renders_live_overview_and_collapses_technical_entities():
+    from energy_brain import web_ui
+
+    payload = web_ui.build_hillview_alphaess_payload()
+    html = web_ui.render_hillview_alphaess_html(payload)
+
+    assert "AlphaESS live overzicht" in html
+    assert "PV nu" in html
+    assert "Net" in html
+    assert "Dispatch vermogen" in html
+    assert "Dispatch SOC" in html
+    assert "Max feed to grid" in html
+    assert '<details class="technical">' in html
+    assert "Technische Hillview entities" in html
+    assert "future guarded control" in html
+
+
+def test_hillview_live_values_is_read_only():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+    helper = text.split("def hillview_live_values", 1)[1].split("def _hillview_value", 1)[0]
+
+    assert "get_state_object" in helper
+    assert "call_service_guarded" not in helper
+    assert "requests.post" not in helper
