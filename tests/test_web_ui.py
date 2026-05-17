@@ -158,19 +158,25 @@ def test_no_http_server_or_write_methods_are_exposed():
     assert "do_DELETE" not in public_names
 
 
-def test_forbidden_control_strings_not_added_to_ui_files():
-    terms = _forbidden_terms()
-    files = [
-        Path("energy_brain/web_ui.py"),
-        Path("tests/test_web_ui.py"),
-    ]
+def test_control_surface_is_limited_to_guarded_hillview_allowlist():
+    web_text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+    ha_text = Path("energy_brain/ha_client.py").read_text(encoding="utf-8")
 
-    offenders = []
-    for path in files:
-        text = path.read_text(encoding="utf-8")
-        offenders.extend(f"{path}:{term}" for term in terms if term in text)
+    # V2497 intentionally introduces one guarded control surface.
+    assert 'if path == "/api/hillview/control"' in web_text
+    assert 'def build_hillview_control_result' in web_text
+    assert 'def call_service_guarded' in ha_text
 
-    assert offenders == []
+    # Only the single Hillview input_boolean may be written through the allowlist.
+    assert ha_text.count('"input_boolean.alphaess_helper_dispatch"') == 2
+    assert '("input_boolean", "turn_on", "input_boolean.alphaess_helper_dispatch")' in ha_text
+    assert '("input_boolean", "turn_off", "input_boolean.alphaess_helper_dispatch")' in ha_text
+
+    # No broad or generic service executor may appear.
+    assert "command_service_domain" not in web_text
+    assert "command_service" not in web_text
+    assert "set_state(" not in web_text
+    assert "set_state(" not in ha_text
 
 
 def test_planner_and_controller_sources_are_unchanged():
@@ -333,3 +339,60 @@ def test_hillview_alphaess_routes_are_registered_once():
     assert text.count("def render_hillview_alphaess_html") == 1
     assert text.count('if path == "/api/hillview"') == 1
     assert text.count('if path == "/hillview"') == 1
+
+def test_hillview_control_is_disabled_by_default(monkeypatch):
+    from energy_brain import web_ui
+
+    monkeypatch.setattr(web_ui.HomeAssistantClient, "_options", staticmethod(lambda: {}))
+
+    result = web_ui.build_hillview_control_result("on")
+
+    assert result["ok"] is False
+    assert result["reason"] == "hillview_controls_disabled"
+    assert result["read_only_fallback"] is True
+
+
+def test_hillview_control_rejects_invalid_action(monkeypatch):
+    from energy_brain import web_ui
+
+    monkeypatch.setattr(web_ui.HomeAssistantClient, "_options", staticmethod(lambda: {"hillview_controls_enabled": True}))
+
+    result = web_ui.build_hillview_control_result("toggle")
+
+    assert result["ok"] is False
+    assert result["reason"] == "invalid_action"
+
+
+def test_hillview_control_calls_allowlisted_input_boolean(monkeypatch):
+    from energy_brain import web_ui
+
+    calls = []
+
+    class FakeClient:
+        @staticmethod
+        def _options():
+            return {"hillview_controls_enabled": True}
+
+        def call_service_guarded(self, domain, service, payload):
+            calls.append((domain, service, payload))
+            return {"ok": True, "domain": domain, "service": service, "entity_id": payload["entity_id"]}
+
+    monkeypatch.setattr(web_ui, "HomeAssistantClient", FakeClient)
+
+    result = web_ui.build_hillview_control_result("on")
+
+    assert result["ok"] is True
+    assert calls == [("input_boolean", "turn_on", {"entity_id": "input_boolean.alphaess_helper_dispatch"})]
+
+
+def test_hillview_html_contains_control_buttons(monkeypatch):
+    from energy_brain import web_ui
+
+    monkeypatch.setattr(web_ui.HomeAssistantClient, "_options", staticmethod(lambda: {"hillview_controls_enabled": True}))
+
+    html = web_ui.render_hillview_alphaess_html(web_ui.build_hillview_alphaess_payload())
+
+    assert "Hillview control" in html
+    assert "Control aan" in html
+    assert "Control uit" in html
+    assert "/api/hillview/control" in html

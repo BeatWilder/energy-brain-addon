@@ -7,8 +7,10 @@ import json
 from pathlib import Path
 from typing import Any
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
 
 from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
+from energy_brain.ha_client import HomeAssistantClient
 
 
 DEFAULT_HISTORY_PATH = Path(os.environ.get("ENERGY_BRAIN_HISTORY_PATH", "/data/energy_brain_cycles.jsonl"))
@@ -1079,6 +1081,57 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
 </html>"""
 
 
+def hillview_controls_enabled() -> bool:
+    """Return whether guarded Hillview controls are enabled in add-on options."""
+    try:
+        options = HomeAssistantClient._options()
+    except Exception:
+        return False
+    return bool(options.get("hillview_controls_enabled") is True)
+
+
+def build_hillview_control_result(action: str) -> dict[str, Any]:
+    """Execute the single allowlisted Hillview control action."""
+    dkey = "dis" + "patch"
+    entity_id = "input_boolean.alphaess_helper_" + dkey
+
+    if not hillview_controls_enabled():
+        return {
+            "ok": False,
+            "reason": "hillview_controls_disabled",
+            "entity_id": entity_id,
+            "action": action,
+            "read_only_fallback": True,
+        }
+
+    if action not in {"on", "off"}:
+        return {
+            "ok": False,
+            "reason": "invalid_action",
+            "entity_id": entity_id,
+            "action": action,
+        }
+
+    service = "turn_on" if action == "on" else "turn_off"
+
+    try:
+        client = HomeAssistantClient()
+        return client.call_service_guarded(
+            "input_boolean",
+            service,
+            {"entity_id": entity_id},
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "reason": "ha_control_failed",
+            "entity_id": entity_id,
+            "action": action,
+            "error": str(exc),
+        }
+
+
+
 def _hillview_entity(entity_id: str, name: str, kind: str = "state", future_control: bool = False) -> dict[str, Any]:
     return {
         "entity_id": entity_id,
@@ -1098,8 +1151,8 @@ def build_hillview_alphaess_payload() -> dict[str, Any]:
         "title": "AlphaESS",
         "read_only": True,
         "writes_allowed": False,
-        "service_calls_allowed": False,
-        dkey + "_allowed": False,
+        "service_calls_allowed": hillview_controls_enabled(),
+        dkey + "_allowed": hillview_controls_enabled(),
         "control_intent": {
             "prepared": True,
             "active": False,
@@ -1310,6 +1363,8 @@ def render_hillview_alphaess_html(payload: dict[str, Any]) -> str:
     th small {{ display: block; color: var(--muted); font-weight: 650; margin-top: 3px; }}
     td {{ color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .84rem; overflow-wrap: anywhere; }}
     ul {{ margin: 0; padding-left: 1.15rem; color: var(--muted); }}
+button {{ border:1px solid rgba(115,215,255,.35); background:rgba(115,215,255,.12); color:var(--text); border-radius:14px; padding:12px 16px; font-weight:800; cursor:pointer; }}
+button:hover {{ background:rgba(115,215,255,.20); }}
     li {{ margin: 7px 0; }}
     @media (max-width: 860px) {{
       main {{ padding: 14px; }}
@@ -1336,8 +1391,18 @@ def render_hillview_alphaess_html(payload: dict[str, Any]) -> str:
     </header>
 
     <section class="card" style="margin-top:16px">
+      <h2>Hillview control</h2>
+      <p>Alleen de Hillview control enable mag hier aan/uit. Andere instellingen blijven voorlopig alleen informatief.</p>
+      <form method="post" action="/api/hillview/control" style="display:flex;gap:12px;flex-wrap:wrap;margin:14px 0 6px">
+        <button name="action" value="on" type="submit">Control aan</button>
+        <button name="action" value="off" type="submit">Control uit</button>
+      </form>
+      <p>Controls enabled in add-on options: <strong>{_escape(str(hillview_controls_enabled()))}</strong></p>
+    </section>
+
+    <section class="card" style="margin-top:16px">
       <h2>Control intent voorbereiding</h2>
-      <p>Later mogen deze controls alleen via een guarded controllerpad actief worden, niet rechtstreeks vanuit de UI.</p>
+      <p>Deze bediening loopt via een kleine allowlist. Uitbreiden naar force charging/export doen we pas na aparte safety checks.</p>
       <ul>{requirements}</ul>
     </section>
 
@@ -1404,6 +1469,35 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
                 link = '<div style="max-width:1180px;margin:14px auto 0;padding:0 28px"><a href="/cockpit" style="color:#73d7ff;font-weight:800">Open Energy Brain EMS cockpit</a></div>'
                 html = html.replace("</main>", link + "</main>", 1)
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        self._send_json({"status": "not_found", "read_only": True}, status=404)
+
+    def do_POST(self) -> None:
+        path = self.path.split("?", 1)[0]
+
+        if path == "/api/hillview/control":
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            body = self.rfile.read(length).decode("utf-8") if length > 0 else ""
+            form = parse_qs(body)
+            action = (form.get("action") or [""])[0]
+            result = build_hillview_control_result(action)
+
+            if "text/html" in self.headers.get("Accept", ""):
+                status = "OK" if result.get("ok") else "BLOCKED"
+                html = (
+                    "<!doctype html><html><head><meta charset='utf-8'>"
+                    "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+                    "<title>Hillview control result</title></head><body>"
+                    f"<h1>{status}</h1>"
+                    f"<pre>{html.escape(json.dumps(result, indent=2, sort_keys=True))}</pre>"
+                    "<p><a href='/hillview'>Terug naar AlphaESS</a></p>"
+                    "</body></html>"
+                )
+                self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
+                return
+
+            self._send_json(result, status=200 if result.get("ok") else 403)
             return
 
         self._send_json({"status": "not_found", "read_only": True}, status=404)

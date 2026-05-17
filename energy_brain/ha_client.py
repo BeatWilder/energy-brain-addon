@@ -80,6 +80,36 @@ class HomeAssistantClient:
 
         return power
 
+
+    def call_service_guarded(self, domain: str, service: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Call a Home Assistant service through a tiny allowlisted control surface."""
+        allowed = {
+            ("input_boolean", "turn_on", "input_boolean.alphaess_helper_dispatch"),
+            ("input_boolean", "turn_off", "input_boolean.alphaess_helper_dispatch"),
+        }
+
+        entity_id = str(payload.get("entity_id", ""))
+        if (domain, service, entity_id) not in allowed:
+            return {
+                "ok": False,
+                "reason": "not_allowlisted",
+                "domain": domain,
+                "service": service,
+                "entity_id": entity_id,
+            }
+
+        url = f"{self.base_url}/services/{domain}/{service}"
+        r = requests.post(url, headers=self.headers, json=payload, timeout=10)
+
+        return {
+            "ok": 200 <= r.status_code < 300,
+            "status_code": r.status_code,
+            "domain": domain,
+            "service": service,
+            "entity_id": entity_id,
+            "response": r.text[:500],
+        }
+
     def read_snapshot(self, config: Any) -> HomeAssistantSnapshot:
         return HomeAssistantSnapshot(
             battery_soc_percent=self._float_or_none(self.get_state(self._cfg(config, "battery_soc_entity"))),
