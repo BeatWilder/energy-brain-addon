@@ -1719,6 +1719,73 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     </section>
     <section id="tab-plan" class="tab-panel" role="tabpanel" data-tab-panel="plan" data-legacy-chart-title="Batterijvulling · SOC Trajectory">
       <div class="timeline-grid">
+
+        <!-- energy-brain-plan-summary-v2695 -->
+
+        <article class="card soft">
+          <h2>Plan nu</h2>
+          <p class="note">
+            Compact live overzicht · inspect-only · geen dispatch
+          </p>
+
+          <div class="flow">
+            <div class="flowbox">
+              <span>Status</span>
+              <strong>Observer-only</strong>
+            </div>
+
+            <div class="flowbox">
+              <span>Modus</span>
+              <strong>Predbat benchmark</strong>
+            </div>
+
+            <div class="flowbox">
+              <span>Controller</span>
+              <strong>Geen writes</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="card soft">
+          <h2>Predbat plan referentie</h2>
+
+          <p class="note">
+            Compacte benchmark-weergave · geen controller-truth
+          </p>
+
+          <div class="flow">
+            <div class="flowbox">
+              <span>Nu</span>
+              <strong>Laden</strong>
+            </div>
+
+            <div class="flowbox">
+              <span>SOC pad</span>
+              <strong>50% → 100%</strong>
+            </div>
+
+            <div class="flowbox">
+              <span>Export</span>
+              <strong>18:00+</strong>
+            </div>
+
+            <div class="flowbox">
+              <span>PV</span>
+              <strong>12.88 kWh</strong>
+            </div>
+
+            <div class="flowbox">
+              <span>Load</span>
+              <strong>19.92 kWh</strong>
+            </div>
+
+            <div class="flowbox">
+              <span>Reserve</span>
+              <strong>10%</strong>
+            </div>
+          </div>
+        </article>
+
         <article class="card">
           <h2>Planner Timeline</h2>
           <p class="mini">Legacy technical reference: SOC Trajectory · SOC trajectory · Integrated Horizon Chart · How to read this chart.</p>
