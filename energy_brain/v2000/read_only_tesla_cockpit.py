@@ -677,6 +677,7 @@ def _pf_node_circle(
 
 
 
+
 def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) -> str:
     snap = snapshot if isinstance(snapshot, dict) else {}
     plain = powerflow_plain_status(snap)
@@ -685,36 +686,38 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     def active(value: float) -> bool:
         return max(_pf_float(value, 0.0), 0.0) > 0.02
 
+    # Alle routes blijven zichtbaar als "snelwegen".
+    # Alleen routes met echte stroom krijgen bewegende dots.
     routes = [
         {
             "name": "zon_naar_huis",
             "source": "solar",
             "active": active(flow.get("solar_to_home", 0.0)),
-            "path": "M 380 180 C 392 226, 460 278, 518 286",
+            "path": "M 380 180 C 395 245, 500 305, 560 315",
         },
         {
             "name": "zon_naar_batterij",
             "source": "solar",
             "active": active(flow.get("solar_to_battery", 0.0)),
-            "path": "M 380 180 C 380 238, 380 318, 380 364",
+            "path": "M 380 180 C 380 255, 380 355, 380 420",
         },
         {
             "name": "batterij_naar_huis",
             "source": "battery",
             "active": active(flow.get("battery_to_home", 0.0)),
-            "path": "M 380 364 C 392 326, 466 294, 518 286",
+            "path": "M 380 420 C 395 385, 495 330, 560 315",
         },
         {
             "name": "net_import",
             "source": "grid",
             "active": active(flow.get("grid_to_home", 0.0)),
-            "path": "M 242 286 C 314 286, 442 286, 518 286",
+            "path": "M 200 315 C 295 315, 455 315, 560 315",
         },
         {
             "name": "net_export",
             "source": "grid",
             "active": active(flow.get("solar_to_grid", 0.0)),
-            "path": "M 380 180 C 350 230, 300 286, 242 286",
+            "path": "M 380 180 C 340 245, 270 305, 200 315",
         },
     ]
 
@@ -728,13 +731,11 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
             if route["active"]
             else f'pf-edge pf-edge-{route["name"]} pf-source-{route["source"]} idle'
         )
-        paths.append(
-            f'<path id="{path_id}" class="{cls}" d="{route["path"]}" />'
-        )
+        paths.append(f'<path id="{path_id}" class="{cls}" d="{route["path"]}" />')
         if route["active"]:
             dots.append(
-                f'<circle class="pf-dot pf-dot-{route["source"]}" r="2.4">'
-                f'<animateMotion dur="3.1s" repeatCount="indefinite">'
+                f'<circle class="pf-dot pf-dot-{route["source"]}" r="2.6">'
+                f'<animateMotion dur="3.2s" repeatCount="indefinite">'
                 f'<mpath href="#{path_id}" />'
                 f'</animateMotion></circle>'
             )
@@ -742,10 +743,10 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     live_soc = snap.get("battery_soc_live_percent", snap.get("battery_soc_percent", 0))
     node_soc = snap.get("battery_soc_percent", live_soc)
 
-    sun_segments = _pf_ring_segments(380, 120, 58, "solar", _pf_solar_segments(snap), gap_deg=0.0)
-    house_segments = _pf_ring_segments(590, 286, 58, "house", _pf_house_ring_segments(snap), gap_deg=2.5)
-    battery_segments = _pf_ring_segments(380, 430, 58, "battery", _pf_battery_soc_segments(snap), gap_deg=2.0)
-    grid_segments = _pf_ring_segments(170, 286, 58, "grid", _pf_grid_segments(snap), gap_deg=0.0)
+    sun_segments = _pf_ring_segments(380, 120, 68, "solar", _pf_solar_segments(snap), gap_deg=0.0)
+    house_segments = _pf_ring_segments(620, 315, 68, "house", _pf_house_ring_segments(snap), gap_deg=2.5)
+    battery_segments = _pf_ring_segments(380, 500, 68, "battery", _pf_battery_soc_segments(snap), gap_deg=2.0)
+    grid_segments = _pf_ring_segments(140, 315, 68, "grid", _pf_grid_segments(snap), gap_deg=0.0)
 
     return f'''<article class="powerflow-panel human-card compact-powerflow ha-powerflow-large ha-powerflow-card-style" data-read-only="true">
   <div class="powerflow-head">
@@ -762,7 +763,7 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     <span>{_esc(plain["soc"])}</span>
   </div>
 
-  <svg class="powerflow-svg compact ha-flow" viewBox="0 0 760 600" role="img" aria-label="Read-only Energy Brain powerflow">
+  <svg class="powerflow-svg compact ha-flow" viewBox="0 0 760 700" role="img" aria-label="Read-only Energy Brain powerflow">
     <defs>
       <filter id="pf-node-shadow" x="-35%" y="-35%" width="170%" height="170%">
         <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#000000" flood-opacity="0.32"/>
@@ -774,12 +775,12 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
       {''.join(dots)}
     </g>
 
-    <circle class="pf-junction-soft" cx="380" cy="286" r="5"/>
+    <circle class="pf-junction-soft" cx="380" cy="315" r="5"/>
 
     {_pf_node_circle(380, 120, "Zon", _pf_kw(snap.get("pv_kw", 0.0)), "solar", "pf-ring-solar-base", sun_segments)}
-    {_pf_node_circle(170, 286, "Net", _pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0))), "grid", "pf-ring-grid-base", grid_segments)}
-    {_pf_node_circle(590, 286, "Huis", _pf_kw(snap.get("load_kw", 0.0)), "house", "pf-ring-home-base", house_segments)}
-    {_pf_node_circle(380, 430, "Batterij", f"{_esc(node_soc)}% nu", "battery", "pf-ring-battery-base", battery_segments)}
+    {_pf_node_circle(140, 315, "Net", _pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0))), "grid", "pf-ring-grid-base", grid_segments)}
+    {_pf_node_circle(620, 315, "Huis", _pf_kw(snap.get("load_kw", 0.0)), "house", "pf-ring-home-base", house_segments)}
+    {_pf_node_circle(380, 500, "Batterij", f"{_esc(node_soc)}% nu", "battery", "pf-ring-battery-base", battery_segments)}
   </svg>
 
   <div class="powerflow-summary-grid">
@@ -1350,13 +1351,14 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       opacity: .65 !important;
     }}
 
+
   
-    /* --- V2352-M HA-like read-only powerflow card render --- */
+    /* --- V2352-N bigger HA-like powerflow with passive lanes --- */
     .ha-powerflow-card-style .powerflow-svg.ha-flow {{
-      min-height: 610px;
+      min-height: 720px;
       max-height: none;
       background:
-        radial-gradient(circle at 50% 45%, rgba(80,150,235,.15), rgba(0,0,0,0) 48%),
+        radial-gradient(circle at 50% 45%, rgba(80,150,235,.15), rgba(0,0,0,0) 50%),
         linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
         linear-gradient(0deg, rgba(255,255,255,.018) 1px, transparent 1px);
       background-size: auto, 48px 48px, 48px 48px;
@@ -1369,21 +1371,21 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
 
     .ha-powerflow-card-style .pf-lines .pf-edge {{
       fill: none !important;
-      stroke-width: 2.15 !important;
+      stroke-width: 2.4 !important;
       stroke-linecap: round !important;
-      stroke-dasharray: none !important;
       filter: none !important;
     }}
 
     .ha-powerflow-card-style .pf-lines .pf-edge.idle {{
-      opacity: .13 !important;
-      stroke-dasharray: 6 12 !important;
+      opacity: .15 !important;
+      stroke-dasharray: 6 13 !important;
+      animation: none !important;
     }}
 
     .ha-powerflow-card-style .pf-lines .pf-edge.active {{
-      opacity: .88 !important;
+      opacity: .90 !important;
       stroke-dasharray: 8 12 !important;
-      animation: eb-flow-dash 2.8s linear infinite;
+      animation: eb-flow-dash 2.9s linear infinite;
     }}
 
     .ha-powerflow-card-style .pf-source-solar {{
@@ -1400,7 +1402,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
 
     .ha-powerflow-card-style .pf-dot {{
       fill: #f7fbff !important;
-      opacity: .92 !important;
+      opacity: .95 !important;
       filter: none !important;
     }}
 
@@ -1410,7 +1412,6 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     }}
 
     .ha-powerflow-card-style .pf-node-circle .pf-core {{
-      r: 49;
       fill: rgba(7,13,22,.98);
       stroke: rgba(255,255,255,.07);
       stroke-width: 1.2;
@@ -1419,13 +1420,13 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
 
     .ha-powerflow-card-style .pf-ring-base {{
       fill: none;
-      stroke-width: 8.5;
+      stroke-width: 9.5;
       opacity: .42;
     }}
 
     .ha-powerflow-card-style .pf-ring-segment {{
       fill: none;
-      stroke-width: 8.5;
+      stroke-width: 9.5;
       stroke-linecap: round;
       opacity: 1;
       filter: none;
@@ -1433,7 +1434,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
 
     .ha-powerflow-card-style .pf-node-label {{
       fill: #eef7ff;
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 760;
       text-anchor: middle;
       dominant-baseline: middle;
@@ -1441,7 +1442,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
 
     .ha-powerflow-card-style .pf-node-value {{
       fill: #eef7ff;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 760;
       text-anchor: middle;
       dominant-baseline: middle;
@@ -1449,7 +1450,7 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
 
     @media (max-width: 700px) {{
       .ha-powerflow-card-style .powerflow-svg.ha-flow {{
-        min-height: 580px;
+        min-height: 660px;
       }}
     }}
 

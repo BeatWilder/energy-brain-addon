@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from energy_brain.v2000.read_only_tesla_cockpit import (
@@ -25,7 +26,7 @@ def test_v2352m_uses_ha_like_card_style_and_no_cross_backbone():
 
     assert "ha-powerflow-card-style" in html
     assert "pf-cross" not in html
-    assert 'viewBox="0 0 760 600"' in html
+    assert 'viewBox="0 0 760 700"' in html
     assert "pf-junction-soft" in html
 
 
@@ -44,9 +45,9 @@ def test_v2352m_routes_are_curved_like_home_assistant_card():
 
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert "M 380 180 C 392 226, 460 278, 518 286" in html
-    assert "M 380 180 C 380 238, 380 318, 380 364" in html
-    assert "M 242 286 C 314 286, 442 286, 518 286" in html
+    assert "M 380 180 C 395 245, 500 305, 560 315" in html
+    assert "M 380 180 C 380 255, 380 355, 380 420" in html
+    assert "M 200 315 C 295 315, 455 315, 560 315" in html
 
 
 def test_v2352m_no_pv_keeps_solar_routes_idle_without_solar_animation():
@@ -88,5 +89,5 @@ def test_v2352m_rendered_full_html_contains_new_css():
         }
     )
 
-    assert "V2352-M HA-like read-only powerflow card render" in html
+    assert "V2352-N bigger HA-like powerflow with passive lanes" in html
     assert "ha-powerflow-card-style" in html

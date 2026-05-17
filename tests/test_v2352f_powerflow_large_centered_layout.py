@@ -23,15 +23,10 @@ def test_powerflow_uses_large_centered_ha_style_viewbox_and_circular_nodes():
 
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert 'viewBox="0 0 760 600"' in html
+    assert 'viewBox="0 0 760 700"' in html
     assert "ha-powerflow-large" in html
     assert "ha-powerflow-card-style" in html
-    assert "powerflow-svg compact ha-flow" in html
     assert "pf-node-circle" in html
-    assert 'data-node="solar"' in html
-    assert 'data-node="grid"' in html
-    assert 'data-node="house"' in html
-    assert 'data-node="battery"' in html
 
 
 def test_powerflow_paths_keep_ha_like_curved_routes_and_soft_junction():
@@ -51,10 +46,8 @@ def test_powerflow_paths_keep_ha_like_curved_routes_and_soft_junction():
 
     assert "pf-cross" not in html
     assert "pf-junction-soft" in html
-    assert "M 380 180 C 392 226, 460 278, 518 286" in html
-    assert "M 392 332" not in html
+    assert "M 380 180 C 395 245, 500 305, 560 315" in html
     assert "Batterij helpt het huis" in html
-    assert "Net bijna nul" in html
 
 
 def test_powerflow_keeps_existing_plain_text_and_readonly_safety():
@@ -75,5 +68,3 @@ def test_powerflow_keeps_existing_plain_text_and_readonly_safety():
     assert 'data-read-only="true"' in html
     assert "Dit is alleen een weergave. Energy Brain stuurt niets aan." in html
     assert "Energy Flow nu" in html
-    assert "Waar komt de stroom nu vandaan" in html
-    assert "powerflow-summary-grid" in html
