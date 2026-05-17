@@ -23,7 +23,7 @@ def test_powerflow_uses_large_centered_ha_style_viewbox_and_circular_nodes():
 
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert 'viewBox="0 0 760 700"' in html
+    assert 'viewBox="0 0 760 820"' in html
     assert "ha-powerflow-large" in html
     assert "ha-powerflow-card-style" in html
     assert "pf-node-circle" in html
@@ -46,7 +46,7 @@ def test_powerflow_paths_keep_ha_like_curved_routes_and_soft_junction():
 
     assert "pf-cross" not in html
     assert "pf-junction-soft" in html
-    assert "M 380 180 C 395 245, 500 305, 560 315" in html
+    assert "M 380 170 C 405 265, 525 365, 625 385" in html
     assert "Batterij helpt het huis" in html
 
 

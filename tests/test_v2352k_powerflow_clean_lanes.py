@@ -61,6 +61,6 @@ def test_v2352k_import_and_export_paths_are_parallel_lanes_or_ha_like_routes():
 
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert "M 200 315 C 295 315, 455 315, 560 315" in html
-    assert "M 380 180 C 340 245, 270 305, 200 315" in html
+    assert "M 135 385 C 260 385, 500 385, 625 385" in html
+    assert "M 380 170 C 340 270, 250 365, 135 385" in html
     assert 'class="pf-dot' in html
