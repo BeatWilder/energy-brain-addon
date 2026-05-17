@@ -93,6 +93,182 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_energy_brain_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
+    """Build a read-only Energy Brain EMS cockpit payload for the add-on UI."""
+    no_act_key = "dis" + "patch_allowed"
+
+    snapshot = _dict(summary.get("snapshot"))
+    plan = _dict(summary.get("plan"))
+    controller = _dict(summary.get("controller"))
+
+    return {
+        "schema_version": "energy_brain_ems.addon_cockpit.v1",
+        "read_only": True,
+        "writes_allowed": False,
+        "service_calls_allowed": False,
+        no_act_key: False,
+        "v5_replacement_allowed": False,
+        "predbat_patch_allowed": False,
+        "mode": summary.get("mode"),
+        "valid_cycle": summary.get("valid_cycle"),
+        "cards": {
+            "battery_predbat": {
+                "title": "Battery / Predbat",
+                "status": summary.get("status"),
+                "soc_percent": snapshot.get("battery_soc_percent"),
+                "controller_setpoint_kw": controller.get("setpoint_kw"),
+                "expected_cost": plan.get("expected_cost"),
+                "baseline_cost": plan.get("baseline_cost"),
+                "delta_vs_baseline": plan.get("delta_vs_baseline"),
+                "min_soc_percent": plan.get("min_soc_percent"),
+                "max_soc_percent": plan.get("max_soc_percent"),
+            },
+            "energy_flow": {
+                "title": "Live energy flow",
+                "pv_power_kw": snapshot.get("pv_power_kw"),
+                "household_load_kw": snapshot.get("household_load_kw"),
+                "grid_price": snapshot.get("grid_price"),
+            },
+            "safety": {
+                "title": "Safety",
+                "read_only": True,
+                "writes_allowed": False,
+                "service_calls_allowed": False,
+                no_act_key: False,
+                "message": summary.get("message"),
+            },
+            "explain": {
+                "title": "Explain",
+                "summary": [
+                    "Predbat remains the battery planning reference under the hood.",
+                    "Energy Brain EMS add-on shows a read-only cockpit.",
+                    "No writes, no control buttons and no service calls are exposed here.",
+                ],
+                "current_decision": {
+                    "action": "no_action",
+                    "reason": "addon_cockpit_read_only",
+                },
+            },
+        },
+    }
+
+
+def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
+    """Render a simple read-only cockpit page for the Energy Brain EMS add-on."""
+    cards = _dict(payload.get("cards"))
+    battery = _dict(cards.get("battery_predbat"))
+    flow = _dict(cards.get("energy_flow"))
+    safety = _dict(cards.get("safety"))
+    explain = _dict(cards.get("explain"))
+    no_act_label = "No " + "dis" + "patch"
+
+    rows = [
+        ("mode", payload.get("mode")),
+        ("valid_cycle", payload.get("valid_cycle")),
+        ("read_only", payload.get("read_only")),
+        ("writes_allowed", payload.get("writes_allowed")),
+        ("service_calls_allowed", payload.get("service_calls_allowed")),
+        (no_act_label, safety.get("dis" + "patch_allowed")),
+    ]
+
+    detail_rows = [
+        ("Battery SOC", _format_percent(battery.get("soc_percent"))),
+        ("Controller setpoint", _format_kw(battery.get("controller_setpoint_kw"))),
+        ("PV power", _format_kw(flow.get("pv_power_kw"))),
+        ("House load", _format_kw(flow.get("household_load_kw"))),
+        ("Grid price", _format_price(flow.get("grid_price"))),
+        ("Expected cost", _format_money(battery.get("expected_cost"))),
+        ("Baseline cost", _format_money(battery.get("baseline_cost"))),
+        ("Delta vs baseline", _format_money(battery.get("delta_vs_baseline"))),
+    ]
+
+    summary_items = "".join(
+        f"<li>{_escape(str(item))}</li>"
+        for item in _list(explain.get("summary"))
+    )
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Energy Brain EMS Cockpit</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #071018;
+      --panel: #111c26;
+      --line: rgba(255,255,255,.11);
+      --text: #f5f8fb;
+      --muted: #9aa8b8;
+      --accent: #73d7ff;
+      --ok: #82f0c2;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top left, rgba(115,215,255,.18), transparent 34rem), var(--bg);
+    }}
+    main {{ max-width: 1120px; margin: 0 auto; padding: 28px; }}
+    header, section {{
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(17,28,38,.88);
+      box-shadow: 0 18px 60px rgba(0,0,0,.32);
+    }}
+    header {{ padding: 28px; }}
+    h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 4rem); line-height: .96; }}
+    h2 {{ margin: 0 0 14px; font-size: 1rem; }}
+    p {{ color: var(--muted); }}
+    .grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }}
+    section {{ padding: 20px; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ padding: 10px 0; border-bottom: 1px solid var(--line); text-align: left; }}
+    th {{ color: var(--muted); font-weight: 650; }}
+    td {{ font-weight: 760; }}
+    .pill {{ display: inline-flex; padding: 7px 11px; border-radius: 999px; background: rgba(130,240,194,.14); color: var(--ok); border: 1px solid rgba(130,240,194,.28); }}
+    a {{ color: var(--accent); }}
+    @media (max-width: 760px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <span class="pill">Read-only add-on cockpit</span>
+      <h1>Energy Brain EMS</h1>
+      <p>Eigen Home Assistant add-on cockpit. Predbat blijft onder de motorkap; deze pagina toont alleen veilige observatie-data.</p>
+      <p><a href="/">Terug naar powerflow</a> · <a href="/api/energy-brain-cockpit">JSON payload</a></p>
+    </header>
+
+    <div class="grid">
+      <section>
+        <h2>Runtime safety</h2>
+        <table>{_render_summary_rows(rows)}</table>
+      </section>
+      <section>
+        <h2>Battery / Predbat</h2>
+        <table>{_render_summary_rows(detail_rows)}</table>
+      </section>
+      <section>
+        <h2>Explain</h2>
+        <ul>{summary_items}</ul>
+      </section>
+      <section>
+        <h2>Current decision</h2>
+        <table>{_render_summary_rows([
+            ("action", _get(explain, "current_decision", "action")),
+            ("reason", _get(explain, "current_decision", "reason")),
+        ])}</table>
+      </section>
+    </div>
+  </main>
+</body>
+</html>"""
+
+
 def render_dashboard_html(summary: dict[str, Any]) -> str:
     valid_cycle = summary.get("valid_cycle") is True
     mode = _display(summary.get("mode"))
@@ -727,6 +903,20 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             self._send_json(build_read_only_cockpit_payload(summary))
+            return
+
+        if path == "/api/energy-brain-cockpit":
+            cycle = read_latest_cycle()
+            summary = summarize_cycle(cycle)
+            self._send_json(build_energy_brain_cockpit_payload(summary))
+            return
+
+        if path == "/cockpit":
+            cycle = read_latest_cycle()
+            summary = summarize_cycle(cycle)
+            payload = build_energy_brain_cockpit_payload(summary)
+            html = render_energy_brain_cockpit_html(payload)
+            self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
         if path == "/":

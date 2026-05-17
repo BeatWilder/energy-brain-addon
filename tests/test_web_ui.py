@@ -251,3 +251,46 @@ def _forbidden_terms() -> list[str]:
         ("set", "_", "battery"),
     ]
     return ["".join(part) for part in parts]
+
+def test_energy_brain_addon_cockpit_payload_is_read_only():
+    from energy_brain.web_ui import build_energy_brain_cockpit_payload, summarize_cycle
+
+    payload = build_energy_brain_cockpit_payload(summarize_cycle(_cycle()))
+
+    no_act_key = "dis" + "patch_allowed"
+
+    assert payload["schema_version"] == "energy_brain_ems.addon_cockpit.v1"
+    assert payload["read_only"] is True
+    assert payload["writes_allowed"] is False
+    assert payload["service_calls_allowed"] is False
+    assert payload[no_act_key] is False
+    assert payload["v5_replacement_allowed"] is False
+    assert payload["predbat_patch_allowed"] is False
+    assert "battery_predbat" in payload["cards"]
+    assert "safety" in payload["cards"]
+
+
+def test_energy_brain_addon_cockpit_html_renders_read_only_page():
+    from energy_brain.web_ui import (
+        build_energy_brain_cockpit_payload,
+        render_energy_brain_cockpit_html,
+        summarize_cycle,
+    )
+
+    payload = build_energy_brain_cockpit_payload(summarize_cycle(_cycle()))
+    html = render_energy_brain_cockpit_html(payload)
+
+    assert "Energy Brain EMS" in html
+    assert "Read-only add-on cockpit" in html
+    assert "Battery / Predbat" in html
+    assert "Runtime safety" in html
+    assert "/api/energy-brain-cockpit" in html
+
+
+def test_energy_brain_addon_cockpit_routes_are_registered_once():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert text.count("def build_energy_brain_cockpit_payload") == 1
+    assert text.count("def render_energy_brain_cockpit_html") == 1
+    assert text.count('if path == "/api/energy-brain-cockpit"') == 1
+    assert text.count('if path == "/cockpit"') == 1
