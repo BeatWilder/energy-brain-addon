@@ -1,3 +1,9 @@
+## 0.1.85
+
+- Add compact Predbat plan reference panel to the Energy Brain Plan tab.
+- Summarize charge/export/SOC/PV/load/cost from the reference plan view.
+- Keep Predbat as benchmark/reference only; no controller-truth or write-path changes.
+
 ## 0.1.83
 
 - Improve Hillview AlphaESS live dashboard layout on mobile screens.
