@@ -45,6 +45,9 @@ def test_powerflow_has_source_color_css_tokens():
     assert "pf-ring-home" in html
     assert "pf-ring-battery" in html
     assert "pf-ring-grid" in html
+    assert "pf-source-solar" in html
+    assert "pf-source-battery" in html
+    assert "pf-source-grid" in html
 
 
 def test_powerflow_svg_values_have_no_inner_capsules():
@@ -73,5 +76,5 @@ def test_powerflow_edges_get_direction_classes_for_colored_routes():
     snapshot = _snapshot()
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert "pf-edge pf-edge-batterij_naar_huis active" in html
-    assert "pf-edge pf-edge-zon_naar_huis" in html or "pf-edge pf-edge-zon_naar_batterij" in html
+    assert "pf-edge pf-edge-batterij_naar_huis pf-source-battery active" in html
+    assert "pf-edge pf-edge-zon_naar_huis pf-source-solar" in html

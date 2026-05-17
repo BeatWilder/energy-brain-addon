@@ -23,8 +23,9 @@ def test_powerflow_uses_large_centered_ha_style_viewbox_and_circular_nodes():
 
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert 'viewBox="0 0 760 560"' in html
+    assert 'viewBox="0 0 760 600"' in html
     assert "ha-powerflow-large" in html
+    assert "ha-powerflow-card-style" in html
     assert "powerflow-svg compact ha-flow" in html
     assert "pf-node-circle" in html
     assert 'data-node="solar"' in html
@@ -33,7 +34,7 @@ def test_powerflow_uses_large_centered_ha_style_viewbox_and_circular_nodes():
     assert 'data-node="battery"' in html
 
 
-def test_powerflow_paths_keep_single_center_junction_shape():
+def test_powerflow_paths_keep_ha_like_curved_routes_and_soft_junction():
     snapshot = powerflow_snapshot(
         {
             "energy_flow": {
@@ -48,8 +49,10 @@ def test_powerflow_paths_keep_single_center_junction_shape():
 
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert '<line x1="380" y1="176" x2="380" y2="390">' in html
-    assert '<line x1="180" y1="250" x2="580" y2="250">' in html
+    assert "pf-cross" not in html
+    assert "pf-junction-soft" in html
+    assert "M 380 180 C 392 226, 460 278, 518 286" in html
+    assert "M 392 332" not in html
     assert "Batterij helpt het huis" in html
     assert "Net bijna nul" in html
 
