@@ -2003,7 +2003,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             payload = build_energy_brain_cockpit_payload(summary)
-            html = render_energy_brain_cockpit_html_v2(payload)
+            html = render_tesla_cockpit_html(payload)
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
