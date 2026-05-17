@@ -1969,6 +1969,165 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 </html>"""
 
 
+# --- Energy Brain fresh home v1: UI-only helper ---
+# Safety: no HA service calls, no AlphaESS writes, no dispatch.
+def build_fresh_home_v1_display_data(summary=None):
+    summary = summary or {}
+
+    def pick(source, paths, default=None):
+        for parts in paths:
+            cur = source
+            ok = True
+            for part in parts:
+                if isinstance(cur, dict) and part in cur:
+                    cur = cur[part]
+                else:
+                    ok = False
+                    break
+            if ok and cur is not None and cur != "":
+                return cur
+        return default
+
+    def as_float(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def kw_from_w_or_kw(value):
+        number = as_float(value)
+        if number is None:
+            return "—"
+        if abs(number) > 50:
+            number = number / 1000.0
+        return f"{number:.1f}"
+
+    def percent(value):
+        number = as_float(value)
+        if number is None:
+            return "—"
+        return f"{number:.0f}"
+
+    soc = pick(summary, [
+        ("battery_soc_percent",),
+        ("soc_percent",),
+        ("battery", "soc_percent"),
+        ("state", "battery_soc_percent"),
+        ("telemetry", "battery_soc_percent"),
+        ("current", "battery_soc_percent"),
+    ])
+
+    pv = pick(summary, [
+        ("pv_power_kw",),
+        ("pv_power_w",),
+        ("pv_now",),
+        ("state", "pv_power_w"),
+        ("telemetry", "pv_power_w"),
+        ("current", "pv_power_w"),
+    ])
+
+    house = pick(summary, [
+        ("household_load_kw",),
+        ("household_load_w",),
+        ("load_power_kw",),
+        ("load_power_w",),
+        ("state", "household_load_w"),
+        ("telemetry", "household_load_w"),
+        ("current", "household_load_w"),
+    ])
+
+    grid = pick(summary, [
+        ("grid_power_kw",),
+        ("grid_power_w",),
+        ("state", "grid_power_w"),
+        ("telemetry", "grid_power_w"),
+        ("current", "grid_power_w"),
+    ])
+
+    mode = pick(summary, [
+        ("mode",),
+        ("controller", "mode"),
+        ("policy", "mode"),
+    ], "Observer-only")
+
+    decision = pick(summary, [
+        ("decision",),
+        ("controller", "decision"),
+        ("action",),
+        ("recommended_action",),
+    ], "Wachten")
+
+    reason = pick(summary, [
+        ("decision_reason",),
+        ("reason",),
+        ("controller", "reason"),
+        ("no_action_reason",),
+    ], "Geen actie nodig op dit moment.")
+
+    predbat_summary = pick(summary, [
+        ("predbat_summary",),
+        ("comparison", "predbat_summary"),
+        ("predbat", "summary"),
+    ], "Predbat vergelijking beschikbaar zodra benchmarkdata in de display-cyclus zit.")
+
+    updated = pick(summary, [
+        ("last_update",),
+        ("updated_at",),
+        ("created_at",),
+        ("cycle_time",),
+        ("timestamp",),
+    ], "laatste cyclus")
+
+    degraded = bool(pick(summary, [
+        ("degraded",),
+        ("data_quality", "degraded"),
+        ("fallback",),
+    ], True))
+
+    return {
+        "mode": str(mode),
+        "execution": "Geen aansturing",
+        "last_update": str(updated),
+        "soc": percent(soc),
+        "pv_now": kw_from_w_or_kw(pv),
+        "house": kw_from_w_or_kw(house),
+        "grid": kw_from_w_or_kw(grid),
+        "decision": str(decision),
+        "decision_reason": str(reason),
+        "predbat_summary": str(predbat_summary),
+        "degraded": degraded,
+        "degraded_text": "Display data uit laatste geldige cyclus. Geen uitvoering toegestaan." if degraded else "Alle display-inputs zijn geldig. Uitvoering blijft afhankelijk van controller-gates.",
+    }
+
+
+def energybrain_fresh_home_v1_html(display_data=None):
+    from energy_brain.ui_static.fresh_home_v1 import render_fresh_home_v1
+    return render_fresh_home_v1(display_data or {})
+
+
+def build_planner_explainability(summary=None):
+    """
+    Compatibility shim. Read-only.
+    Voorkomt crash van oude cockpit/API code als build_planner_explainability ontbreekt.
+    """
+    summary = summary or {}
+    fn = globals().get("build_timeline_explainability")
+    if callable(fn):
+        try:
+            return fn(summary)
+        except Exception as exc:
+            return {
+                "status": "degraded",
+                "reason": "timeline_explainability_failed",
+                "error": str(exc),
+            }
+    return {
+        "status": "degraded",
+        "reason": "planner_explainability_unavailable",
+        "summary_status": summary.get("status") if isinstance(summary, dict) else None,
+    }
+# --- end fresh home v1 helper ---
+
 class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     """Read-only HTTP handler for the Energy Brain observer UI."""
 
@@ -2013,18 +2172,14 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
         if path == "/cockpit":
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
-            payload = build_energy_brain_cockpit_payload(summary)
-            html = render_tesla_cockpit_html(payload)
+            html = energybrain_fresh_home_v1_html(build_fresh_home_v1_display_data(summary))
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
-        if path == "/":
+        if path in ("", "/", "/home", "/index.html"):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
-            html = render_tesla_cockpit_html(summary)
-            if "</main>" in html and "/cockpit" not in html:
-                link = '<div style="max-width:1180px;margin:14px auto 0;padding:0 28px"><a href="/cockpit" style="color:#73d7ff;font-weight:800">Open Energy Brain EMS cockpit</a></div>'
-                html = html.replace("</main>", link + "</main>", 1)
+            html = energybrain_fresh_home_v1_html(build_fresh_home_v1_display_data(summary))
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
@@ -2736,3 +2891,10 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# FRESH_HOME_V1_ROUTE_ENABLED = True
+
+# HA_OPENS_DIRECTLY_IN_COCKPIT = True
+
+# FRESH_HOME_V1_HELPERS_BEFORE_DO_GET = True
