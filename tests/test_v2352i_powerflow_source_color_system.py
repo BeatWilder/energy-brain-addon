@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from energy_brain.v2000.read_only_tesla_cockpit import (
@@ -40,22 +41,21 @@ def test_powerflow_has_source_color_css_tokens():
         }
     )
 
-    assert "--pf-sun:" in html
-    assert "--pf-home:" in html
-    assert "--pf-battery:" in html
-    assert "--pf-grid:" in html
-    assert ".pf-edge-zon_naar_huis.active" in html
-    assert ".pf-edge-batterij_naar_huis.active" in html
+    assert "pf-ring-solar" in html
+    assert "pf-ring-home" in html
+    assert "pf-ring-battery" in html
+    assert "pf-ring-grid" in html
 
 
-def test_powerflow_svg_values_have_source_colored_frames():
+def test_powerflow_svg_values_have_no_inner_capsules():
     snapshot = _snapshot()
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert "pf-value-pill pf-sun-pill" in html
-    assert "pf-value-pill pf-home-pill" in html
-    assert "pf-value-pill pf-battery-pill" in html
-    assert "pf-value-pill pf-grid-pill" in html
+    assert "pf-value-pill" not in html
+    assert "pf-sun-pill" not in html
+    assert "pf-home-pill" not in html
+    assert "pf-battery-pill" not in html
+    assert "pf-grid-pill" not in html
     assert "79.0% nu" in html or "79% nu" in html
 
 
@@ -63,10 +63,10 @@ def test_powerflow_summary_cards_use_matching_source_classes():
     snapshot = _snapshot()
     html = render_powerflow_svg(snapshot, powerflow_edges(snapshot))
 
-    assert "pf-summary-source pf-summary-sun" in html
-    assert "pf-summary-source pf-summary-home" in html
-    assert "pf-summary-source pf-summary-battery" in html
-    assert "pf-summary-source pf-summary-grid" in html
+    assert "pf-summary pf-summary-solar" in html
+    assert "pf-summary pf-summary-home" in html
+    assert "pf-summary pf-summary-battery" in html
+    assert "pf-summary pf-summary-grid" in html
 
 
 def test_powerflow_edges_get_direction_classes_for_colored_routes():

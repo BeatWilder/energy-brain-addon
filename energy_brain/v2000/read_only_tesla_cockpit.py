@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 from typing import Any
+import math
 
 from energy_brain.v1969.tesla_style_cockpit_spec import REQUIRED_SECTIONS, build_tesla_style_cockpit_spec
 
@@ -519,23 +520,173 @@ def powerflow_plain_status(snapshot: dict[str, Any]) -> dict[str, str]:
 
 
 
+
+def _pf_clamp01(value: float) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except Exception:
+        return 0.0
+
+
+def _pf_polar(cx: float, cy: float, radius: float, angle_deg: float) -> tuple[float, float]:
+    angle_rad = math.radians(angle_deg)
+    return (
+        cx + radius * math.cos(angle_rad),
+        cy + radius * math.sin(angle_rad),
+    )
+
+
+def _pf_arc_path(cx: float, cy: float, radius: float, start_angle: float, sweep_angle: float) -> str:
+    sweep = max(0.0, float(sweep_angle))
+    if sweep <= 0.0:
+        return ""
+    end_angle = start_angle + sweep
+    start = _pf_polar(cx, cy, radius, start_angle)
+    end = _pf_polar(cx, cy, radius, end_angle)
+    large_arc = 1 if sweep > 180 else 0
+    return (
+        f"M {start[0]:.2f} {start[1]:.2f} "
+        f"A {radius:.2f} {radius:.2f} 0 {large_arc} 1 {end[0]:.2f} {end[1]:.2f}"
+    )
+
+
+def _pf_flow_breakdown(snapshot: dict[str, Any]) -> dict[str, float]:
+    pv = max(_pf_float(snapshot.get("pv_kw"), 0.0), 0.0)
+    load = max(_pf_float(snapshot.get("load_kw"), 0.0), 0.0)
+    battery = _pf_float(snapshot.get("battery_kw"), 0.0)
+    grid = _pf_float(snapshot.get("grid_kw"), 0.0)
+
+    solar_to_home = min(pv, load)
+    remaining_load = max(load - solar_to_home, 0.0)
+
+    battery_to_home = min(max(-battery, 0.0), remaining_load)
+    remaining_load = max(remaining_load - battery_to_home, 0.0)
+
+    grid_to_home = min(max(grid, 0.0), remaining_load)
+    remaining_load = max(remaining_load - grid_to_home, 0.0)
+
+    solar_surplus = max(pv - solar_to_home, 0.0)
+    solar_to_battery = min(max(battery, 0.0), solar_surplus)
+    solar_surplus = max(solar_surplus - solar_to_battery, 0.0)
+
+    solar_to_grid = min(max(-grid, 0.0), solar_surplus)
+
+    return {
+        "pv": pv,
+        "load": load,
+        "battery": battery,
+        "grid": grid,
+        "solar_to_home": solar_to_home,
+        "battery_to_home": battery_to_home,
+        "grid_to_home": grid_to_home,
+        "solar_to_battery": solar_to_battery,
+        "solar_to_grid": solar_to_grid,
+    }
+
+
+def _pf_ring_segments(
+    cx: float,
+    cy: float,
+    radius: float,
+    node_name: str,
+    segments: list[tuple[str, float]],
+    start_angle: float = -90.0,
+    gap_deg: float = 3.0,
+) -> str:
+    parts: list[str] = []
+    cursor = start_angle
+
+    for source_name, fraction in segments:
+        frac = _pf_clamp01(fraction)
+        if frac <= 0.0:
+            continue
+        sweep_full = frac * 360.0
+        sweep_visible = max(sweep_full - gap_deg, 0.0)
+        arc = _pf_arc_path(cx, cy, radius, cursor, sweep_visible)
+        if arc:
+            parts.append(
+                f'<path class="pf-ring-segment pf-ring-{source_name}" '
+                f'data-node="{_esc(node_name)}" data-source="{_esc(source_name)}" '
+                f'd="{arc}" />'
+            )
+        cursor += sweep_full
+
+    return "".join(parts)
+
+
+def _pf_house_ring_segments(snapshot: dict[str, Any]) -> list[tuple[str, float]]:
+    flow = _pf_flow_breakdown(snapshot)
+    load = flow["load"]
+    if load <= 0.0:
+        return []
+
+    solar_frac = flow["solar_to_home"] / load
+    battery_frac = flow["battery_to_home"] / load
+    grid_frac = flow["grid_to_home"] / load
+    other_frac = max(0.0, 1.0 - solar_frac - battery_frac - grid_frac)
+
+    segments: list[tuple[str, float]] = []
+    if solar_frac > 0:
+        segments.append(("solar", solar_frac))
+    if battery_frac > 0:
+        segments.append(("battery", battery_frac))
+    if grid_frac > 0:
+        segments.append(("grid", grid_frac))
+    if other_frac > 0:
+        segments.append(("home", other_frac))
+    return segments or [("home", 1.0)]
+
+
+def _pf_battery_soc_segments(snapshot: dict[str, Any]) -> list[tuple[str, float]]:
+    soc = _pf_float(snapshot.get("battery_soc_live_percent", snapshot.get("battery_soc_percent", 0.0)), 0.0)
+    return [("battery", _pf_clamp01(soc / 100.0))]
+
+
+def _pf_solar_segments(snapshot: dict[str, Any]) -> list[tuple[str, float]]:
+    pv = max(_pf_float(snapshot.get("pv_kw"), 0.0), 0.0)
+    if pv <= 0.0:
+        return []
+    return [("solar", 1.0)]
+
+
+def _pf_grid_segments(snapshot: dict[str, Any]) -> list[tuple[str, float]]:
+    grid = abs(_pf_float(snapshot.get("grid_kw"), 0.0))
+    if grid <= 0.02:
+        return []
+    return [("grid", 1.0)]
+
+
+def _pf_node_circle(
+    cx: float,
+    cy: float,
+    label: str,
+    value: str,
+    node_name: str,
+    base_ring_class: str,
+    segments_html: str,
+) -> str:
+    return f'''
+    <g class="pf-node-circle pf-node-{_esc(node_name)}" data-node="{_esc(node_name)}">
+      <circle class="pf-ring-base {base_ring_class}" cx="{cx}" cy="{cy}" r="66"/>
+      {segments_html}
+      <circle class="pf-core" cx="{cx}" cy="{cy}" r="56"/>
+      <text class="pf-node-label" x="{cx}" y="{cy - 9}">{_esc(label)}</text>
+      <text class="pf-node-value" x="{cx}" y="{cy + 20}">{_esc(value)}</text>
+    </g>
+    '''
+
+
 def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) -> str:
     snap = snapshot if isinstance(snapshot, dict) else {}
     edge_list = edges if isinstance(edges, list) else []
     plain = powerflow_plain_status(snap)
 
-    # HA-style centered powerflow layout:
-    #              Zon
-    #               |
-    # Net ---- centraal punt ---- Huis
-    #               |
-    #            Batterij
     path_map = {
-        "zon_naar_huis": "M 380 168 C 380 215, 430 280, 530 280",
-        "zon_naar_batterij": "M 380 168 C 380 235, 380 325, 380 388",
-        "batterij_naar_huis": "M 380 388 C 380 330, 455 280, 530 280",
-        "net_import": "M 230 280 C 300 280, 455 280, 530 280",
-        "net_export": "M 530 280 C 455 280, 300 280, 230 280",
+        "zon_naar_huis": "M 380 178 C 380 215, 455 250, 512 250",
+        "zon_naar_batterij": "M 380 178 C 380 235, 380 310, 380 332",
+        "batterij_naar_huis": "M 380 332 C 380 310, 455 250, 512 250",
+        "net_import": "M 248 250 C 310 250, 390 250, 512 250",
+        "net_export": "M 512 250 C 390 250, 310 250, 248 250",
     }
 
     paths: list[str] = []
@@ -544,14 +695,14 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     for idx, edge in enumerate(edge_list):
         direction = str(edge.get("direction", "geen_duidelijke_stroomrichting"))
         path_id = f"pf-path-{idx}"
-        d = path_map.get(direction, "M 230 280 C 300 280, 455 280, 530 280")
+        d = path_map.get(direction, "M 248 250 C 330 250, 430 250, 512 250")
         active = bool(edge.get("active"))
         cls = f"pf-edge pf-edge-{direction} active" if active else f"pf-edge pf-edge-{direction} idle"
         paths.append(f'<path id="{path_id}" class="{cls}" d="{d}" />')
         if active:
             dots.append(
-                f'<circle class="pf-dot" r="5.5">'
-                f'<animateMotion dur="2.4s" repeatCount="indefinite">'
+                f'<circle class="pf-dot" r="4.8">'
+                f'<animateMotion dur="2.2s" repeatCount="indefinite">'
                 f'<mpath href="#{path_id}" />'
                 f'</animateMotion></circle>'
             )
@@ -559,7 +710,12 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
     live_soc = snap.get("battery_soc_live_percent", snap.get("battery_soc_percent", 0))
     node_soc = snap.get("battery_soc_percent", live_soc)
 
-    return f"""<article class="powerflow-panel human-card compact-powerflow ha-powerflow-large" data-read-only="true">
+    sun_segments = _pf_ring_segments(380, 110, 66, "solar", _pf_solar_segments(snap))
+    house_segments = _pf_ring_segments(580, 250, 66, "house", _pf_house_ring_segments(snap))
+    battery_segments = _pf_ring_segments(380, 390, 66, "battery", _pf_battery_soc_segments(snap))
+    grid_segments = _pf_ring_segments(180, 250, 66, "grid", _pf_grid_segments(snap))
+
+    return f'''<article class="powerflow-panel human-card compact-powerflow ha-powerflow-large" data-read-only="true">
   <div class="powerflow-head">
     <div>
       <p class="eyebrow">Alleen meekijken - Geen aansturing</p>
@@ -575,51 +731,30 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
   </div>
 
   <svg class="powerflow-svg compact ha-flow" viewBox="0 0 760 560" role="img" aria-label="Read-only Energy Brain powerflow">
-    <g class="pf-lines">
-      <path class="pf-backbone" d="M 380 168 L 380 392" />
-      <path class="pf-backbone" d="M 230 280 L 530 280" />
-      <circle class="pf-junction" cx="380" cy="280" r="7" />
-      {''.join(paths)}{''.join(dots)}
+    <g class="pf-cross">
+      <line x1="380" y1="176" x2="380" y2="390"></line>
+      <line x1="180" y1="250" x2="580" y2="250"></line>
+      <circle cx="380" cy="250" r="6"></circle>
     </g>
 
-    <g class="pf-node pf-sun pf-node-round">
-      <circle cx="380" cy="92" r="74"/>
-      <text x="380" y="74">Zon</text>
-      <rect class="pf-value-pill pf-sun-pill" x="318" y="85" width="124" height="38" rx="19"/>
-      <text x="380" y="104">{_pf_kw(snap.get("pv_kw", 0.0))}</text>
-    </g>
+    <g class="pf-lines">{''.join(paths)}{''.join(dots)}</g>
 
-    <g class="pf-node pf-grid">
-      <rect x="80" y="225" width="150" height="110" rx="30"/>
-      <text x="155" y="262">Net</text>
-      <rect class="pf-value-pill pf-grid-pill" x="95" y="280" width="120" height="36" rx="18"/>
-      <text x="155" y="298">{_pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0)))}</text>
-    </g>
-
-    <g class="pf-node pf-home">
-      <rect x="530" y="225" width="150" height="110" rx="30"/>
-      <text x="605" y="262">Huis</text>
-      <rect class="pf-value-pill pf-home-pill" x="545" y="280" width="120" height="36" rx="18"/>
-      <text x="605" y="298">{_pf_kw(snap.get("load_kw", 0.0))}</text>
-    </g>
-
-    <g class="pf-node pf-battery">
-      <rect x="295" y="388" width="170" height="112" rx="32"/>
-      <text x="380" y="428">Batterij</text>
-      <rect class="pf-value-pill pf-battery-pill" x="306" y="446" width="148" height="38" rx="19"/>
-      <text x="380" y="464">{_esc(node_soc)}% nu</text>
-    </g>
+    {_pf_node_circle(380, 110, "Zon", _pf_kw(snap.get("pv_kw", 0.0)), "solar", "pf-ring-solar-base", sun_segments)}
+    {_pf_node_circle(180, 250, "Net", _pf_kw(abs(_pf_float(snap.get("grid_kw"), 0.0))), "grid", "pf-ring-grid-base", grid_segments)}
+    {_pf_node_circle(580, 250, "Huis", _pf_kw(snap.get("load_kw", 0.0)), "house", "pf-ring-home-base", house_segments)}
+    {_pf_node_circle(380, 390, "Batterij", f"{_esc(node_soc)}% nu", "battery", "pf-ring-battery-base", battery_segments)}
   </svg>
 
   <div class="powerflow-summary-grid">
-    <div class="pf-summary-source pf-summary-sun"><span>Zon</span><strong>{_pf_kw(snap.get("pv_kw", 0.0))}</strong><small>naar huis of batterij</small></div>
-    <div class="pf-summary-source pf-summary-home"><span>Huis</span><strong>{_pf_kw(snap.get("load_kw", 0.0))}</strong><small>actueel verbruik</small></div>
-    <div class="pf-summary-source pf-summary-battery"><span>Batterij</span><strong>{_esc(plain["battery_badge"])}</strong><small>{_esc(plain["soc"])}</small></div>
-    <div class="pf-summary-source pf-summary-grid"><span>Net</span><strong>{_esc(plain["grid_badge"])}</strong><small>import of teruglevering</small></div>
+    <div class="pf-summary pf-summary-solar"><span>Zon</span><strong>{_pf_kw(snap.get("pv_kw", 0.0))}</strong><small>naar huis of batterij</small></div>
+    <div class="pf-summary pf-summary-home"><span>Huis</span><strong>{_pf_kw(snap.get("load_kw", 0.0))}</strong><small>actueel verbruik</small></div>
+    <div class="pf-summary pf-summary-battery"><span>Batterij</span><strong>{_esc(plain["battery_badge"])}</strong><small>{_esc(plain["soc"])}</small></div>
+    <div class="pf-summary pf-summary-grid"><span>Net</span><strong>{_esc(plain["grid_badge"])}</strong><small>import of teruglevering</small></div>
   </div>
 
   <p class="powerflow-explain">{_esc(powerflow_explanation(snap, edge_list))}</p>
-</article>"""
+</article>'''
+
 
 def render_powerflow_panel(payload: dict[str, Any]) -> str:
     snapshot = powerflow_snapshot(payload)
@@ -955,6 +1090,107 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       .powerflow-summary-grid strong {{ font-size:.95rem; }}
     }}
     @keyframes eb-flow-dash {{ from {{ stroke-dashoffset:42; }} to {{ stroke-dashoffset:0; }} }}
+
+    /* --- V2352-J HA-style segmented circular powerflow --- */
+    .ha-powerflow-large .powerflow-svg.ha-flow {{
+      min-height: 640px;
+      max-height: none;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(90,160,255,.18), rgba(0,0,0,0) 46%),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255,255,255,.02) 1px, transparent 1px);
+      background-size: auto, 48px 48px, 48px 48px;
+      border-radius: 24px;
+    }}
+
+    .ha-powerflow-large .pf-cross line {{
+      stroke: rgba(160,185,210,.18);
+      stroke-width: 4;
+      stroke-linecap: round;
+    }}
+
+    .ha-powerflow-large .pf-cross circle {{
+      fill: rgba(235,242,249,.88);
+    }}
+
+    .ha-powerflow-large .pf-node-circle .pf-core {{
+      fill: rgba(8,15,24,.96);
+      stroke: rgba(255,255,255,.06);
+      stroke-width: 1.5;
+      filter: drop-shadow(0 10px 24px rgba(0,0,0,.28));
+    }}
+
+    .ha-powerflow-large .pf-ring-base {{
+      fill: none;
+      stroke-width: 11;
+      opacity: .34;
+    }}
+
+    .ha-powerflow-large .pf-ring-solar-base {{ stroke: #f4c54d; }}
+    .ha-powerflow-large .pf-ring-home-base {{ stroke: #4cb5ff; }}
+    .ha-powerflow-large .pf-ring-battery-base {{ stroke: #5ee07a; }}
+    .ha-powerflow-large .pf-ring-grid-base {{ stroke: #f39b42; }}
+
+    .ha-powerflow-large .pf-ring-segment {{
+      fill: none;
+      stroke-width: 11;
+      stroke-linecap: round;
+      opacity: 1;
+      filter: drop-shadow(0 0 7px rgba(255,255,255,.12));
+    }}
+
+    .ha-powerflow-large .pf-ring-solar {{ stroke: #f4c54d; }}
+    .ha-powerflow-large .pf-ring-home {{ stroke: #4cb5ff; }}
+    .ha-powerflow-large .pf-ring-battery {{ stroke: #5ee07a; }}
+    .ha-powerflow-large .pf-ring-grid {{ stroke: #f39b42; }}
+
+    .ha-powerflow-large .pf-node-label {{
+      fill: #eef7ff;
+      font-size: 18px;
+      font-weight: 750;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }}
+
+    .ha-powerflow-large .pf-node-value {{
+      fill: #eef7ff;
+      font-size: 16px;
+      font-weight: 750;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }}
+
+    .ha-powerflow-large .powerflow-summary-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }}
+
+    .ha-powerflow-large .pf-summary {{
+      border-radius: 24px;
+      padding: 18px 18px 16px;
+      background: rgba(255,255,255,.035);
+    }}
+
+    .ha-powerflow-large .pf-summary-solar {{ border: 2px solid rgba(244,197,77,.95); }}
+    .ha-powerflow-large .pf-summary-home {{ border: 2px solid rgba(76,181,255,.95); }}
+    .ha-powerflow-large .pf-summary-battery {{ border: 2px solid rgba(94,224,122,.95); }}
+    .ha-powerflow-large .pf-summary-grid {{ border: 2px solid rgba(243,155,66,.95); }}
+
+    .ha-powerflow-large .pf-summary strong {{
+      font-size: 1.12rem;
+      line-height: 1.2;
+      border: 0;
+      padding: 0;
+    }}
+
+    @media (max-width: 700px) {{
+      .ha-powerflow-large .powerflow-svg.ha-flow {{ min-height: 600px; }}
+      .ha-powerflow-large .pf-node-label {{ font-size: 16px; }}
+      .ha-powerflow-large .pf-node-value {{ font-size: 15px; }}
+    }}
+
     @media (prefers-reduced-motion: reduce) {{ .pf-edge.active {{ animation:none; }} .pf-dot animateMotion {{ display:none; }} }}
     .plain-dashboard {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }}
     .plain-wide {{ grid-column: 1 / -1; }}
