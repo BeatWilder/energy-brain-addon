@@ -524,3 +524,15 @@ def test_hillview_post_redirect_keeps_user_at_dispatch_control_card():
     assert 'id="hillview-dispatch-control"' in text
     assert '#hillview-dispatch-control' in text
     assert 'scroll-margin-top' in text
+
+def test_hillview_form_uses_inline_fetch_without_page_refresh():
+    html = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert 'id="hillview-dispatch-form"' in html
+    assert 'id="hillview-inline-notice"' in html
+    assert "def _hillview_inline_control_script" in html
+    assert 'event.preventDefault()' in html
+    assert 'fetch(form.action' in html
+    assert '"Accept": "application/json"' in html
+    assert "showNotice(true" in html
+    assert "showNotice(false" in html

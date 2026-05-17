@@ -1439,7 +1439,7 @@ def _render_hillview_dispatch_form(payload: dict[str, Any]) -> str:
         return f'<input type="number" name="{_escape(name)}" value="{_escape(value)}"{extra}>'
 
     return f"""
-      <form method="post" action="/api/hillview/control" class="control-form">
+      <form id="hillview-dispatch-form" method="post" action="/api/hillview/control" class="control-form">
         <div class="form-grid">
           <label><span>Mode</span>{mode_input}</label>
           <label><span>Duration</span>{number_input("duration", duration_value)}</label>
@@ -1454,6 +1454,85 @@ def _render_hillview_dispatch_form(payload: dict[str, Any]) -> str:
         </div>
       </form>
     """
+
+
+def _hillview_inline_control_script() -> str:
+    return """
+  <script>
+    (function () {
+      const form = document.getElementById("hillview-dispatch-form");
+      const notice = document.getElementById("hillview-inline-notice");
+      if (!form || !notice || !window.fetch) {
+        return;
+      }
+
+      let clickedAction = "";
+
+      form.querySelectorAll("button[name='action']").forEach((button) => {
+        button.addEventListener("click", function () {
+          clickedAction = button.value || "";
+        });
+      });
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function showNotice(ok, title, message, detail) {
+        notice.className = ok ? "notice ok" : "notice blocked";
+        notice.innerHTML =
+          "<strong>" + escapeHtml(title) + "</strong>" +
+          "<span>" + escapeHtml(message) + "</span>" +
+          "<small>" + escapeHtml(detail || "") + "</small>";
+      }
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        const data = new FormData(form);
+        if (clickedAction) {
+          data.set("action", clickedAction);
+        }
+
+        const buttons = form.querySelectorAll("button");
+        buttons.forEach((button) => button.disabled = true);
+
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: new URLSearchParams(data),
+            headers: {
+              "Accept": "application/json",
+              "Content-Type": "application/x-www-form-urlencoded"
+            }
+          });
+
+          const result = await response.json();
+          const ok = Boolean(result.ok);
+          const reason = result.reason || (result.failed && result.failed.reason) || "";
+          const action = result.action || data.get("action") || "";
+
+          if (ok) {
+            showNotice(true, "Opgeslagen", "Hillview dispatch instelling is verwerkt.", "actie: " + action);
+          } else if (reason === "hillview_controls_disabled") {
+            showNotice(false, "Geblokkeerd", "Bediening staat nog uit in de add-on configuratie.", "actie: " + action + " · reden: " + reason);
+          } else {
+            showNotice(false, "Geblokkeerd", "De guarded control heeft de actie geweigerd.", "actie: " + action + " · reden: " + reason);
+          }
+        } catch (error) {
+          showNotice(false, "Fout", "De actie kon niet worden verwerkt.", String(error));
+        } finally {
+          buttons.forEach((button) => button.disabled = false);
+        }
+      });
+    })();
+  </script>
+"""
 
 def render_hillview_alphaess_html(payload: dict[str, Any], notice: dict[str, str] | None = None) -> str:
     """Render the Hillview / AlphaESS app tab with same-page feedback."""
@@ -1596,6 +1675,7 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 
     <section id="hillview-dispatch-control" class="card" style="margin-top:16px; scroll-margin-top: 18px;">
       <h2>Hillview dispatch bediening</h2>
+      <div id="hillview-inline-notice"></div>
       <p>Kies eerst mode, tijd, vermogen en cutoff. Daarna kun je dispatch aanzetten. Alleen deze Hillview dispatch helpers staan op de allowlist.</p>
       {_render_hillview_dispatch_form(payload)}
       <p>Controls enabled in add-on options: <strong>{_escape(str(hillview_controls_enabled()))}</strong></p>
@@ -1611,6 +1691,7 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
       {''.join(group_html)}
     </div>
   </main>
+  {_hillview_inline_control_script()}
 </body>
 </html>"""
 
