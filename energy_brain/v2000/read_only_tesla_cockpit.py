@@ -1049,7 +1049,12 @@ def build_read_only_cockpit_payload(summary: dict[str, Any]) -> dict[str, Any]:
 
 
 def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
-    payload = build_read_only_cockpit_payload(summary)
+    payload = (
+        summary
+        if isinstance(summary, dict)
+        and "planner_timeline" in summary
+        else build_read_only_cockpit_payload(summary)
+    )
     payload_json = json.dumps(payload, sort_keys=True)
     return f"""<!doctype html>
 <html lang="en">

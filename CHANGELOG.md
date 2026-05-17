@@ -1,3 +1,10 @@
+## 0.1.84
+
+- Fix Tesla cockpit payload passthrough
+- Enable Plan timeline renderer
+- Enable compact Predbat-inspired plan summary
+- Fix cockpit payload fallback behavior
+
 ## 0.1.85
 
 - Add compact Predbat plan reference panel to the Energy Brain Plan tab.
