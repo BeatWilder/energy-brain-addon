@@ -3,108 +3,271 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
+from energy_brain.ui_static.ha_powerflow_card import render_ha_powerflow_card
 
-def _fmt(value: Any, fallback: str = "—") -> str:
-    if value is None:
+
+MISSING_VALUES = (None, "", "unknown", "unavailable", "none", "None", "nan")
+
+
+def safe_pick(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
+    for key in keys:
+        cur: Any = data
+        ok = True
+        for part in key.split("."):
+            if isinstance(cur, dict) and part in cur:
+                cur = cur[part]
+            else:
+                ok = False
+                break
+        if ok and cur not in MISSING_VALUES:
+            return cur
+    return default
+
+
+def _as_float(value: Any) -> float | None:
+    if value in MISSING_VALUES:
+        return None
+    try:
+        if isinstance(value, str):
+            cleaned = (
+                value.strip()
+                .replace(",", ".")
+                .replace("kWh", "")
+                .replace("kW", "")
+                .replace("W", "")
+                .replace("%", "")
+                .replace("EUR", "")
+                .replace("€", "")
+                .strip()
+            )
+            if cleaned in ("", "-", "--", "—"):
+                return None
+            return float(cleaned)
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def format_power(value: Any) -> tuple[str, str]:
+    number = _as_float(value)
+    if number is None:
+        return "—", "kW"
+    if abs(number) > 50:
+        number = number / 1000.0
+    return f"{number:.1f}".replace(".", ","), "kW"
+
+
+def format_percent(value: Any) -> tuple[str, str]:
+    number = _as_float(value)
+    if number is None:
+        return "—", "%"
+    return f"{number:.0f}", "%"
+
+
+def _format_kwh(value: Any) -> tuple[str, str]:
+    number = _as_float(value)
+    if number is None:
+        return "—", "kWh"
+    return f"{number:.1f}".replace(".", ","), "kWh"
+
+
+def _format_price(value: Any) -> tuple[str, str]:
+    number = _as_float(value)
+    if number is None:
+        return "—", "EUR/kWh"
+    return f"{number:.3f}".replace(".", ","), "EUR/kWh"
+
+
+def _format_money(value: Any) -> tuple[str, str]:
+    number = _as_float(value)
+    if number is None:
+        return "—", "EUR"
+    return f"{number:.2f}".replace(".", ","), "EUR"
+
+
+def _text(value: Any, fallback: str = "—") -> str:
+    if value in MISSING_VALUES:
         return fallback
-    text = str(value).strip()
-    return escape(text) if text else fallback
+    return str(value)
 
 
-def _logo(kind: str = "hero") -> str:
-    cls = "eb-logo eb-logo-small" if kind == "small" else "eb-logo eb-logo-hero"
+def render_status_chip(label: str, tone: str = "neutral") -> str:
+    return f'<span class="mode-chip {escape(tone)}">{escape(label)}</span>'
+
+
+def render_metric_card(label: str, value: str, unit: str = "", note: str = "") -> str:
+    unit_html = f'<span class="metric-unit">{escape(unit)}</span>' if unit else ""
+    note_html = f'<div class="metric-note">{escape(note)}</div>' if note else ""
     return f'''
-<div class="{cls}" aria-hidden="true">
-  <svg viewBox="0 0 240 240" focusable="false">
-    <defs>
-      <filter id="eb_glow" x="-70%" y="-70%" width="240%" height="240%">
-        <feGaussianBlur stdDeviation="3.2" result="blur"/>
-        <feMerge>
-          <feMergeNode in="blur"/>
-          <feMergeNode in="SourceGraphic"/>
-        </feMerge>
-      </filter>
-      <radialGradient id="eb_core" cx="50%" cy="50%" r="58%">
-        <stop offset="0%" stop-color="#35f2d0" stop-opacity=".25"/>
-        <stop offset="58%" stop-color="#35f2d0" stop-opacity=".07"/>
-        <stop offset="100%" stop-color="#35f2d0" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
+      <article class="metric-card">
+        <div class="metric-label">{escape(label)}</div>
+        <div class="metric-value">{escape(value)}{unit_html}</div>
+        {note_html}
+      </article>
+    '''
 
-    <circle class="eb-core" cx="120" cy="120" r="78" fill="url(#eb_core)"/>
 
-    <g class="eb-orbit eb-orbit-slow">
-      <circle cx="120" cy="120" r="94" fill="none" stroke="rgba(97,166,255,.46)" stroke-width="1.7"/>
-      <circle cx="120" cy="120" r="70" fill="none" stroke="rgba(97,166,255,.28)" stroke-width="1.3"/>
-      <circle cx="120" cy="120" r="106" fill="none" stroke="rgba(97,166,255,.38)" stroke-width="1.3" stroke-dasharray="2 7"/>
-      <circle class="eb-dot" cx="120" cy="28" r="4.8"/>
-      <circle class="eb-dot" cx="120" cy="212" r="4.8"/>
-      <circle class="eb-dot" cx="28" cy="120" r="4.8"/>
-      <circle class="eb-dot" cx="212" cy="120" r="4.8"/>
-      <circle class="eb-dot eb-dot-soft" cx="62" cy="48" r="4"/>
-      <circle class="eb-dot eb-dot-soft" cx="190" cy="72" r="4"/>
-      <circle class="eb-dot eb-dot-soft" cx="182" cy="184" r="4"/>
-      <circle class="eb-dot eb-dot-soft" cx="54" cy="172" r="4"/>
-    </g>
+def _brain_logo() -> str:
+    return '''
+      <svg class="eb-logo" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(84,217,201,.25)" stroke-width="1.5"/>
+        <path d="M30 14c-8 0-13 6-13 13-6 2-8 8-5 14 2 5 7 8 13 7h5V14Z"
+          fill="none" stroke="#54d9c9" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M34 14c8 0 13 6 13 13 6 2 8 8 5 14-2 5-7 8-13 7h-5V14Z"
+          fill="none" stroke="#54d9c9" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M24 25h-6M25 34h-9M24 42h-5M40 25h6M39 34h9M40 42h5"
+          fill="none" stroke="#7bb8ff" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    '''
 
-    <g class="eb-orbit eb-orbit-fast">
-      <path d="M36 120h23" stroke="rgba(97,166,255,.55)" stroke-width="1.6" stroke-linecap="round"/>
-      <path d="M181 120h23" stroke="rgba(97,166,255,.55)" stroke-width="1.6" stroke-linecap="round"/>
-      <path d="M120 36v23" stroke="rgba(97,166,255,.55)" stroke-width="1.6" stroke-linecap="round"/>
-      <path d="M120 181v23" stroke="rgba(97,166,255,.55)" stroke-width="1.6" stroke-linecap="round"/>
-      <circle cx="28" cy="120" r="8" fill="none" stroke="rgba(97,166,255,.82)" stroke-width="3.5"/>
-      <circle cx="212" cy="120" r="8" fill="none" stroke="rgba(97,166,255,.82)" stroke-width="3.5"/>
-      <circle cx="120" cy="28" r="8" fill="none" stroke="rgba(97,166,255,.82)" stroke-width="3.5"/>
-      <circle cx="120" cy="212" r="8" fill="none" stroke="rgba(97,166,255,.82)" stroke-width="3.5"/>
-    </g>
 
-    <g class="eb-brain" filter="url(#eb_glow)">
-      <path d="M113 70 C101 61 82 65 78 82 C61 81 49 93 50 111 C39 121 42 143 60 149 C60 168 74 178 91 174 C102 181 115 174 115 160 L115 80 C115 76 115 73 113 70Z"
-            fill="none" stroke="#35f2d0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
-      <path d="M127 70 C139 61 158 65 162 82 C179 81 191 93 190 111 C201 121 198 143 180 149 C180 168 166 178 149 174 C138 181 125 174 125 160 L125 80 C125 76 125 73 127 70Z"
-            fill="none" stroke="#35f2d0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
-      <path d="M120 76v92" stroke="#35f2d0" stroke-width="5" stroke-linecap="round"/>
+def _metric_cards(data: dict[str, Any]) -> str:
+    soc, soc_unit = format_percent(safe_pick(data, "soc_percent", "battery_soc_percent", "soc", "battery_soc"))
+    pv, pv_unit = format_power(safe_pick(data, "pv_power_kw", "pv_now_kw", "pv_now", "pv_power_w", "pv_power"))
+    home, home_unit = format_power(safe_pick(data, "household_load_kw", "home_load_kw", "load_kw", "house_kw", "household_load_w", "house"))
+    grid, grid_unit = format_power(safe_pick(data, "grid_power_kw", "grid_kw", "net_kw", "grid_power_w", "grid_power", "grid"))
+    battery, battery_unit = format_power(safe_pick(data, "battery_power_kw", "battery_kw", "battery_power_w", "battery_charge_kw", "battery_discharge_kw"))
+    price, price_unit = _format_price(safe_pick(data, "price_now", "grid_price", "energy_flow.grid_price", "snapshot.grid_price"))
+    return "\n".join(
+        [
+            render_metric_card("SOC", soc, soc_unit, _text(safe_pick(data, "soc_status", "battery_status"), "Batterijstand")),
+            render_metric_card("PV nu", pv, pv_unit, _text(safe_pick(data, "pv_status", "solar_status"), "Live bron of laatste cyclus")),
+            render_metric_card("Huis", home, home_unit, _text(safe_pick(data, "home_status", "load_status"), "Huidige belasting")),
+            render_metric_card("Net", grid, grid_unit, _text(safe_pick(data, "grid_status"), "Import/export indicatie")),
+            render_metric_card("Batterij", battery, battery_unit, _text(safe_pick(data, "battery_power_status"), "Laad/ontlaad vermogen")),
+            render_metric_card("Prijs nu", price, price_unit, _text(safe_pick(data, "price_status"), "Tarief uit displaydata")),
+        ]
+    )
 
-      <path d="M70 120h28l21 16" stroke="#35f2d0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M86 96l24-18" stroke="#35f2d0" stroke-width="4" stroke-linecap="round"/>
-      <path d="M98 120v34" stroke="#35f2d0" stroke-width="4" stroke-linecap="round"/>
-      <path d="M170 120h-28l-21 16" stroke="#35f2d0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M154 96l-24-18" stroke="#35f2d0" stroke-width="4" stroke-linecap="round"/>
-      <path d="M142 120v34" stroke="#35f2d0" stroke-width="4" stroke-linecap="round"/>
 
-      <circle class="eb-node" cx="70" cy="120" r="7"/>
-      <circle class="eb-node" cx="86" cy="96" r="6"/>
-      <circle class="eb-node" cx="110" cy="78" r="6"/>
-      <circle class="eb-node" cx="98" cy="120" r="6"/>
-      <circle class="eb-node" cx="98" cy="154" r="6"/>
-      <circle class="eb-node" cx="170" cy="120" r="7"/>
-      <circle class="eb-node" cx="154" cy="96" r="6"/>
-      <circle class="eb-node" cx="130" cy="78" r="6"/>
-      <circle class="eb-node" cx="142" cy="120" r="6"/>
-      <circle class="eb-node" cx="142" cy="154" r="6"/>
-    </g>
-  </svg>
-</div>
-'''
+def render_predbat_comparison(data: dict[str, Any]) -> str:
+    predbat = safe_pick(data, "predbat", default={})
+    predbat = predbat if isinstance(predbat, dict) else {}
+    rows = [
+        ("Status", safe_pick(data, "predbat.status", "predbat_status", default=None)),
+        ("SOC", safe_pick(data, "predbat.soc_kw", "predbat_soc_kw", default=None)),
+        ("Best SOC", safe_pick(data, "predbat.soc_kw_best", "predbat.best_soc_min_kwh", "predbat_best_soc", default=None)),
+        ("Charge window", _window_text(predbat, "charge_start", "charge_end", "charge_limit_kw")),
+        ("Best charge", _window_text(predbat, "best_charge_start", "best_charge_end", "best_charge_limit_kw")),
+        ("Export/discharge", _window_text(predbat, "best_export_start", "best_export_end", "best_export_limit_kw")),
+        ("Cost today", safe_pick(data, "predbat.cost_today", "predbat_cost_today", default=None)),
+        ("Best metric", safe_pick(data, "predbat.best_metric", "predbat_best_metric", default=None)),
+    ]
+    present = any(value not in MISSING_VALUES for _, value in rows if value != "—")
+    body = "".join(
+        f'<div class="kv-row"><span>{escape(label)}</span><strong>{escape(_text(value))}</strong></div>'
+        for label, value in rows
+    )
+    degraded = "" if present else '<p class="degraded-copy">Geen Predbat benchmarkdata beschikbaar in display_data. Vergelijking blijft gedegradeerd en read-only.</p>'
+    return f'''
+      <section id="benchmark" class="panel comparison-panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Benchmark</p>
+            <h2>Predbat vergelijking</h2>
+          </div>
+          {render_status_chip("benchmark only", "warn")}
+        </div>
+        <p class="panel-copy">Predbat is hier alleen referentie-input. Energy Brain neemt geen runtime-aansturing over en schrijft niets terug.</p>
+        {degraded}
+        <div class="kv-grid">{body}</div>
+      </section>
+    '''
+
+
+def _window_text(source: dict[str, Any], start_key: str, end_key: str, limit_key: str) -> str:
+    start = source.get(start_key)
+    end = source.get(end_key)
+    limit = source.get(limit_key)
+    if start in MISSING_VALUES and end in MISSING_VALUES and limit in MISSING_VALUES:
+        return "—"
+    limit_value, limit_unit = format_power(limit)
+    return f"{_text(start)} - {_text(end)} · {limit_value} {limit_unit}"
+
+
+def render_plan_timeline(data: dict[str, Any]) -> str:
+    windows = safe_pick(data, "plan_windows", "plan.timeline", "planner_timeline", "timeline", default=None)
+    if not isinstance(windows, list) or not windows:
+        rows = '''
+          <article class="timeline-item muted">
+            <span class="timeline-time">nu</span>
+            <div>
+              <strong>Geen geldig plan / observer-only</strong>
+              <p>Geen planner-vensters beschikbaar in display_data. Er wordt niets aangestuurd.</p>
+            </div>
+          </article>
+        '''
+    else:
+        rows = "\n".join(_render_timeline_item(item) for item in windows[:12] if isinstance(item, dict))
+    return f'''
+      <section id="plan" class="panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Volgende 24 uur</p>
+            <h2>Plan vandaag</h2>
+          </div>
+          {render_status_chip("observer-only", "safe")}
+        </div>
+        <div class="timeline">{rows}</div>
+      </section>
+    '''
+
+
+def _render_timeline_item(item: dict[str, Any]) -> str:
+    start = _text(safe_pick(item, "start", "time", "from", default="—"))
+    end = _text(safe_pick(item, "end", "to", default=""))
+    kind = _text(safe_pick(item, "kind", "type", "action", default="no-action")).replace("_", " ")
+    reason = _text(safe_pick(item, "reason", "explanation", default="Read-only planvenster."))
+    time_label = f"{start} - {end}" if end else start
+    return f'''
+      <article class="timeline-item">
+        <span class="timeline-time">{escape(time_label)}</span>
+        <div>
+          <strong>{escape(kind)}</strong>
+          <p>{escape(reason)}</p>
+        </div>
+      </article>
+    '''
+
+
+def render_safety_card(data: dict[str, Any]) -> str:
+    flags = safe_pick(data, "missing_data_flags", "safety.missing_data_flags", default=[])
+    flags = flags if isinstance(flags, list) else []
+    degraded_flags = safe_pick(data, "degraded_flags", "safety.degraded_flags", default=[])
+    degraded_flags = degraded_flags if isinstance(degraded_flags, list) else []
+    rows = [
+        ("Observer-only", "ja"),
+        ("Shadow/comparison", _text(safe_pick(data, "shadow_state", "mode"), "observer")),
+        ("Degraded flags", ", ".join(str(x) for x in degraded_flags) if degraded_flags else "—"),
+        ("Missing data", ", ".join(str(x) for x in flags) if flags else "—"),
+        ("Execution blocked", _text(safe_pick(data, "execution_blocked_reason", "safety.execution_blocked_reason"), "UI read-only")),
+        ("Battery reserve", _text(safe_pick(data, "reserve_status", "battery_reserve_status"), "—")),
+        ("Fault/warning", _text(safe_pick(data, "fault_status", "warning_status", "safety.fault_status"), "geen bekende melding")),
+    ]
+    body = "".join(
+        f'<div class="kv-row"><span>{escape(label)}</span><strong>{escape(value)}</strong></div>'
+        for label, value in rows
+    )
+    return f'''
+      <section id="safety" class="panel safety-panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Safety</p>
+            <h2>Geen aansturing</h2>
+          </div>
+          {render_status_chip("read-only", "safe")}
+        </div>
+        <p class="panel-copy">Deze pagina toont status, vergelijking en planning zonder Home Assistant writes of controller-wijzigingen.</p>
+        <div class="kv-grid">{body}</div>
+      </section>
+    '''
 
 
 def render_fresh_home_v1(display_data: dict[str, Any] | None = None) -> str:
-    data = display_data or {}
-
-    mode = _fmt(data.get("mode", "Observer-only"))
-    execution = _fmt(data.get("execution", "Geen aansturing"))
-    last_update = _fmt(data.get("last_update", "laatste cyclus"))
-    soc = _fmt(data.get("soc", "—"))
-    pv_now = _fmt(data.get("pv_now", "—"))
-    house = _fmt(data.get("house", "—"))
-    grid = _fmt(data.get("grid", "—"))
-    decision = _fmt(data.get("decision", "Wachten"))
-    decision_reason = _fmt(data.get("decision_reason", "Geen actie nodig op dit moment."))
-    predbat_summary = _fmt(data.get("predbat_summary", "Predbat laadt eerder, Energy Brain wacht langer op PV."))
-    degraded_text = _fmt(data.get("degraded_text", "Display data uit laatste geldige cyclus. Geen uitvoering toegestaan."))
-
-    logo_small = _logo("small")
-    logo_hero = _logo("hero")
+    data = display_data if isinstance(display_data, dict) else {}
+    mode = _text(safe_pick(data, "mode", "status.mode", default="observer-only")).replace("_", "-")
+    last_update = _text(safe_pick(data, "last_update", "updated_at", "cycle_time", "timestamp"), "—")
+    blocked = _text(safe_pick(data, "execution", "execution_state", "safety.execution_state"), "Uitvoering geblokkeerd")
 
     return f'''<!doctype html>
 <html lang="nl">
@@ -113,943 +276,220 @@ def render_fresh_home_v1(display_data: dict[str, Any] | None = None) -> str:
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Energy Brain EMS</title>
   <style>
+    /* ENERGY_BRAIN_EMS_PAGE_V1_START */
     :root {{
-      --bg0:#050b12;
-      --bg1:#07131d;
-      --card:#0b1824;
-      --card2:#0d1d2b;
-      --line:#1a3345;
-      --line2:#244c63;
-      --text:#eef6fb;
-      --muted:#91a7b8;
-      --teal:#35f2d0;
-      --blue:#61a6ff;
-      --green:#61d88d;
-      --yellow:#ffd36a;
-      --purple:#a78bfa;
-      --danger:#ff7a7a;
-      --shadow:0 18px 60px rgba(0,0,0,.35);
-      --radius:24px;
+      color-scheme: dark;
+      --bg:#071018;
+      --panel:#0d1821;
+      --panel-2:#121f2a;
+      --line:rgba(220,238,248,.13);
+      --text:#f2f7f9;
+      --muted:#a6b5c0;
+      --soft:#d4e1e8;
+      --cyan:#54d9c9;
+      --blue:#79b8ff;
+      --amber:#f6b35f;
+      --bad:#ff8b7c;
+      --safe:#88e0b0;
+      --shadow:0 18px 48px rgba(0,0,0,.28);
     }}
-
     * {{ box-sizing:border-box; }}
-
+    html {{ scroll-behavior:smooth; }}
     body {{
       margin:0;
       min-height:100vh;
+      background:linear-gradient(180deg,#061019 0%,#09141d 48%,#071018 100%);
       color:var(--text);
-      background:
-        radial-gradient(circle at 24% -8%, rgba(53,242,208,.16), transparent 26rem),
-        radial-gradient(circle at 90% 12%, rgba(97,166,255,.12), transparent 28rem),
-        linear-gradient(145deg, var(--bg0), var(--bg1));
-      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      letter-spacing:.015em;
+      font:15px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       overflow-x:hidden;
     }}
-
-    body:before {{
-      content:"";
-      position:fixed;
-      inset:0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.024) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.024) 1px, transparent 1px);
-      background-size:46px 46px;
-      mask-image:linear-gradient(to bottom, rgba(0,0,0,.8), transparent 82%);
-      pointer-events:none;
-    }}
-
-    .app {{
-      width:min(1180px,100%);
-      margin:0 auto;
-      padding:20px 18px 92px;
-    }}
-
-    .top {{
+    a {{ color:inherit; text-decoration:none; }}
+    .topbar {{
       position:sticky;
       top:0;
-      z-index:10;
-      margin:-20px -18px 18px;
-      padding:18px 18px 14px;
-      display:flex;
-      align-items:center;
-      gap:18px;
-      background:rgba(5,11,18,.76);
-      border-bottom:1px solid rgba(255,255,255,.08);
+      z-index:20;
+      min-height:64px;
+      padding:8px max(13px,env(safe-area-inset-left)) 8px max(13px,env(safe-area-inset-right));
+      background:rgba(7,16,24,.94);
+      border-bottom:1px solid var(--line);
       backdrop-filter:blur(16px);
     }}
-
-    .menu {{
-      font-size:28px;
-      color:var(--text);
-      opacity:.95;
-    }}
-
-    .brand {{
+    .topbar-inner {{
+      width:min(1120px,100%);
+      margin:0 auto;
       display:flex;
       align-items:center;
-      gap:14px;
-      font-size:24px;
-      font-weight:780;
-      letter-spacing:.08em;
-    }}
-
-    .chips {{
-      display:flex;
+      justify-content:space-between;
       gap:12px;
-      flex-wrap:wrap;
-      margin:16px 0 18px;
     }}
-
-    .chip {{
+    .brand {{ display:flex; align-items:center; gap:10px; min-width:0; }}
+    .eb-logo {{ width:36px; height:36px; flex:0 0 auto; }}
+    .brand h1 {{ margin:0; font-size:clamp(18px,5vw,26px); line-height:1.05; font-weight:680; letter-spacing:0; white-space:nowrap; }}
+    .mode-chips {{ display:flex; gap:6px; flex-wrap:nowrap; justify-content:flex-end; }}
+    .mode-chip {{
       display:inline-flex;
       align-items:center;
-      gap:9px;
-      padding:10px 16px;
-      border-radius:14px;
-      background:rgba(13,29,43,.88);
-      border:1px solid rgba(255,255,255,.08);
-      color:var(--muted);
-      font-weight:700;
-      letter-spacing:.08em;
-    }}
-
-    .chip.good {{
-      color:var(--teal);
-      border-color:rgba(53,242,208,.24);
-      background:rgba(53,242,208,.065);
-    }}
-
-    .grid {{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:16px;
-    }}
-
-    .card {{
-      position:relative;
-      overflow:hidden;
-      background:linear-gradient(155deg, rgba(13,29,43,.93), rgba(7,18,29,.94));
-      border:1px solid rgba(71,117,147,.45);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-    }}
-
-    .hero {{
-      grid-column:1 / -1;
-      min-height:238px;
-      padding:30px 32px;
-    }}
-
-    .hero:after {{
-      content:"";
-      position:absolute;
-      right:24px;
-      top:30px;
-      width:245px;
-      height:245px;
-      border-radius:50%;
-      background:radial-gradient(circle, rgba(53,242,208,.12), transparent 70%);
-      pointer-events:none;
-    }}
-
-    .eyebrow {{
-      color:var(--teal);
-      font-size:14px;
-      font-weight:900;
-      letter-spacing:.24em;
-      text-transform:uppercase;
-      margin-bottom:8px;
-    }}
-
-    h1 {{
-      margin:0 0 16px;
-      font-size:52px;
-      line-height:1;
-      letter-spacing:-.04em;
-    }}
-
-    .hero-list {{
-      display:grid;
-      gap:8px;
-      font-size:24px;
-      color:var(--text);
-    }}
-
-    .hero-list span {{
-      color:var(--muted);
-      margin-right:12px;
-    }}
-
-    .hero-text {{
-      max-width:640px;
-      margin-top:22px;
-      padding-top:18px;
-      border-top:1px solid rgba(255,255,255,.14);
-      color:var(--muted);
-      font-size:22px;
-      line-height:1.35;
-    }}
-
-    .metric {{
-      min-height:146px;
-      padding:24px 28px;
-      display:grid;
-      grid-template-columns:88px 1fr;
-      gap:18px;
-      align-items:center;
-    }}
-
-    .metric .label {{
-      position:absolute;
-      top:20px;
-      left:24px;
-      font-size:15px;
-      font-weight:900;
-      letter-spacing:.18em;
-      color:var(--teal);
-      text-transform:uppercase;
-    }}
-
-    .metric .icon {{
-      margin-top:28px;
-      color:#dce8f0;
-      opacity:.9;
-      font-size:50px;
-    }}
-
-    .metric .value {{
-      margin-top:28px;
-      font-size:58px;
-      font-weight:820;
-      letter-spacing:-.04em;
+      min-height:26px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:4px 8px;
+      color:var(--soft);
+      background:rgba(255,255,255,.045);
+      font-size:11px;
+      font-weight:650;
       white-space:nowrap;
     }}
-
-    .metric .unit {{
-      font-size:28px;
-      font-weight:650;
-      color:var(--muted);
-      margin-left:6px;
+    .mode-chip.safe {{ color:var(--safe); border-color:rgba(136,224,176,.32); background:rgba(136,224,176,.10); }}
+    .mode-chip.warn {{ color:var(--amber); border-color:rgba(246,179,95,.34); background:rgba(246,179,95,.10); }}
+    .app {{
+      width:min(1120px,100%);
+      margin:0 auto;
+      padding:10px 12px calc(94px + env(safe-area-inset-bottom));
     }}
-
-    .socbar {{
-      position:absolute;
-      left:28px;
-      right:28px;
-      bottom:22px;
-      height:6px;
-      border-radius:999px;
-      background:rgba(255,255,255,.08);
-      overflow:hidden;
+    .hero {{
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:12px;
+      background:linear-gradient(180deg,rgba(20,33,44,.94),rgba(11,22,31,.96));
+      box-shadow:var(--shadow);
     }}
-
-    .socbar span {{
-      display:block;
-      height:100%;
-      width:min(100%, max(0%, {soc}%));
-      background:linear-gradient(90deg, var(--teal), #5ceea1);
-      box-shadow:0 0 18px rgba(53,242,208,.45);
+    .section-kicker {{ margin:0 0 3px; color:var(--cyan); font-size:11px; font-weight:760; letter-spacing:.1em; text-transform:uppercase; }}
+    h2 {{ margin:0; font-size:clamp(21px,5.5vw,34px); line-height:1.08; letter-spacing:0; }}
+    .hero-grid {{ display:grid; gap:10px; }}
+    .status-list {{ display:grid; gap:5px; margin-top:8px; color:var(--soft); }}
+    .status-line {{ display:flex; gap:7px; align-items:flex-start; font-size:13px; line-height:1.3; }}
+    .status-dot {{ width:6px; height:6px; margin-top:6px; border-radius:50%; background:var(--cyan); flex:0 0 auto; }}
+    .hero-copy {{ margin:8px 0 0; color:var(--muted); max-width:760px; font-size:13px; line-height:1.35; font-weight:400; }}
+    .metrics {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }}
+    .metric-card {{
+      min-height:92px;
+      padding:11px;
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:rgba(16,26,35,.82);
     }}
-
-    .advice, .plan, .predbat, .safety {{
-      min-height:190px;
-      padding:24px 28px;
+    .metric-label {{ color:var(--muted); font-size:11px; font-weight:760; text-transform:uppercase; letter-spacing:.07em; }}
+    .metric-value {{ margin-top:8px; color:var(--text); font-size:clamp(22px,7vw,34px); line-height:1; font-weight:680; overflow-wrap:anywhere; }}
+    .metric-unit {{ margin-left:4px; color:var(--muted); font-size:.48em; font-weight:650; }}
+    .metric-note {{ margin-top:7px; color:var(--muted); font-size:11px; line-height:1.25; }}
+    .panel {{
+      margin-top:10px;
+      padding:13px;
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:linear-gradient(180deg,rgba(16,26,35,.94),rgba(10,20,29,.95));
+      box-shadow:0 10px 30px rgba(0,0,0,.22);
     }}
-
-    .advice h2 {{
-      margin:8px 0 8px;
-      font-size:36px;
-    }}
-
-    .advice p, .predbat p, .safety p {{
-      margin:0;
-      color:var(--text);
-      font-size:20px;
-      line-height:1.38;
-    }}
-
-    .ticks {{
-      margin-top:18px;
-      padding-top:16px;
-      border-top:1px solid rgba(255,255,255,.12);
+    .section-head {{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:9px; }}
+    .section-head h2 {{ font-size:20px; }}
+    .panel-copy,.degraded-copy {{ margin:0 0 10px; color:var(--muted); font-size:13px; line-height:1.35; }}
+    .degraded-copy {{ color:var(--amber); }}
+    .kv-grid {{ display:grid; gap:8px; }}
+    .kv-row {{
       display:grid;
-      gap:8px;
-      color:#d7e4ec;
-      font-size:19px;
-    }}
-
-    .ticks div:before {{
-      content:"✓";
-      display:inline-grid;
-      place-items:center;
-      width:22px;
-      height:22px;
-      margin-right:10px;
-      border-radius:50%;
-      border:1px solid rgba(53,242,208,.65);
-      color:var(--teal);
-      font-size:14px;
-    }}
-
-    .plan-list {{
-      margin-top:16px;
-      display:grid;
+      grid-template-columns:minmax(105px,.8fr) minmax(0,1.2fr);
       gap:10px;
+      align-items:start;
+      padding:8px 0;
+      border-top:1px solid rgba(255,255,255,.08);
     }}
-
-    .plan-row {{
+    .kv-row span {{ color:var(--muted); }}
+    .kv-row strong {{ color:var(--soft); font-weight:650; overflow-wrap:anywhere; }}
+    .timeline {{ display:grid; gap:9px; }}
+    .timeline-item {{
       display:grid;
-      grid-template-columns:80px 1fr;
-      align-items:center;
-      gap:14px;
-      padding:10px 14px;
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:12px;
-      color:#dce8f0;
-      background:rgba(0,0,0,.12);
-      font-size:18px;
+      grid-template-columns:74px minmax(0,1fr);
+      gap:12px;
+      padding:12px;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:8px;
+      background:rgba(255,255,255,.035);
     }}
-
-    .plan-row time {{
-      color:var(--text);
-      font-size:24px;
-    }}
-
-    .predbat {{
-      border-color:rgba(167,139,250,.38);
-    }}
-
-    .predbat .eyebrow {{
-      color:var(--purple);
-    }}
-
-    .safety {{
-      border-color:rgba(255,211,106,.42);
-    }}
-
-    .safety .eyebrow {{
-      color:var(--yellow);
-    }}
-
-    .eb-logo {{
-      position:relative;
-      display:grid;
-      place-items:center;
-      flex:0 0 auto;
-      color:var(--teal);
-      filter:drop-shadow(0 0 16px rgba(53,242,208,.22));
-    }}
-
-    .eb-logo svg {{
-      display:block;
-      width:100%;
-      height:100%;
-      overflow:visible;
-    }}
-
-    .eb-logo-small {{
-      width:48px;
-      height:48px;
-    }}
-
-    .eb-logo-hero {{
-      position:absolute;
-      right:30px;
-      top:12px;
-      width:270px;
-      height:270px;
-      z-index:1;
-      opacity:.86;
-      pointer-events:none;
-    }}
-
-    .eb-core {{
-      animation:ebPulse 3.8s ease-in-out infinite;
-    }}
-
-    .eb-brain {{
-      animation:ebBrainGlow 3.2s ease-in-out infinite;
-      transform-origin:120px 120px;
-    }}
-
-    .eb-orbit {{
-      transform-origin:120px 120px;
-    }}
-
-    .eb-orbit-slow {{
-      animation:ebOrbitSlow 28s linear infinite;
-    }}
-
-    .eb-orbit-fast {{
-      animation:ebOrbitFast 17s linear infinite reverse;
-    }}
-
-    .eb-dot, .eb-node {{
-      fill:currentColor;
-      color:var(--teal);
-      animation:ebNodePulse 2.8s ease-in-out infinite;
-    }}
-
-    .eb-dot {{
-      color:var(--blue);
-    }}
-
-    .eb-dot-soft {{
-      opacity:.74;
-      animation-delay:.7s;
-    }}
-
-    @keyframes ebOrbitSlow {{
-      from {{ transform:rotate(0deg); }}
-      to {{ transform:rotate(360deg); }}
-    }}
-
-    @keyframes ebOrbitFast {{
-      from {{ transform:rotate(0deg); }}
-      to {{ transform:rotate(360deg); }}
-    }}
-
-    @keyframes ebPulse {{
-      0%,100% {{ opacity:.48; transform:scale(.985); }}
-      50% {{ opacity:.95; transform:scale(1.035); }}
-    }}
-
-    @keyframes ebBrainGlow {{
-      0%,100% {{ opacity:.90; }}
-      50% {{ opacity:1; }}
-    }}
-
-    @keyframes ebNodePulse {{
-      0%,100% {{ opacity:.72; }}
-      50% {{ opacity:1; }}
-    }}
-
-    .bottom {{
+    .timeline-item.muted {{ border-color:rgba(246,179,95,.25); background:rgba(246,179,95,.08); }}
+    .timeline-time {{ color:var(--cyan); font-size:12px; font-weight:760; }}
+    .timeline-item strong {{ display:block; margin-bottom:3px; color:var(--text); text-transform:capitalize; }}
+    .timeline-item p {{ margin:0; color:var(--muted); }}
+    .bottom-nav {{
       position:fixed;
       left:0;
       right:0;
       bottom:0;
-      z-index:20;
+      z-index:25;
       display:grid;
-      grid-template-columns:repeat(5, 1fr);
-      gap:2px;
-      padding:10px 14px max(10px, env(safe-area-inset-bottom));
-      background:rgba(5,11,18,.86);
-      border-top:1px solid rgba(255,255,255,.10);
-      backdrop-filter:blur(18px);
+      grid-template-columns:repeat(5,1fr);
+      min-height:64px;
+      padding:6px max(8px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-right));
+      background:rgba(7,16,24,.96);
+      border-top:1px solid var(--line);
+      backdrop-filter:blur(16px);
     }}
-
-    .tab {{
-      display:grid;
-      place-items:center;
-      gap:4px;
-      color:rgba(238,246,251,.55);
-      font-size:14px;
-      text-decoration:none;
+    .bottom-nav a {{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--muted); font-size:11px; font-weight:650; }}
+    .bottom-nav svg {{ width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:2; }}
+    @media (max-width:430px) {{
+      .topbar-inner {{ align-items:center; gap:8px; }}
+      .brand {{ gap:8px; }}
+      .mode-chip {{ font-size:10.5px; min-height:24px; padding-inline:7px; }}
+      .brand h1 {{ font-size:18px; white-space:normal; }}
+      .eb-logo {{ width:32px; height:32px; }}
     }}
-
-    .tab b {{
-      font-size:27px;
-      line-height:1;
+    @media (min-width:720px) {{
+      .app {{ padding:18px 22px calc(104px + env(safe-area-inset-bottom)); }}
+      .hero {{ padding:22px; }}
+      .hero-grid {{ grid-template-columns:minmax(0,.9fr) minmax(330px,.75fr); align-items:center; }}
+      .metrics {{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }}
+      .panel {{ padding:20px; margin-top:16px; }}
+      .kv-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:22px; }}
+      .timeline-item {{ grid-template-columns:110px minmax(0,1fr); }}
     }}
-
-    .tab.active {{
-      color:var(--teal);
-    }}
-
-    @media (max-width:760px) {{
-      .app {{
-        padding:14px 12px 88px;
-      }}
-
-      .top {{
-        margin:-14px -12px 14px;
-        padding:14px 14px 11px;
-      }}
-
-      .brand {{
-        font-size:21px;
-        letter-spacing:.09em;
-      }}
-
-      .grid {{
-        grid-template-columns:1fr 1fr;
-        gap:12px;
-      }}
-
-      .hero {{
-        min-height:246px;
-        padding:24px 22px;
-      }}
-
-      .hero h1 {{
-        font-size:43px;
-      }}
-
-      .hero-list {{
-        font-size:21px;
-      }}
-
-      .hero-text {{
-        max-width:72%;
-        font-size:20px;
-      }}
-
-      .eb-logo-hero {{
-        width:178px;
-        height:178px;
-        right:0;
-        top:34px;
-        opacity:.72;
-      }}
-
-      .metric {{
-        grid-template-columns:72px 1fr;
-        min-height:132px;
-        padding:22px 20px;
-      }}
-
-      .metric .icon {{
-        font-size:42px;
-      }}
-
-      .metric .value {{
-        font-size:48px;
-      }}
-
-      .metric .unit {{
-        font-size:24px;
-      }}
-
-      .advice, .plan, .predbat, .safety {{
-        min-height:172px;
-        padding:22px 20px;
-      }}
-
-      .advice h2 {{
-        font-size:32px;
-      }}
-    }}
-
-    @media (max-width:520px) {{
-      .grid {{
-        grid-template-columns:1fr;
-      }}
-
-      .hero-text {{
-        max-width:100%;
-        padding-right:118px;
-      }}
-
-      .eb-logo-hero {{
-        width:142px;
-        height:142px;
-        right:-6px;
-        top:58px;
-        opacity:.7;
-      }}
-
-      .metric {{
-        grid-template-columns:78px 1fr;
-      }}
-    }}
-
-    @media (prefers-reduced-motion:reduce) {{
-      .eb-core,
-      .eb-brain,
-      .eb-orbit-slow,
-      .eb-orbit-fast,
-      .eb-dot,
-      .eb-node {{
-        animation:none !important;
-      }}
-    }}
-
-
-    /* ENERGY_BRAIN_RESPONSIVE_POLISH_V2_START */
-
-    .hero {{
-      min-height: 258px;
-    }}
-
-    .hero .eyebrow,
-    .hero h1,
-    .hero-list,
-    .hero-text {{
-      position: relative;
-      z-index: 2;
-    }}
-
-    .eb-logo-hero {{
-      top: 0;
-      right: 20px;
-      width: 255px;
-      height: 255px;
-      opacity: .82;
-    }}
-
-    @media (min-width: 761px) and (max-width: 1180px) {{
-      .app {{
-        padding: 22px 22px 104px;
-      }}
-
-      .grid {{
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-      }}
-
-      .hero {{
-        min-height: 270px;
-        padding: 32px 34px;
-      }}
-
-      .eb-logo-hero {{
-        top: 4px;
-        right: 28px;
-        width: 265px;
-        height: 265px;
-      }}
-
-      .hero-list,
-      .hero-text {{
-        max-width: 62%;
-      }}
-    }}
-
-    @media (max-width: 760px) {{
-      .app {{
-        padding: 14px 12px 92px;
-      }}
-
-      .top {{
-        min-height: 74px;
-      }}
-
-      .brand {{
-        font-size: 22px;
-        letter-spacing: .14em;
-      }}
-
-      .eb-logo-small {{
-        width: 50px;
-        height: 50px;
-      }}
-
-      .chips {{
-        gap: 10px;
-        margin: 14px 0 16px;
-      }}
-
-      .chip {{
-        min-height: 46px;
-        padding: 10px 15px;
-        border-radius: 15px;
-        font-size: 18px;
-        letter-spacing: .12em;
-      }}
-
-      .grid {{
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 12px;
-      }}
-
-      .hero {{
-        grid-column: 1 / -1;
-        min-height: 320px;
-        padding: 26px 22px 24px;
-      }}
-
-      .hero h1 {{
-        font-size: 48px;
-        max-width: 58%;
-      }}
-
-      .hero-list {{
-        max-width: 58%;
-        font-size: 24px;
-        gap: 12px;
-      }}
-
-      .hero-text {{
-        max-width: 56%;
-        margin-top: 22px;
-        padding-right: 0;
-        font-size: 21px;
-        line-height: 1.42;
-      }}
-
-      .eb-logo-hero {{
-        width: 180px;
-        height: 180px;
-        right: 12px;
-        top: 42px;
-        opacity: .82;
-      }}
-
-      .metric {{
-        min-height: 152px;
-        grid-template-columns: 54px 1fr;
-        gap: 12px;
-        padding: 22px 18px;
-      }}
-
-      .metric .label {{
-        top: 18px;
-        left: 18px;
-        font-size: 16px;
-        letter-spacing: .20em;
-      }}
-
-      .metric .icon {{
-        margin-top: 34px;
-        font-size: 38px;
-      }}
-
-      .metric .value {{
-        margin-top: 34px;
-        font-size: 44px;
-        line-height: 1;
-      }}
-
-      .metric .unit {{
-        font-size: 24px;
-      }}
-
-      .socbar {{
-        left: 18px;
-        right: 18px;
-        bottom: 18px;
-      }}
-
-      .advice,
-      .plan,
-      .predbat,
-      .safety {{
-        min-height: 184px;
-        padding: 22px 18px;
-      }}
-
-      .advice h2 {{
-        font-size: 34px;
-      }}
-
-      .advice p,
-      .predbat p,
-      .safety p {{
-        font-size: 19px;
-      }}
-
-      .plan-row {{
-        grid-template-columns: 64px 1fr;
-        gap: 10px;
-        padding: 9px 10px;
-        font-size: 15px;
-      }}
-
-      .plan-row time {{
-        font-size: 19px;
-      }}
-
-      .bottom {{
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-      }}
-
-      .tab {{
-        font-size: 15px;
-      }}
-
-      .tab b {{
-        font-size: 27px;
-      }}
-    }}
-
-    @media (max-width: 430px) {{
-      .top {{
-        gap: 12px;
-      }}
-
-      .brand {{
-        font-size: 20px;
-        letter-spacing: .12em;
-      }}
-
-      .menu {{
-        font-size: 26px;
-      }}
-
-      .eb-logo-small {{
-        width: 46px;
-        height: 46px;
-      }}
-
-      .hero {{
-        min-height: 314px;
-        padding: 24px 20px 22px;
-      }}
-
-      .hero h1 {{
-        font-size: 45px;
-        max-width: 57%;
-      }}
-
-      .hero-list {{
-        max-width: 58%;
-        font-size: 22px;
-      }}
-
-      .hero-text {{
-        max-width: 56%;
-        font-size: 20px;
-      }}
-
-      .eb-logo-hero {{
-        width: 158px;
-        height: 158px;
-        right: 10px;
-        top: 48px;
-      }}
-
-      .metric {{
-        min-height: 146px;
-        grid-template-columns: 48px 1fr;
-        padding: 21px 16px;
-      }}
-
-      .metric .icon {{
-        font-size: 34px;
-      }}
-
-      .metric .value {{
-        font-size: 39px;
-      }}
-
-      .metric .unit {{
-        font-size: 22px;
-      }}
-    }}
-
-    @media (max-width: 370px) {{
-      .hero {{
-        min-height: 330px;
-      }}
-
-      .hero h1,
-      .hero-list,
-      .hero-text {{
-        max-width: 100%;
-      }}
-
-      .eb-logo-hero {{
-        width: 132px;
-        height: 132px;
-        top: 42px;
-        right: 4px;
-        opacity: .44;
-      }}
-
-      .metric .value {{
-        font-size: 34px;
-      }}
-
-      .metric .unit {{
-        font-size: 20px;
-      }}
-    }}
-
-    /* ENERGY_BRAIN_RESPONSIVE_POLISH_V2_END */
-
+    /* ENERGY_BRAIN_EMS_PAGE_V1_END */
   </style>
 </head>
 <body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        {_brain_logo()}
+        <h1>Energy Brain EMS</h1>
+      </div>
+      <div class="mode-chips" aria-label="Modus">
+        {render_status_chip("observer", "safe")}
+        {render_status_chip("read-only", "safe")}
+      </div>
+    </div>
+  </header>
+
   <main class="app">
-    <header class="top">
-      <div class="menu">☰</div>
-      {logo_small}
-      <div class="brand">Energy Brain EMS</div>
-    </header>
-
-    <section class="chips">
-      <div class="chip good">◉ {mode}</div>
-      <div class="chip">{execution}</div>
+    <section id="home" class="hero">
+      <div class="hero-grid">
+        <div>
+          <p class="section-kicker">Cockpit</p>
+          <h2>Vandaag</h2>
+          <div class="status-list">
+            <div class="status-line"><span class="status-dot"></span><span>Mode: {escape(mode)}</span></div>
+            <div class="status-line"><span class="status-dot"></span><span>{escape(blocked)}</span></div>
+            <div class="status-line"><span class="status-dot"></span><span>Laatste update: {escape(last_update)}</span></div>
+          </div>
+          <p class="hero-copy">Energy Brain kijkt mee, vergelijkt en plant, maar stuurt nu niets aan.</p>
+        </div>
+        {render_ha_powerflow_card(data)}
+      </div>
     </section>
 
-    <section class="grid">
-      <section class="card hero">
-        <div class="eyebrow">Cockpit</div>
-        <h1>Vandaag</h1>
-        {logo_hero}
-        <div class="hero-list">
-          <div><span>◉</span>{mode}</div>
-          <div><span>▣</span>Uitvoering geblokkeerd</div>
-          <div><span>◷</span>Laatste update {last_update}</div>
-        </div>
-        <div class="hero-text">Energy Brain kijkt mee, vergelijkt en plant, maar stuurt nu niets aan.</div>
-      </section>
-
-      <section class="card metric">
-        <div class="label">SOC</div>
-        <div class="icon">▣</div>
-        <div class="value">{soc}<span class="unit">%</span></div>
-        <div class="socbar"><span></span></div>
-      </section>
-
-      <section class="card metric">
-        <div class="label">PV nu</div>
-        <div class="icon">▤</div>
-        <div class="value">{pv_now}<span class="unit">kW</span></div>
-      </section>
-
-      <section class="card metric">
-        <div class="label" style="color:var(--blue)">Huis</div>
-        <div class="icon">⌂</div>
-        <div class="value">{house}<span class="unit">kW</span></div>
-      </section>
-
-      <section class="card metric">
-        <div class="label" style="color:var(--blue)">Net</div>
-        <div class="icon">♜</div>
-        <div class="value" style="color:var(--green)">{grid}<span class="unit">kW</span></div>
-      </section>
-
-      <section class="card advice">
-        <div class="eyebrow">Advies nu</div>
-        <h2>{decision}</h2>
-        <p>{decision_reason}</p>
-        <div class="ticks">
-          <div>Reserve veilig</div>
-          <div>Goedkoop laadvenster later</div>
-          <div>PV verwacht</div>
-        </div>
-      </section>
-
-      <section class="card plan">
-        <div class="eyebrow" style="color:var(--blue)">Plan vandaag</div>
-        <div class="plan-list">
-          <div class="plan-row"><time>03:00</time><span>Laden · goedkoop</span></div>
-          <div class="plan-row"><time>12:00</time><span>PV laden · overschot</span></div>
-          <div class="plan-row"><time>18:00</time><span>Ontladen · hoge prijs</span></div>
-        </div>
-      </section>
-
-      <section class="card predbat">
-        <div class="eyebrow">Predbat vergelijking</div>
-        <p>{predbat_summary}</p>
-      </section>
-
-      <section class="card safety">
-        <div class="eyebrow">Safety / mode</div>
-        <p>Degraded mode:<br>{degraded_text}</p>
-      </section>
+    <section id="forecast" class="metrics" aria-label="EMS metrics">
+      {_metric_cards(data)}
     </section>
+
+    {render_predbat_comparison(data)}
+    {render_plan_timeline(data)}
+    {render_safety_card(data)}
   </main>
 
-  <nav class="bottom">
-    <a class="tab active" href="/"><b>⌂</b><span>Home</span></a>
-    <a class="tab" href="/cockpit"><b>▣</b><span>Plan</span></a>
-    <a class="tab" href="/api/latest-cycle"><b>⌁</b><span>Forecast</span></a>
-    <a class="tab" href="/api/energy-brain-cockpit"><b>▥</b><span>Benchmark</span></a>
-    <a class="tab" href="/hillview"><b>⌵</b><span>Safety</span></a>
+  <nav class="bottom-nav" aria-label="Energy Brain navigatie">
+    <a href="#home" aria-label="Home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Home</span></a>
+    <a href="#plan" aria-label="Plan"><svg viewBox="0 0 24 24"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h10"/></svg><span>Plan</span></a>
+    <a href="#forecast" aria-label="Forecast"><svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9"/><path d="M4 20h16"/></svg><span>Forecast</span></a>
+    <a href="#benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24"><path d="M5 20V6"/><path d="M12 20V4"/><path d="M19 20v-9"/></svg><span>Benchmark</span></a>
+    <a href="#safety" aria-label="Safety"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-5"/></svg><span>Safety</span></a>
   </nav>
 </body>
 </html>'''

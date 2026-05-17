@@ -2179,10 +2179,95 @@ def build_fresh_home_v1_display_data(summary=None):
         ("fallback",),
     ], default=True))
 
+    reserve = first_value([
+        ("reserve_percent",),
+        ("battery", "reserve_percent"),
+        ("config", "reserve_percent"),
+        ("plan", "reserve_percent"),
+    ])
+    battery_power = first_value([
+        ("battery_power_kw",),
+        ("battery_power_w",),
+        ("controller", "setpoint_kw"),
+    ])
+    price_now = first_value([
+        ("price_now",),
+        ("grid_price",),
+        ("snapshot", "grid_price"),
+        ("cards", "energy_flow", "grid_price"),
+    ])
+    confidence = first_value([
+        ("forecast_confidence",),
+        ("data_quality", "confidence"),
+        ("confidence_percent",),
+    ])
+    predbat = pick(summary, [
+        ("predbat",),
+        ("benchmark", "predbat"),
+        ("comparison", "predbat"),
+    ], default={})
+    if not isinstance(predbat, dict):
+        predbat = {}
+
+    plan_steps = pick(summary, [
+        ("plan", "steps"),
+        ("plan_windows",),
+        ("timeline",),
+        ("planner_timeline",),
+    ], default=[])
+    plan_windows = []
+    if isinstance(plan_steps, list):
+        for step in plan_steps[:12]:
+            if not isinstance(step, dict):
+                continue
+            index = step.get("index")
+            if index is None:
+                time_label = step.get("start") or step.get("time") or "—"
+            else:
+                time_label = f"+{index} stap"
+            setpoint = as_float(step.get("battery_setpoint_kw"))
+            if setpoint is None:
+                kind = step.get("kind") or step.get("action") or "no-action"
+            elif setpoint > 0:
+                kind = "charge window"
+            elif setpoint < 0:
+                kind = "discharge/export candidate"
+            else:
+                kind = "no-action"
+            plan_windows.append({
+                "start": time_label,
+                "kind": kind,
+                "reason": step.get("reason") or "Energy Brain observer-plan uit laatste cyclus.",
+            })
+
+    missing_flags = []
+    for name, value in (
+        ("SOC", soc),
+        ("PV", pv),
+        ("Huis", house),
+        ("Net", grid),
+        ("Prijs", price_now),
+    ):
+        if clean_state_value(value) is None:
+            missing_flags.append(name)
+
     return {
         "mode": str(mode).replace("_", "-"),
-        "execution": "Geen aansturing",
+        "execution": "Uitvoering geblokkeerd / Geen aansturing",
+        "execution_blocked_reason": "UI observer-only; geen Home Assistant writes of device commands.",
         "last_update": str(updated),
+        "soc_percent": soc,
+        "battery_soc_percent": soc,
+        "pv_power_kw": pv,
+        "pv_now_kw": pv,
+        "household_load_kw": house,
+        "home_load_kw": house,
+        "grid_power_kw": grid,
+        "battery_power_kw": battery_power,
+        "price_now": price_now,
+        "grid_price": price_now,
+        "reserve_percent": reserve,
+        "forecast_confidence": confidence,
         "soc": percent(soc),
         "pv_now": kw_from_w_or_kw(pv),
         "house": kw_from_w_or_kw(house),
@@ -2190,6 +2275,13 @@ def build_fresh_home_v1_display_data(summary=None):
         "decision": str(decision),
         "decision_reason": str(reason),
         "predbat_summary": str(predbat_summary),
+        "predbat": predbat,
+        "plan_windows": plan_windows,
+        "missing_data_flags": missing_flags,
+        "degraded_flags": ["missing_display_data"] if missing_flags else [],
+        "shadow_state": "comparison-only",
+        "reserve_status": "Reserve onbekend" if clean_state_value(reserve) is None else "Reserve beschikbaar in displaydata",
+        "fault_status": "geen bekende melding",
         "degraded": degraded,
         "degraded_text": "Display data uit laatste geldige cyclus. Geen uitvoering toegestaan." if degraded else "Alle display-inputs zijn geldig. Uitvoering blijft afhankelijk van controller-gates.",
     }
@@ -2198,6 +2290,14 @@ def build_fresh_home_v1_display_data(summary=None):
 def energybrain_fresh_home_v1_html(display_data=None):
     from energy_brain.ui_static.fresh_home_v1 import render_fresh_home_v1
     return render_fresh_home_v1(display_data or {})
+
+
+def energybrain_fresh_home_v2_html(display_data=None):
+    try:
+        from energy_brain.ui_static.fresh_home_v2 import render_fresh_home_v2
+        return render_fresh_home_v2(display_data or {})
+    except Exception:
+        return energybrain_fresh_home_v1_html(display_data or {})
 
 
 def build_planner_explainability(summary=None):
@@ -2267,14 +2367,14 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
         if path == "/cockpit":
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
-            html = energybrain_fresh_home_v1_html(build_fresh_home_v1_display_data(summary))
+            html = energybrain_fresh_home_v2_html(build_fresh_home_v1_display_data(summary))
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
         if path in ("", "/", "/home", "/index.html"):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
-            html = energybrain_fresh_home_v1_html(build_fresh_home_v1_display_data(summary))
+            html = energybrain_fresh_home_v2_html(build_fresh_home_v1_display_data(summary))
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 

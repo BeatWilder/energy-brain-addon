@@ -674,3 +674,45 @@ def test_hillview_live_values_is_read_only():
     assert "get_state_object" in helper
     assert "call_service_guarded" not in helper
     assert "requests.post" not in helper
+
+
+def test_fresh_ems_page_renders_required_sections():
+    from energy_brain.web_ui import build_fresh_home_v1_display_data, summarize_cycle
+    from energy_brain.ui_static.fresh_home_v1 import render_fresh_home_v1
+
+    html = render_fresh_home_v1(build_fresh_home_v1_display_data(summarize_cycle(_cycle())))
+
+    for text in [
+        "Energy Brain EMS",
+        "Vandaag",
+        "Zonne-energie",
+        "SOC",
+        "PV nu",
+        "Predbat vergelijking",
+        "Safety",
+        "Geen aansturing",
+    ]:
+        assert text in html
+
+
+def test_fresh_ems_page_missing_data_is_safe():
+    from energy_brain.ui_static.fresh_home_v1 import render_fresh_home_v1
+
+    html = render_fresh_home_v1({})
+
+    assert "Energy Brain EMS" in html
+    assert "observer-only" in html or "Observer-only" in html
+    assert "—" in html
+    assert "Geen Predbat benchmarkdata beschikbaar" in html
+
+
+def test_fresh_powerflow_is_svg_without_html_node_overlays():
+    from energy_brain.ui_static.ha_powerflow_card import render_ha_powerflow_card
+
+    html = render_ha_powerflow_card({})
+
+    assert "<svg" in html
+    assert "viewBox=" in html
+    assert "Zonne-energie" in html
+    assert "Batterij" in html
+    assert "position:absolute" not in html
