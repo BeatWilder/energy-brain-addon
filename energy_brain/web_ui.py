@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
 from energy_brain.ha_client import HomeAssistantClient
@@ -1359,6 +1359,50 @@ def build_hillview_alphaess_payload() -> dict[str, Any]:
 
 
 
+
+def _hillview_notice_from_query(query: str) -> dict[str, str]:
+    params = parse_qs(query)
+    status = (params.get("control_status") or [""])[0]
+    reason = (params.get("reason") or [""])[0]
+    action = (params.get("action") or [""])[0]
+
+    if not status:
+        return {}
+
+    if status == "ok":
+        title = "Opgeslagen"
+        message = "Hillview dispatch instelling is verwerkt."
+    elif reason == "hillview_controls_disabled":
+        title = "Geblokkeerd"
+        message = "Bediening staat nog uit in de add-on configuratie."
+    else:
+        title = "Geblokkeerd"
+        message = reason or "De guarded control heeft de actie geweigerd."
+
+    return {
+        "status": status,
+        "title": title,
+        "message": message,
+        "action": action,
+        "reason": reason,
+    }
+
+
+def _render_hillview_notice(notice: dict[str, str]) -> str:
+    if not notice:
+        return ""
+
+    css_class = "notice ok" if notice.get("status") == "ok" else "notice blocked"
+    action = notice.get("action") or "-"
+    reason = notice.get("reason") or "-"
+    return (
+        f'<section class="{css_class}">'
+        f'<strong>{_escape(notice.get("title", ""))}</strong>'
+        f'<span>{_escape(notice.get("message", ""))}</span>'
+        f'<small>actie: {_escape(action)} · reden: {_escape(reason)}</small>'
+        "</section>"
+    )
+
 def _render_hillview_dispatch_form(payload: dict[str, Any]) -> str:
     current = _dict(payload.get("control_values"))
     values = _dict(current.get("values"))
@@ -1411,8 +1455,9 @@ def _render_hillview_dispatch_form(payload: dict[str, Any]) -> str:
       </form>
     """
 
-def render_hillview_alphaess_html(payload: dict[str, Any]) -> str:
-    """Render the Hillview / AlphaESS app tab as read-only cards."""
+def render_hillview_alphaess_html(payload: dict[str, Any], notice: dict[str, str] | None = None) -> str:
+    """Render the Hillview / AlphaESS app tab with same-page feedback."""
+    notice = notice or {}
     groups = _list(payload.get("groups"))
     intent = _dict(payload.get("control_intent"))
     total = sum(len(_list(_dict(group).get("entities"))) for group in groups)
@@ -1514,6 +1559,11 @@ button:hover {{ background:rgba(115,215,255,.20); }}
 .form-grid {{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; }}
 label span {{ display:block; color:var(--muted); font-weight:800; margin-bottom:6px; }}
 input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:#07111a; color:var(--text); border-radius:14px; padding:12px; font:inherit; }}
+.notice {{ margin-top:16px; border:1px solid rgba(255,255,255,.14); border-radius:20px; padding:14px 16px; display:grid; gap:4px; }}
+.notice.ok {{ background:rgba(130,240,194,.12); border-color:rgba(130,240,194,.28); }}
+.notice.blocked {{ background:rgba(255,211,106,.12); border-color:rgba(255,211,106,.28); }}
+.notice strong {{ font-size:1.05rem; }}
+.notice span, .notice small {{ color:var(--muted); }}
 .button-row {{ display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }}
 .mini {{ margin:10px 0 0; font-size:.92rem; }}
 @media (max-width: 860px) {{ .form-grid {{ grid-template-columns:1fr; }} }}
@@ -1541,6 +1591,8 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
         <a href="/api/hillview">JSON payload</a>
       </div>
     </header>
+
+    {_render_hillview_notice(notice)}
 
     <section class="card" style="margin-top:16px">
       <h2>Hillview dispatch bediening</h2>
@@ -1598,7 +1650,9 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/hillview":
-            html = render_hillview_alphaess_html(build_hillview_alphaess_payload())
+            query = self.path.split("?", 1)[1] if "?" in self.path else ""
+            notice = _hillview_notice_from_query(query)
+            html = render_hillview_alphaess_html(build_hillview_alphaess_payload(), notice)
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
@@ -1639,25 +1693,17 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             result = build_hillview_control_result(action, fields)
 
             if "text/html" in self.headers.get("Accept", ""):
-                status = "OK" if result.get("ok") else "BLOCKED"
-                result_json = html.escape(json.dumps(result, indent=2, sort_keys=True))
-                page = (
-                    "<!doctype html><html><head><meta charset='utf-8'>"
-                    "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-                    "<title>Hillview control result</title>"
-                    "<style>"
-                    "body{margin:0;background:#050b11;color:#f4f8fc;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;padding:22px}"
-                    "main{max-width:760px;margin:0 auto}"
-                    ".card{border:1px solid rgba(255,255,255,.12);border-radius:24px;background:#0c1620;padding:22px}"
-                    "a{color:#73d7ff}"
-                    "pre{white-space:pre-wrap;background:#07111a;border-radius:16px;padding:14px;overflow:auto}"
-                    "</style></head><body><main><section class='card'>"
-                    f"<h1>{status}</h1>"
-                    f"<pre>{result_json}</pre>"
-                    "<p><a href='/hillview'>Terug naar AlphaESS</a></p>"
-                    "</section></main></body></html>"
-                )
-                self._send_response(200, page.encode("utf-8"), "text/html; charset=utf-8")
+                status = "ok" if result.get("ok") else "blocked"
+                reason = str(result.get("reason") or result.get("failed", {}).get("reason") or "")
+                location = "/hillview?" + urlencode({
+                    "control_status": status,
+                    "action": action,
+                    "reason": reason,
+                })
+                self.send_response(303)
+                self.send_header("Location", location)
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
                 return
 
             self._send_json(result, status=200 if result.get("ok") else 403)

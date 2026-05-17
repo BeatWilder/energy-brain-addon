@@ -493,3 +493,27 @@ def test_hillview_on_saves_settings_then_turns_dispatch_on(monkeypatch):
 
     assert result["ok"] is True
     assert calls[-1] == ("input_boolean", "turn_on", {"entity_id": "input_boolean.alphaess_helper_dispatch"})
+
+def test_hillview_notice_renders_same_page_confirmation():
+    from energy_brain import web_ui
+
+    notice = web_ui._hillview_notice_from_query(
+        "control_status=blocked&action=on&reason=hillview_controls_disabled"
+    )
+    html = web_ui.render_hillview_alphaess_html(
+        web_ui.build_hillview_alphaess_payload(),
+        notice,
+    )
+
+    assert "Geblokkeerd" in html
+    assert "Bediening staat nog uit" in html
+    assert "Hillview dispatch bediening" in html
+
+
+def test_hillview_post_uses_redirect_not_result_page():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert "self.send_response(303)" in text
+    assert 'self.send_header("Location", location)' in text
+    assert "Hillview control result" not in text
+    assert "result_json = html.escape" not in text
