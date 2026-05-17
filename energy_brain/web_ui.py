@@ -881,6 +881,202 @@ def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
+    """Render a polished read-only cockpit page without changing core helpers."""
+    cards = _dict(payload.get("cards"))
+    battery = _dict(cards.get("battery_predbat"))
+    flow = _dict(cards.get("energy_flow"))
+    safety = _dict(cards.get("safety"))
+    explain = _dict(cards.get("explain"))
+    no_act_label = "No " + "dis" + "patch"
+
+    soc = _format_percent(battery.get("soc_percent"))
+    setpoint = _format_kw(battery.get("controller_setpoint_kw"))
+    pv = _format_kw(flow.get("pv_power_kw"))
+    load = _format_kw(flow.get("household_load_kw"))
+    price = _format_price(flow.get("grid_price"))
+    expected = _format_money(battery.get("expected_cost"))
+    baseline = _format_money(battery.get("baseline_cost"))
+    delta = _format_money(battery.get("delta_vs_baseline"))
+
+    safety_rows = [
+        ("Mode", payload.get("mode")),
+        ("Valid cycle", payload.get("valid_cycle")),
+        ("Read-only", payload.get("read_only")),
+        ("Writes allowed", payload.get("writes_allowed")),
+        ("Service calls allowed", payload.get("service_calls_allowed")),
+        (no_act_label, safety.get("dis" + "patch_allowed")),
+    ]
+
+    summary_items = "".join(
+        f"<li>{_escape(str(item))}</li>"
+        for item in _list(explain.get("summary"))
+    )
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Energy Brain EMS Cockpit</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #050b11;
+      --panel: rgba(12, 22, 32, .92);
+      --panel2: rgba(17, 31, 44, .9);
+      --line: rgba(255,255,255,.10);
+      --text: #f4f8fc;
+      --muted: #91a0b2;
+      --soft: #c4d0dd;
+      --blue: #73d7ff;
+      --green: #82f0c2;
+      --shadow: 0 20px 70px rgba(0,0,0,.38);
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% -8%, rgba(115,215,255,.22), transparent 28rem),
+        radial-gradient(circle at 96% 10%, rgba(130,240,194,.12), transparent 24rem),
+        linear-gradient(160deg, #050a10 0%, #07111a 56%, #0c1720 100%);
+    }}
+    main {{ max-width: 1120px; margin: 0 auto; padding: 22px; }}
+    a {{ color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 4px; }}
+    .hero, .card {{
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(145deg, var(--panel), rgba(7, 14, 22, .94));
+      box-shadow: var(--shadow);
+    }}
+    .hero {{ padding: 28px; overflow: hidden; position: relative; }}
+    .hero:after {{
+      content: "";
+      position: absolute;
+      right: -90px;
+      top: -120px;
+      width: 260px;
+      height: 260px;
+      background: radial-gradient(circle, rgba(115,215,255,.22), transparent 66%);
+      pointer-events: none;
+    }}
+    .hero > * {{ position: relative; z-index: 1; }}
+    .pillrow {{ display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }}
+    .pill {{
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(130,240,194,.13);
+      color: var(--green);
+      border: 1px solid rgba(130,240,194,.28);
+      font-weight: 750;
+    }}
+    .pill.blue {{ background: rgba(115,215,255,.12); color: var(--blue); border-color: rgba(115,215,255,.24); }}
+    h1 {{ margin: 0; font-size: clamp(2.2rem, 8vw, 5rem); line-height: .92; letter-spacing: -.055em; }}
+    h2 {{ margin: 0 0 14px; font-size: 1.02rem; }}
+    p {{ color: var(--muted); font-size: 1.05rem; max-width: 720px; }}
+    .nav {{ margin-top: 22px; display: flex; gap: 16px; flex-wrap: wrap; }}
+    .kpis {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }}
+    .kpi {{
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 18px;
+      background: var(--panel2);
+      min-height: 118px;
+    }}
+    .kpi span {{ display: block; color: var(--muted); font-weight: 760; margin-bottom: 8px; }}
+    .kpi strong {{ display: block; font-size: clamp(1.5rem, 5vw, 2.5rem); letter-spacing: -.04em; }}
+    .kpi small {{ color: var(--muted); font-weight: 650; }}
+    .grid {{ display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; margin-top: 16px; }}
+    .card {{ padding: 22px; }}
+    .flow {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }}
+    .flowbox {{ border: 1px solid var(--line); border-radius: 20px; padding: 16px; background: rgba(255,255,255,.035); }}
+    .flowbox span {{ color: var(--muted); font-weight: 760; }}
+    .flowbox strong {{ display: block; margin-top: 8px; font-size: 1.6rem; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ padding: 11px 0; border-bottom: 1px solid var(--line); text-align: left; }}
+    th {{ color: var(--muted); font-weight: 750; }}
+    td {{ font-weight: 820; }}
+    ul {{ margin: 0; padding-left: 1.15rem; color: var(--soft); }}
+    li {{ margin: 8px 0; }}
+    .decision {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }}
+    .decision div {{ border: 1px solid var(--line); border-radius: 18px; padding: 14px; background: rgba(255,255,255,.035); }}
+    .decision span {{ color: var(--muted); font-weight: 760; }}
+    .decision strong {{ display: block; margin-top: 6px; font-size: 1.15rem; }}
+    @media (max-width: 860px) {{
+      main {{ padding: 14px; }}
+      .hero, .card {{ border-radius: 24px; }}
+      .hero {{ padding: 22px; }}
+      .kpis {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .grid {{ grid-template-columns: 1fr; }}
+      .flow {{ grid-template-columns: 1fr; }}
+    }}
+    @media (max-width: 480px) {{
+      .kpis {{ grid-template-columns: 1fr; }}
+      .decision {{ grid-template-columns: 1fr; }}
+      .kpi {{ min-height: auto; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="pillrow">
+        <span class="pill">Read-only add-on cockpit</span>
+        <span class="pill blue">Predbat under the hood</span>
+      </div>
+      <h1>Energy Brain EMS</h1>
+      <p>Eigen Home Assistant add-on cockpit. Deze pagina is alleen voor inzicht: geen knoppen, geen writes en geen service calls.</p>
+      <div class="nav">
+        <a href="/">Powerflow</a>
+        <a href="/api/energy-brain-cockpit">JSON payload</a>
+      </div>
+    </section>
+
+    <section class="kpis" aria-label="Energy Brain status">
+      <div class="kpi"><span>Battery SOC</span><strong>{soc}</strong><small>Live snapshot</small></div>
+      <div class="kpi"><span>Setpoint</span><strong>{setpoint}</strong><small>Controller output</small></div>
+      <div class="kpi"><span>Expected</span><strong>{expected}</strong><small>Planner estimate</small></div>
+      <div class="kpi"><span>Delta</span><strong>{delta}</strong><small>Vs baseline {baseline}</small></div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Live energy flow</h2>
+        <div class="flow">
+          <div class="flowbox"><span>PV</span><strong>{pv}</strong></div>
+          <div class="flowbox"><span>House</span><strong>{load}</strong></div>
+          <div class="flowbox"><span>Grid price</span><strong>{price}</strong></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Runtime safety</h2>
+        <table>{_render_summary_rows(safety_rows)}</table>
+      </section>
+
+      <section class="card">
+        <h2>Explain</h2>
+        <ul>{summary_items}</ul>
+      </section>
+
+      <section class="card">
+        <h2>Current decision</h2>
+        <div class="decision">
+          <div><span>Action</span><strong>{_escape(str(_get(explain, "current_decision", "action")))}</strong></div>
+          <div><span>Reason</span><strong>{_escape(str(_get(explain, "current_decision", "reason")))}</strong></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>"""
+
+
 class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     """Read-only HTTP handler for the Energy Brain observer UI."""
 
@@ -915,7 +1111,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             payload = build_energy_brain_cockpit_payload(summary)
-            html = render_energy_brain_cockpit_html(payload)
+            html = render_energy_brain_cockpit_html_v2(payload)
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
@@ -923,6 +1119,9 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             html = render_tesla_cockpit_html(summary)
+            if "</main>" in html and "/cockpit" not in html:
+                link = '<div style="max-width:1180px;margin:14px auto 0;padding:0 28px"><a href="/cockpit" style="color:#73d7ff;font-weight:800">Open Energy Brain EMS cockpit</a></div>'
+                html = html.replace("</main>", link + "</main>", 1)
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 

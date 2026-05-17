@@ -291,6 +291,7 @@ def test_energy_brain_addon_cockpit_routes_are_registered_once():
     text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
 
     assert text.count("def build_energy_brain_cockpit_payload") == 1
-    assert text.count("def render_energy_brain_cockpit_html") == 1
+    assert text.count("def render_energy_brain_cockpit_html(payload: dict[str, Any])") == 1
+    assert text.count("def render_energy_brain_cockpit_html_v2(payload: dict[str, Any])") == 1
     assert text.count('if path == "/api/energy-brain-cockpit"') == 1
     assert text.count('if path == "/cockpit"') == 1
