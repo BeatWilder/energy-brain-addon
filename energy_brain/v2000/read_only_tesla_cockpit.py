@@ -1594,6 +1594,61 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
       }}
     }}
 
+  
+    /* --- V2352-R tighter powerflow card spacing --- */
+    .ha-powerflow-card-style {{
+      padding-top: 12px !important;
+      padding-bottom: 8px !important;
+    }}
+
+    .ha-powerflow-card-style .powerflow-head {{
+      margin-bottom: 4px !important;
+    }}
+
+    .ha-powerflow-card-style .powerflow-head p {{
+      margin-bottom: 0 !important;
+    }}
+
+    .ha-powerflow-card-style .powerflow-plain {{
+      margin-top: 4px !important;
+      margin-bottom: 4px !important;
+      padding: 10px 12px !important;
+    }}
+
+    .ha-powerflow-card-style .powerflow-svg.ha-flow {{
+      min-height: 560px !important;
+      height: 560px !important;
+      max-height: 560px !important;
+      margin-top: -18px !important;
+      margin-bottom: 4px !important;
+      background:
+        radial-gradient(circle at 50% 46%, rgba(80,150,235,.11), rgba(0,0,0,0) 52%) !important;
+      background-size: auto !important;
+    }}
+
+    .ha-powerflow-card-style .powerflow-summary-grid {{
+      margin-top: 4px !important;
+      gap: 8px !important;
+    }}
+
+    .ha-powerflow-card-style .pf-summary {{
+      padding: 12px 14px !important;
+    }}
+
+    .ha-powerflow-card-style .powerflow-explain {{
+      margin-top: 4px !important;
+      margin-bottom: 0 !important;
+    }}
+
+    @media (max-width: 700px) {{
+      .ha-powerflow-card-style .powerflow-svg.ha-flow {{
+        min-height: 535px !important;
+        height: 535px !important;
+        max-height: 535px !important;
+        margin-top: -20px !important;
+      }}
+    }}
+
   </style>
 </head>
 <body>
