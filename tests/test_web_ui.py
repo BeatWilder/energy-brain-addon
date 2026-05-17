@@ -571,3 +571,22 @@ def test_hillview_backend_results_include_service_entity_value_context():
     assert 'result.setdefault("payload", payload)' in text
     assert 'result.setdefault("value", payload.get("value"))' in text
     assert 'result.setdefault("option", payload.get("option"))' in text
+
+def test_hillview_failed_guard_result_is_flattened_for_ui_debugging():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert '"failed_domain": result.get("domain", domain)' in text
+    assert '"failed_service": result.get("service", service)' in text
+    assert '"failed_entity_id": result.get("entity_id", payload.get("entity_id"))' in text
+    assert '"failed_value": result.get("value", result.get("option", payload.get("value", payload.get("option"))))' in text
+    assert '"failed_reason": result.get("reason", "unknown_guard_failure")' in text
+
+
+def test_hillview_inline_failure_notice_includes_compact_debug_json():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert "const compactDebug = JSON.stringify" in text
+    assert "failed_service" in text
+    assert "failed_entity_id" in text
+    assert "failed_value" in text
+    assert '"debug: " + compactDebug' in text
