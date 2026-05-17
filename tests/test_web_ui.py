@@ -536,3 +536,17 @@ def test_hillview_form_uses_inline_fetch_without_page_refresh():
     assert '"Accept": "application/json"' in html
     assert "showNotice(true" in html
     assert "showNotice(false" in html
+
+def test_hillview_inline_feedback_hides_legacy_top_redirect_notice():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert "Legacy redirect notice intentionally hidden" in text
+    assert "id=\"hillview-inline-notice\"" in text
+    assert "controle geweigerd of onvolledige invoer" in text
+    assert "nestedFailed" in text
+
+
+def test_hillview_inline_copy_says_dispatch_on_saves_values_first():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert "Dispatch aan slaat deze waarden eerst op" in text

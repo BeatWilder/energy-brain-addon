@@ -1514,7 +1514,13 @@ def _hillview_inline_control_script() -> str:
 
           const result = await response.json();
           const ok = Boolean(result.ok);
-          const reason = result.reason || (result.failed && result.failed.reason) || "";
+          const nestedFailed = Array.isArray(result.failed) ? result.failed[0] : result.failed;
+          const reason =
+            result.reason ||
+            (nestedFailed && nestedFailed.reason) ||
+            (result.result && result.result.reason) ||
+            (result.error && result.error.reason) ||
+            "";
           const action = result.action || data.get("action") || "";
 
           if (ok) {
@@ -1522,7 +1528,8 @@ def _hillview_inline_control_script() -> str:
           } else if (reason === "hillview_controls_disabled") {
             showNotice(false, "Geblokkeerd", "Bediening staat nog uit in de add-on configuratie.", "actie: " + action + " · reden: " + reason);
           } else {
-            showNotice(false, "Geblokkeerd", "De guarded control heeft de actie geweigerd.", "actie: " + action + " · reden: " + reason);
+            const shownReason = reason || "controle geweigerd of onvolledige invoer";
+            showNotice(false, "Geblokkeerd", "De guarded control heeft de actie geweigerd.", "actie: " + action + " · reden: " + shownReason);
           }
         } catch (error) {
           showNotice(false, "Fout", "De actie kon niet worden verwerkt.", String(error));
@@ -1671,12 +1678,12 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
       </div>
     </header>
 
-    {_render_hillview_notice(notice)}
+    <!-- Legacy redirect notice intentionally hidden; inline dispatch notice is used instead. -->
 
     <section id="hillview-dispatch-control" class="card" style="margin-top:16px; scroll-margin-top: 18px;">
       <h2>Hillview dispatch bediening</h2>
       <div id="hillview-inline-notice"></div>
-      <p>Kies eerst mode, tijd, vermogen en cutoff. Daarna kun je dispatch aanzetten. Alleen deze Hillview dispatch helpers staan op de allowlist.</p>
+      <p>Kies mode, tijd, vermogen en cutoff. Dispatch aan slaat deze waarden eerst op en zet daarna dispatch aan. Alleen deze Hillview dispatch helpers staan op de allowlist.</p>
       {_render_hillview_dispatch_form(payload)}
       <p>Controls enabled in add-on options: <strong>{_escape(str(hillview_controls_enabled()))}</strong></p>
     </section>
