@@ -167,10 +167,16 @@ def test_control_surface_is_limited_to_guarded_hillview_allowlist():
     assert 'def build_hillview_control_result' in web_text
     assert 'def call_service_guarded' in ha_text
 
-    # Only the single Hillview input_boolean may be written through the allowlist.
-    assert ha_text.count('"input_boolean.alphaess_helper_dispatch"') == 2
-    assert '("input_boolean", "turn_on", "input_boolean.alphaess_helper_dispatch")' in ha_text
-    assert '("input_boolean", "turn_off", "input_boolean.alphaess_helper_dispatch")' in ha_text
+    # Only the Hillview dispatch helper family may be written through the allowlist.
+    for marker in [
+        '("input_boolean", "turn_on", "input_boolean.alphaess_helper_dispatch")',
+        '("input_boolean", "turn_off", "input_boolean.alphaess_helper_dispatch")',
+        '("input_select", "select_option", "input_select.alphaess_helper_dispatch_mode")',
+        '("input_number", "set_value", "input_number.alphaess_helper_dispatch_duration")',
+        '("input_number", "set_value", "input_number.alphaess_helper_dispatch_power")',
+        '("input_number", "set_value", "input_number.alphaess_helper_dispatch_cutoff_soc")',
+    ]:
+        assert marker in ha_text
 
     # No broad or generic service executor may appear.
     assert "command_service_domain" not in web_text
@@ -392,7 +398,98 @@ def test_hillview_html_contains_control_buttons(monkeypatch):
 
     html = web_ui.render_hillview_alphaess_html(web_ui.build_hillview_alphaess_payload())
 
-    assert "Hillview control" in html
-    assert "Control aan" in html
-    assert "Control uit" in html
+    assert "Hillview dispatch bediening" in html
+    assert "Dispatch aan" in html
+    assert "Dispatch uit" in html
+    assert "Instellingen opslaan" in html
     assert "/api/hillview/control" in html
+
+def test_hillview_dispatch_form_renders_mode_duration_power_cutoff(monkeypatch):
+    from energy_brain import web_ui
+
+    monkeypatch.setattr(web_ui, "hillview_dispatch_current_values", lambda: {
+        "available": True,
+        "values": {
+            "mode": "Mode 1",
+            "duration": "60",
+            "power": "1000",
+            "cutoff_soc": "20",
+            "enabled": "off",
+        },
+        "attributes": {
+            "duration": {"min": 1, "max": 240, "step": 1},
+            "power": {"min": 0, "max": 5000, "step": 100},
+            "cutoff_soc": {"min": 5, "max": 95, "step": 1},
+        },
+        "options": ["Mode 1", "Mode 2"],
+    })
+
+    html = web_ui.render_hillview_alphaess_html(web_ui.build_hillview_alphaess_payload())
+
+    assert "Hillview dispatch bediening" in html
+    assert 'name="mode"' in html
+    assert 'name="duration"' in html
+    assert 'name="power"' in html
+    assert 'name="cutoff_soc"' in html
+    assert "Instellingen opslaan" in html
+    assert "Dispatch aan" in html
+    assert "Dispatch uit" in html
+
+
+def test_hillview_save_writes_only_allowlisted_dispatch_helpers(monkeypatch):
+    from energy_brain import web_ui
+
+    calls = []
+
+    class FakeClient:
+        @staticmethod
+        def _options():
+            return {"hillview_controls_enabled": True}
+
+        def call_service_guarded(self, domain, service, payload):
+            calls.append((domain, service, payload))
+            return {"ok": True, "domain": domain, "service": service, "entity_id": payload["entity_id"]}
+
+    monkeypatch.setattr(web_ui, "HomeAssistantClient", FakeClient)
+
+    result = web_ui.build_hillview_control_result("save", {
+        "mode": "Mode 1",
+        "duration": "60",
+        "power": "1000",
+        "cutoff_soc": "20",
+    })
+
+    assert result["ok"] is True
+    assert calls == [
+        ("input_select", "select_option", {"entity_id": "input_select.alphaess_helper_dispatch_mode", "option": "Mode 1"}),
+        ("input_number", "set_value", {"entity_id": "input_number.alphaess_helper_dispatch_duration", "value": "60"}),
+        ("input_number", "set_value", {"entity_id": "input_number.alphaess_helper_dispatch_power", "value": "1000"}),
+        ("input_number", "set_value", {"entity_id": "input_number.alphaess_helper_dispatch_cutoff_soc", "value": "20"}),
+    ]
+
+
+def test_hillview_on_saves_settings_then_turns_dispatch_on(monkeypatch):
+    from energy_brain import web_ui
+
+    calls = []
+
+    class FakeClient:
+        @staticmethod
+        def _options():
+            return {"hillview_controls_enabled": True}
+
+        def call_service_guarded(self, domain, service, payload):
+            calls.append((domain, service, payload))
+            return {"ok": True, "domain": domain, "service": service, "entity_id": payload["entity_id"]}
+
+    monkeypatch.setattr(web_ui, "HomeAssistantClient", FakeClient)
+
+    result = web_ui.build_hillview_control_result("on", {
+        "mode": "Mode 1",
+        "duration": "60",
+        "power": "1000",
+        "cutoff_soc": "20",
+    })
+
+    assert result["ok"] is True
+    assert calls[-1] == ("input_boolean", "turn_on", {"entity_id": "input_boolean.alphaess_helper_dispatch"})

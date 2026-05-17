@@ -1090,46 +1090,137 @@ def hillview_controls_enabled() -> bool:
     return bool(options.get("hillview_controls_enabled") is True)
 
 
-def build_hillview_control_result(action: str) -> dict[str, Any]:
-    """Execute the single allowlisted Hillview control action."""
+def hillview_dispatch_current_values() -> dict[str, Any]:
+    """Read current Hillview helper states for form rendering."""
+    ids = {
+        "mode": "input_select.alphaess_helper_dispatch_mode",
+        "duration": "input_number.alphaess_helper_dispatch_duration",
+        "power": "input_number.alphaess_helper_dispatch_power",
+        "cutoff_soc": "input_number.alphaess_helper_dispatch_cutoff_soc",
+        "enabled": "input_boolean.alphaess_helper_dispatch",
+    }
+
+    result: dict[str, Any] = {
+        "available": False,
+        "values": {},
+        "attributes": {},
+        "options": [],
+    }
+
+    try:
+        client = HomeAssistantClient()
+    except Exception as exc:
+        result["error"] = str(exc)
+        return result
+
+    for key, entity_id in ids.items():
+        state = client.get_state_object(entity_id)
+        if not state:
+            continue
+        result["available"] = True
+        result["values"][key] = state.get("state")
+        attrs = state.get("attributes")
+        result["attributes"][key] = attrs if isinstance(attrs, dict) else {}
+        if key == "mode":
+            options = result["attributes"][key].get("options")
+            if isinstance(options, list):
+                result["options"] = [str(item) for item in options]
+
+    return result
+
+
+def build_hillview_control_result(action: str, fields: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Execute allowlisted Hillview dispatch setting writes and on/off action."""
     dkey = "dis" + "patch"
-    entity_id = "input_boolean.alphaess_helper_" + dkey
+    fields = fields or {}
 
     if not hillview_controls_enabled():
         return {
             "ok": False,
             "reason": "hillview_controls_disabled",
-            "entity_id": entity_id,
+            "entity_id": "input_boolean.alphaess_helper_" + dkey,
             "action": action,
             "read_only_fallback": True,
         }
 
-    if action not in {"on", "off"}:
+    if action not in {"save", "on", "off"}:
         return {
             "ok": False,
             "reason": "invalid_action",
-            "entity_id": entity_id,
+            "entity_id": "input_boolean.alphaess_helper_" + dkey,
             "action": action,
         }
 
-    service = "turn_on" if action == "on" else "turn_off"
-
     try:
         client = HomeAssistantClient()
-        return client.call_service_guarded(
-            "input_boolean",
-            service,
-            {"entity_id": entity_id},
-        )
     except Exception as exc:
         return {
             "ok": False,
             "reason": "ha_control_failed",
-            "entity_id": entity_id,
             "action": action,
             "error": str(exc),
         }
 
+    writes: list[tuple[str, str, dict[str, Any]]] = []
+
+    mode = str(fields.get("mode", "")).strip()
+    duration = str(fields.get("duration", "")).strip()
+    power = str(fields.get("power", "")).strip()
+    cutoff_soc = str(fields.get("cutoff_soc", "")).strip()
+
+    if mode:
+        writes.append((
+            "input_select",
+            "select_option",
+            {
+                "entity_id": "input_select.alphaess_helper_" + dkey + "_mode",
+                "option": mode,
+            },
+        ))
+
+    for name, value in [
+        ("duration", duration),
+        ("power", power),
+        ("cutoff_soc", cutoff_soc),
+    ]:
+        if value:
+            writes.append((
+                "input_number",
+                "set_value",
+                {
+                    "entity_id": "input_number.alphaess_helper_" + dkey + "_" + name,
+                    "value": value,
+                },
+            ))
+
+    if action in {"on", "off"}:
+        writes.append((
+            "input_boolean",
+            "turn_on" if action == "on" else "turn_off",
+            {
+                "entity_id": "input_boolean.alphaess_helper_" + dkey,
+            },
+        ))
+
+    results = []
+    for domain, service, payload in writes:
+        result = client.call_service_guarded(domain, service, payload)
+        results.append(result)
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "reason": "guarded_write_failed",
+                "action": action,
+                "failed": result,
+                "results": results,
+            }
+
+    return {
+        "ok": True,
+        "reason": "hillview_guarded_control_applied",
+        "action": action,
+        "results": results,
+    }
 
 
 def _hillview_entity(entity_id: str, name: str, kind: str = "state", future_control: bool = False) -> dict[str, Any]:
@@ -1153,6 +1244,7 @@ def build_hillview_alphaess_payload() -> dict[str, Any]:
         "writes_allowed": False,
         "service_calls_allowed": hillview_controls_enabled(),
         dkey + "_allowed": hillview_controls_enabled(),
+        "control_values": hillview_dispatch_current_values(),
         "control_intent": {
             "prepared": True,
             "active": False,
@@ -1266,6 +1358,59 @@ def build_hillview_alphaess_payload() -> dict[str, Any]:
     }
 
 
+
+def _render_hillview_dispatch_form(payload: dict[str, Any]) -> str:
+    current = _dict(payload.get("control_values"))
+    values = _dict(current.get("values"))
+    attrs = _dict(current.get("attributes"))
+    options = _list(current.get("options"))
+
+    mode_value = str(values.get("mode") or "")
+    duration_value = str(values.get("duration") or "")
+    power_value = str(values.get("power") or "")
+    cutoff_value = str(values.get("cutoff_soc") or "")
+    enabled_value = str(values.get("enabled") or "unknown")
+
+    if options:
+        option_html = "".join(
+            f'<option value="{_escape(str(option))}"{" selected" if str(option) == mode_value else ""}>{_escape(str(option))}</option>'
+            for option in options
+        )
+        mode_input = f'<select name="mode">{option_html}</select>'
+    else:
+        mode_input = f'<input name="mode" value="{_escape(mode_value)}" placeholder="mode nog niet gelezen">'
+
+    def number_input(name: str, value: str) -> str:
+        meta = _dict(attrs.get(name))
+        minimum = meta.get("min")
+        maximum = meta.get("max")
+        step = meta.get("step", "any")
+        extra = ""
+        if minimum is not None:
+            extra += f' min="{_escape(str(minimum))}"'
+        if maximum is not None:
+            extra += f' max="{_escape(str(maximum))}"'
+        if step is not None:
+            extra += f' step="{_escape(str(step))}"'
+        return f'<input type="number" name="{_escape(name)}" value="{_escape(value)}"{extra}>'
+
+    return f"""
+      <form method="post" action="/api/hillview/control" class="control-form">
+        <div class="form-grid">
+          <label><span>Mode</span>{mode_input}</label>
+          <label><span>Duration</span>{number_input("duration", duration_value)}</label>
+          <label><span>Power</span>{number_input("power", power_value)}</label>
+          <label><span>Cutoff SoC</span>{number_input("cutoff_soc", cutoff_value)}</label>
+        </div>
+        <p class="mini">Huidige dispatch status: <strong>{_escape(enabled_value)}</strong></p>
+        <div class="button-row">
+          <button name="action" value="save" type="submit">Instellingen opslaan</button>
+          <button name="action" value="on" type="submit">Dispatch aan</button>
+          <button name="action" value="off" type="submit">Dispatch uit</button>
+        </div>
+      </form>
+    """
+
 def render_hillview_alphaess_html(payload: dict[str, Any]) -> str:
     """Render the Hillview / AlphaESS app tab as read-only cards."""
     groups = _list(payload.get("groups"))
@@ -1365,6 +1510,13 @@ def render_hillview_alphaess_html(payload: dict[str, Any]) -> str:
     ul {{ margin: 0; padding-left: 1.15rem; color: var(--muted); }}
 button {{ border:1px solid rgba(115,215,255,.35); background:rgba(115,215,255,.12); color:var(--text); border-radius:14px; padding:12px 16px; font-weight:800; cursor:pointer; }}
 button:hover {{ background:rgba(115,215,255,.20); }}
+.control-form {{ margin-top: 12px; }}
+.form-grid {{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; }}
+label span {{ display:block; color:var(--muted); font-weight:800; margin-bottom:6px; }}
+input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:#07111a; color:var(--text); border-radius:14px; padding:12px; font:inherit; }}
+.button-row {{ display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }}
+.mini {{ margin:10px 0 0; font-size:.92rem; }}
+@media (max-width: 860px) {{ .form-grid {{ grid-template-columns:1fr; }} }}
     li {{ margin: 7px 0; }}
     @media (max-width: 860px) {{
       main {{ padding: 14px; }}
@@ -1391,12 +1543,9 @@ button:hover {{ background:rgba(115,215,255,.20); }}
     </header>
 
     <section class="card" style="margin-top:16px">
-      <h2>Hillview control</h2>
-      <p>Alleen de Hillview control enable mag hier aan/uit. Andere instellingen blijven voorlopig alleen informatief.</p>
-      <form method="post" action="/api/hillview/control" style="display:flex;gap:12px;flex-wrap:wrap;margin:14px 0 6px">
-        <button name="action" value="on" type="submit">Control aan</button>
-        <button name="action" value="off" type="submit">Control uit</button>
-      </form>
+      <h2>Hillview dispatch bediening</h2>
+      <p>Kies eerst mode, tijd, vermogen en cutoff. Daarna kun je dispatch aanzetten. Alleen deze Hillview dispatch helpers staan op de allowlist.</p>
+      {_render_hillview_dispatch_form(payload)}
       <p>Controls enabled in add-on options: <strong>{_escape(str(hillview_controls_enabled()))}</strong></p>
     </section>
 
@@ -1481,7 +1630,13 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(length).decode("utf-8") if length > 0 else ""
             form = parse_qs(body)
             action = (form.get("action") or [""])[0]
-            result = build_hillview_control_result(action)
+            fields = {
+                "mode": (form.get("mode") or [""])[0],
+                "duration": (form.get("duration") or [""])[0],
+                "power": (form.get("power") or [""])[0],
+                "cutoff_soc": (form.get("cutoff_soc") or [""])[0],
+            }
+            result = build_hillview_control_result(action, fields)
 
             if "text/html" in self.headers.get("Accept", ""):
                 status = "OK" if result.get("ok") else "BLOCKED"

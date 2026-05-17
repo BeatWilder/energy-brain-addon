@@ -28,14 +28,21 @@ class HomeAssistantClient:
             "Content-Type": "application/json",
         }
 
-    def get_state(self, entity_id: str) -> Any:
+    def get_state_object(self, entity_id: str) -> dict[str, Any] | None:
         if not entity_id:
             return None
         r = requests.get(f"{self.base_url}/states/{entity_id}", headers=self.headers, timeout=10)
         if r.status_code != 200:
             print(f"[HA ERROR] {entity_id}: {r.status_code} {r.text}")
             return None
-        return r.json().get("state")
+        data = r.json()
+        return data if isinstance(data, dict) else None
+
+    def get_state(self, entity_id: str) -> Any:
+        data = self.get_state_object(entity_id)
+        if not data:
+            return None
+        return data.get("state")
 
     @staticmethod
     def _float_or_none(value: Any) -> float | None:
@@ -82,13 +89,18 @@ class HomeAssistantClient:
 
 
     def call_service_guarded(self, domain: str, service: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """Call a Home Assistant service through a tiny allowlisted control surface."""
+        """Call a Home Assistant service through a tiny allowlisted Hillview control surface."""
+        entity_id = str(payload.get("entity_id", ""))
+
         allowed = {
             ("input_boolean", "turn_on", "input_boolean.alphaess_helper_dispatch"),
             ("input_boolean", "turn_off", "input_boolean.alphaess_helper_dispatch"),
+            ("input_select", "select_option", "input_select.alphaess_helper_dispatch_mode"),
+            ("input_number", "set_value", "input_number.alphaess_helper_dispatch_duration"),
+            ("input_number", "set_value", "input_number.alphaess_helper_dispatch_power"),
+            ("input_number", "set_value", "input_number.alphaess_helper_dispatch_cutoff_soc"),
         }
 
-        entity_id = str(payload.get("entity_id", ""))
         if (domain, service, entity_id) not in allowed:
             return {
                 "ok": False,
@@ -97,6 +109,10 @@ class HomeAssistantClient:
                 "service": service,
                 "entity_id": entity_id,
             }
+
+        guard = self._validate_guarded_payload(domain, service, entity_id, payload)
+        if not guard.get("ok"):
+            return guard
 
         url = f"{self.base_url}/services/{domain}/{service}"
         r = requests.post(url, headers=self.headers, json=payload, timeout=10)
@@ -109,6 +125,92 @@ class HomeAssistantClient:
             "entity_id": entity_id,
             "response": r.text[:500],
         }
+
+    def _validate_guarded_payload(
+        self,
+        domain: str,
+        service: str,
+        entity_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Validate options/min/max from Home Assistant before writing."""
+        if domain == "input_boolean":
+            return {"ok": True}
+
+        state = self.get_state_object(entity_id)
+        if not state:
+            return {
+                "ok": False,
+                "reason": "state_unavailable",
+                "domain": domain,
+                "service": service,
+                "entity_id": entity_id,
+            }
+
+        attrs = state.get("attributes")
+        if not isinstance(attrs, dict):
+            attrs = {}
+
+        if domain == "input_select":
+            option = str(payload.get("option", ""))
+            options = attrs.get("options")
+            if not isinstance(options, list) or not options:
+                return {
+                    "ok": False,
+                    "reason": "input_select_options_missing",
+                    "entity_id": entity_id,
+                }
+            if option not in [str(item) for item in options]:
+                return {
+                    "ok": False,
+                    "reason": "option_not_allowed",
+                    "entity_id": entity_id,
+                    "option": option,
+                    "allowed_options": options,
+                }
+            return {"ok": True}
+
+        if domain == "input_number":
+            try:
+                value = float(payload.get("value"))
+            except (TypeError, ValueError):
+                return {
+                    "ok": False,
+                    "reason": "invalid_number",
+                    "entity_id": entity_id,
+                    "value": payload.get("value"),
+                }
+
+            minimum = self._float_or_none(attrs.get("min"))
+            maximum = self._float_or_none(attrs.get("max"))
+
+            if minimum is None or maximum is None:
+                return {
+                    "ok": False,
+                    "reason": "input_number_bounds_missing",
+                    "entity_id": entity_id,
+                }
+
+            if value < minimum or value > maximum:
+                return {
+                    "ok": False,
+                    "reason": "value_outside_bounds",
+                    "entity_id": entity_id,
+                    "value": value,
+                    "min": minimum,
+                    "max": maximum,
+                }
+
+            return {"ok": True}
+
+        return {
+            "ok": False,
+            "reason": "unsupported_guarded_payload",
+            "domain": domain,
+            "service": service,
+            "entity_id": entity_id,
+        }
+
 
     def read_snapshot(self, config: Any) -> HomeAssistantSnapshot:
         return HomeAssistantSnapshot(
