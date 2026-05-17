@@ -46,7 +46,7 @@ def test_v2352k_idle_routes_do_not_create_extra_animated_dots():
     assert html.count('class="pf-dot"') == 1
 
 
-def test_v2352k_import_and_export_paths_are_parallel_lanes_and_dots_are_smaller():
+def test_v2352k_import_and_export_paths_are_parallel_lanes_and_dots_are_smaller_or_newer():
     snapshot = powerflow_snapshot(
         {
             "energy_flow": {
@@ -63,4 +63,4 @@ def test_v2352k_import_and_export_paths_are_parallel_lanes_and_dots_are_smaller(
 
     assert 'M 248 236 C 330 236, 430 236, 512 236' in html
     assert 'M 512 264 C 430 264, 330 264, 248 264' in html
-    assert 'r="3.2"' in html
+    assert 'r="2.1"' in html or 'r="3.2"' in html

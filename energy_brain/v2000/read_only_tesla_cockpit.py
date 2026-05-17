@@ -724,7 +724,7 @@ def render_powerflow_svg(snapshot: dict[str, Any], edges: list[dict[str, Any]]) 
         paths.append(f'<path id="{path_id}" class="{cls}" d="{d}" />')
         if active:
             dots.append(
-                f'<circle class="pf-dot" r="3.2">'
+                f'<circle class="pf-dot" r="2.1">'
                 f'<animateMotion dur="2.8s" repeatCount="indefinite">'
                 f'<mpath href="#{path_id}" />'
                 f'</animateMotion></circle>'
@@ -1297,28 +1297,43 @@ def render_tesla_cockpit_html(summary: dict[str, Any]) -> str:
     .json-viewer.open {{ display: block; }}
     @media (max-width: 1040px) {{ .hero, .top, .timeline-grid, .chart-layout, .three, .four, .flow, .human-grid, .plain-dashboard, .plan-sections, .dayparts, .scenario-grid {{ grid-template-columns: 1fr; }} .steps {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} .inspector {{ position: static; }} }}
     @media (max-width: 620px) {{ main {{ padding: 14px; }} .hero {{ padding: 22px; }} .steps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .window-row {{ grid-template-columns: 1fr; }} }}
+
   
-    /* --- V2352-K clean HA-style lanes and idle flow routes --- */
-    .ha-powerflow-large .pf-edge {{
-      fill: none;
-      stroke-width: 3.2;
-      stroke-linecap: round;
-      opacity: .88;
+    /* --- V2352-L obvious thin HA-style lanes --- */
+    .ha-powerflow-large .pf-lines .pf-edge {{
+      fill: none !important;
+      stroke-width: 1.7 !important;
+      stroke-linecap: round !important;
+      opacity: .82 !important;
+      filter: none !important;
     }}
 
-    .ha-powerflow-large .pf-edge.idle {{
-      opacity: .20;
-      stroke-dasharray: 8 12;
-      animation: none;
+    .ha-powerflow-large .pf-lines .pf-edge.idle {{
+      opacity: .10 !important;
+      stroke-dasharray: 5 13 !important;
+      animation: none !important;
     }}
 
-    .ha-powerflow-large .pf-edge.active {{
-      opacity: .95;
+    .ha-powerflow-large .pf-lines .pf-edge.active {{
+      opacity: .92 !important;
+      stroke-dasharray: 7 12 !important;
     }}
 
-    .ha-powerflow-large .pf-dot {{
-      fill: rgba(240,244,248,.96);
-      opacity: .96;
+    .ha-powerflow-large .pf-lines .pf-dot {{
+      r: 2.1;
+      fill: rgba(245,248,252,.96) !important;
+      opacity: .90 !important;
+      filter: none !important;
+    }}
+
+    .ha-powerflow-large .pf-cross line {{
+      stroke-width: 2 !important;
+      opacity: .55 !important;
+    }}
+
+    .ha-powerflow-large .pf-cross circle {{
+      r: 4;
+      opacity: .65 !important;
     }}
 
   </style>
