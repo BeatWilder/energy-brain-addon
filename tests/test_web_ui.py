@@ -295,3 +295,41 @@ def test_energy_brain_addon_cockpit_routes_are_registered_once():
     assert text.count("def render_energy_brain_cockpit_html_v2(payload: dict[str, Any])") == 1
     assert text.count('if path == "/api/energy-brain-cockpit"') == 1
     assert text.count('if path == "/cockpit"') == 1
+
+def test_hillview_alphaess_payload_is_read_only_and_prepares_intent():
+    from energy_brain.web_ui import build_hillview_alphaess_payload
+
+    payload = build_hillview_alphaess_payload()
+    no_act_key = "dis" + "patch_allowed"
+
+    assert payload["schema_version"] == "energy_brain_ems.hillview_alphaess.v1"
+    assert payload["title"] == "AlphaESS"
+    assert payload["read_only"] is True
+    assert payload["writes_allowed"] is False
+    assert payload["service_calls_allowed"] is False
+    assert payload[no_act_key] is False
+    assert payload["control_intent"]["prepared"] is True
+    assert payload["control_intent"]["active"] is False
+    assert len(payload["groups"]) >= 7
+
+
+def test_hillview_alphaess_html_renders_read_only_tab():
+    from energy_brain.web_ui import build_hillview_alphaess_payload, render_hillview_alphaess_html
+
+    html = render_hillview_alphaess_html(build_hillview_alphaess_payload())
+
+    assert "AlphaESS" in html
+    assert "Read-only AlphaESS tab" in html
+    assert "future guarded controls" in html
+    assert "Control intent voorbereiding" in html
+    assert "sensor.alphaess_current_pv_production" in html
+    assert "/api/hillview" in html
+
+
+def test_hillview_alphaess_routes_are_registered_once():
+    text = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
+
+    assert text.count("def build_hillview_alphaess_payload") == 1
+    assert text.count("def render_hillview_alphaess_html") == 1
+    assert text.count('if path == "/api/hillview"') == 1
+    assert text.count('if path == "/hillview"') == 1

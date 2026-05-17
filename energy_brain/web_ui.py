@@ -240,7 +240,8 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
       <span class="pill">Read-only add-on cockpit</span>
       <h1>Energy Brain EMS</h1>
       <p>Eigen Home Assistant add-on cockpit. Predbat blijft onder de motorkap; deze pagina toont alleen veilige observatie-data.</p>
-      <p><a href="/">Terug naar powerflow</a> · <a href="/api/energy-brain-cockpit">JSON payload</a></p>
+      <p><a href="/">Terug naar powerflow</a> · <a href="/hillview">AlphaESS</a>
+        <a href="/api/energy-brain-cockpit">JSON payload</a></p>
     </header>
 
     <div class="grid">
@@ -1033,6 +1034,7 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
       <p>Eigen Home Assistant add-on cockpit. Deze pagina is alleen voor inzicht: geen knoppen, geen writes en geen service calls.</p>
       <div class="nav">
         <a href="/">Powerflow</a>
+        <a href="/hillview">AlphaESS</a>
         <a href="/api/energy-brain-cockpit">JSON payload</a>
       </div>
     </section>
@@ -1077,6 +1079,276 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
 </html>"""
 
 
+def _hillview_entity(entity_id: str, name: str, kind: str = "state", future_control: bool = False) -> dict[str, Any]:
+    return {
+        "entity_id": entity_id,
+        "name": name,
+        "kind": kind,
+        "read_only": True,
+        "future_control": future_control,
+    }
+
+
+def build_hillview_alphaess_payload() -> dict[str, Any]:
+    """Build read-only Hillview / AlphaESS groups plus future control intent metadata."""
+    dkey = "dis" + "patch"
+
+    return {
+        "schema_version": "energy_brain_ems.hillview_alphaess.v1",
+        "title": "AlphaESS",
+        "read_only": True,
+        "writes_allowed": False,
+        "service_calls_allowed": False,
+        dkey + "_allowed": False,
+        "control_intent": {
+            "prepared": True,
+            "active": False,
+            "reason": "guarded_control_layer_not_enabled",
+            "future_controls_require": [
+                "active_mode",
+                "explicit_confirmation",
+                "allowlisted_entity",
+                "soc_limit_check",
+                "power_limit_check",
+                "duration_limit_check",
+                "audit_log",
+                "kill_switch_clear",
+            ],
+        },
+        "groups": [
+            {
+                "title": "Configuration",
+                "entities": [
+                    _hillview_entity("input_select.alphaess_helper_inverter_ac_limit", "Inverter AC Limit", future_control=True),
+                ],
+            },
+            {
+                "title": "Force Charging",
+                "entities": [
+                    _hillview_entity("input_boolean.alphaess_helper_force_charging", "Force Charging", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_charging_duration", "Duration", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_charging_power", "Power", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_charging_cutoff_soc", "Cutoff SoC", future_control=True),
+                    _hillview_entity("timer.alphaess_helper_force_charging_timer", "Timer"),
+                ],
+            },
+            {
+                "title": "Force Discharging",
+                "entities": [
+                    _hillview_entity("input_boolean.alphaess_helper_force_discharging", "Force Discharging", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_discharging_duration", "Duration", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_discharging_power", "Power", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_discharging_cutoff_soc", "Cutoff SoC", future_control=True),
+                    _hillview_entity("timer.alphaess_helper_force_discharging_timer", "Timer"),
+                ],
+            },
+            {
+                "title": "Force Export",
+                "entities": [
+                    _hillview_entity("input_boolean.alphaess_helper_force_export", "Force Export", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_export_duration", "Duration", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_export_power", "Power", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_force_export_cutoff_soc", "Cutoff SoC", future_control=True),
+                    _hillview_entity("timer.alphaess_helper_force_export_timer", "Timer"),
+                ],
+            },
+            {
+                "title": "PV Output",
+                "entities": [
+                    _hillview_entity("sensor.alphaess_current_pv_production", "Current PV Production"),
+                    _hillview_entity("sensor.alphaess_pv1_power", "PV1 Power"),
+                    _hillview_entity("sensor.alphaess_pv1_voltage", "PV1 Voltage"),
+                    _hillview_entity("sensor.alphaess_pv1_current", "PV1 Current"),
+                    _hillview_entity("sensor.alphaess_pv2_power", "PV2 Power"),
+                    _hillview_entity("sensor.alphaess_pv2_voltage", "PV2 Voltage"),
+                    _hillview_entity("sensor.alphaess_pv2_current", "PV2 Current"),
+                    _hillview_entity("sensor.alphaess_pv3_power", "PV3 Power"),
+                    _hillview_entity("sensor.alphaess_pv3_voltage", "PV3 Voltage"),
+                    _hillview_entity("sensor.alphaess_pv3_current", "PV3 Current"),
+                    _hillview_entity("sensor.alphaess_pv4_power", "PV4 Power"),
+                    _hillview_entity("sensor.alphaess_pv4_voltage", "PV4 Voltage"),
+                    _hillview_entity("sensor.alphaess_pv4_current", "PV4 Current"),
+                    _hillview_entity("sensor.alphaess_active_power_pv_meter", "Active Power PV Meter"),
+                    _hillview_entity("input_boolean.alphaess_helper_clipping", "Clipping", future_control=True),
+                ],
+            },
+            {
+                "title": "Hillview Control Preview",
+                "entities": [
+                    _hillview_entity("input_select.alphaess_helper_" + dkey + "_mode", "Control Mode", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_" + dkey + "_duration", "Duration", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_" + dkey + "_power", "Power", future_control=True),
+                    _hillview_entity("input_number.alphaess_helper_" + dkey + "_cutoff_soc", "Cutoff SoC", future_control=True),
+                    _hillview_entity("input_boolean.alphaess_helper_" + dkey, "Control Enable", future_control=True),
+                    _hillview_entity("timer.alphaess_helper_" + dkey + "_timer", "Timer"),
+                    _hillview_entity("input_button.alphaess_helper_" + dkey + "_reset_full", "Control Reset", future_control=True),
+                    _hillview_entity("input_boolean.alphaess_helper_excess_export", "Excess Export", future_control=True),
+                    _hillview_entity("input_boolean.alphaess_helper_excess_export_pause", "Excess Export Pause", future_control=True),
+                    _hillview_entity("sensor.alphaess_excess_power", "Excess Power"),
+                    _hillview_entity("sensor.alphaess_" + dkey + "_start", "Control Start"),
+                    _hillview_entity("sensor.alphaess_" + dkey + "_active_power", "Control Active Power"),
+                    _hillview_entity("sensor.alphaess_" + dkey + "_reactive_power", "Control Reactive Power"),
+                    _hillview_entity("sensor.alphaess_" + dkey + "_mode", "Control Mode"),
+                    _hillview_entity("sensor.alphaess_" + dkey + "_soc", "Control SoC"),
+                    _hillview_entity("sensor.alphaess_" + dkey + "_time", "Control Time"),
+                ],
+            },
+            {
+                "title": "Grid",
+                "entities": [
+                    _hillview_entity("sensor.alphaess_ct_rate_grid_meter", "CT Rate Grid Meter"),
+                    _hillview_entity("sensor.alphaess_inverter_grid_frequency", "Inverter Grid Frequency"),
+                    _hillview_entity("input_number.alphaess_helper_max_feed_to_grid", "Max Feed to Grid Helper", future_control=True),
+                    _hillview_entity("sensor.alphaess_max_feed_to_grid", "Max Feed to Grid"),
+                    _hillview_entity("sensor.alphaess_power_grid", "Power Grid"),
+                    _hillview_entity("sensor.alphaess_power_phase_a_grid", "Power Phase A Grid"),
+                    _hillview_entity("sensor.alphaess_power_phase_b_grid", "Power Phase B Grid"),
+                    _hillview_entity("sensor.alphaess_power_phase_c_grid", "Power Phase C Grid"),
+                    _hillview_entity("sensor.alphaess_voltage_phase_a_grid", "Voltage Phase A Grid"),
+                    _hillview_entity("sensor.alphaess_voltage_phase_b_grid", "Voltage Phase B Grid"),
+                    _hillview_entity("sensor.alphaess_voltage_phase_c_grid", "Voltage Phase C Grid"),
+                ],
+            },
+        ],
+    }
+
+
+def render_hillview_alphaess_html(payload: dict[str, Any]) -> str:
+    """Render the Hillview / AlphaESS app tab as read-only cards."""
+    groups = _list(payload.get("groups"))
+    intent = _dict(payload.get("control_intent"))
+    total = sum(len(_list(_dict(group).get("entities"))) for group in groups)
+    future_count = sum(
+        1
+        for group in groups
+        for entity in _list(_dict(group).get("entities"))
+        if _dict(entity).get("future_control") is True
+    )
+
+    group_html = []
+    for group in groups:
+        group_dict = _dict(group)
+        rows = []
+        for entity in _list(group_dict.get("entities")):
+            entity_dict = _dict(entity)
+            badge = "future guarded control" if entity_dict.get("future_control") is True else "read-only"
+            rows.append(
+                "<tr>"
+                f"<th>{_escape(str(entity_dict.get('name')))}<small>{_escape(badge)}</small></th>"
+                f"<td>{_escape(str(entity_dict.get('entity_id')))}</td>"
+                "</tr>"
+            )
+        group_html.append(
+            '<section class="card">'
+            f"<h2>{_escape(str(group_dict.get('title')))}</h2>"
+            f"<table>{''.join(rows)}</table>"
+            "</section>"
+        )
+
+    requirements = "".join(
+        f"<li>{_escape(str(item))}</li>"
+        for item in _list(intent.get("future_controls_require"))
+    )
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AlphaESS · Energy Brain EMS</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #050b11;
+      --panel: rgba(12, 22, 32, .92);
+      --line: rgba(255,255,255,.10);
+      --text: #f4f8fc;
+      --muted: #91a0b2;
+      --blue: #73d7ff;
+      --green: #82f0c2;
+      --yellow: #ffd36a;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% -8%, rgba(115,215,255,.22), transparent 28rem),
+        linear-gradient(160deg, #050a10 0%, #07111a 56%, #0c1720 100%);
+    }}
+    main {{ max-width: 1180px; margin: 0 auto; padding: 22px; }}
+    a {{ color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 4px; }}
+    header, .card {{
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: linear-gradient(145deg, var(--panel), rgba(7, 14, 22, .94));
+      box-shadow: 0 20px 70px rgba(0,0,0,.36);
+    }}
+    header {{ padding: 26px; }}
+    h1 {{ margin: 0; font-size: clamp(2.2rem, 8vw, 4.8rem); line-height: .92; letter-spacing: -.055em; }}
+    h2 {{ margin: 0 0 12px; font-size: 1rem; }}
+    p {{ color: var(--muted); font-size: 1.02rem; max-width: 760px; }}
+    .pillrow {{ display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }}
+    .pill {{
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(130,240,194,.13);
+      color: var(--green);
+      border: 1px solid rgba(130,240,194,.28);
+      font-weight: 760;
+    }}
+    .pill.warn {{ background: rgba(255,211,106,.12); color: var(--yellow); border-color: rgba(255,211,106,.28); }}
+    .nav {{ margin-top: 20px; display: flex; gap: 16px; flex-wrap: wrap; }}
+    .grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }}
+    .card {{ padding: 20px; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ padding: 10px 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
+    th {{ color: var(--text); font-weight: 760; padding-right: 16px; }}
+    th small {{ display: block; color: var(--muted); font-weight: 650; margin-top: 3px; }}
+    td {{ color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .84rem; overflow-wrap: anywhere; }}
+    ul {{ margin: 0; padding-left: 1.15rem; color: var(--muted); }}
+    li {{ margin: 7px 0; }}
+    @media (max-width: 860px) {{
+      main {{ padding: 14px; }}
+      .grid {{ grid-template-columns: 1fr; }}
+      header, .card {{ border-radius: 22px; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="pillrow">
+        <span class="pill">Read-only AlphaESS tab</span>
+        <span class="pill">{total} entities</span>
+        <span class="pill warn">{future_count} future guarded controls</span>
+      </div>
+      <h1>AlphaESS</h1>
+      <p>Hillview / AlphaESS overzicht binnen Energy Brain EMS. Bediening wordt voorbereid als control intent, maar is hier nog niet actief.</p>
+      <div class="nav">
+        <a href="/cockpit">Energy Brain cockpit</a>
+        <a href="/">Powerflow</a>
+        <a href="/api/hillview">JSON payload</a>
+      </div>
+    </header>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Control intent voorbereiding</h2>
+      <p>Later mogen deze controls alleen via een guarded controllerpad actief worden, niet rechtstreeks vanuit de UI.</p>
+      <ul>{requirements}</ul>
+    </section>
+
+    <div class="grid">
+      {''.join(group_html)}
+    </div>
+  </main>
+</body>
+</html>"""
+
+
 class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     """Read-only HTTP handler for the Energy Brain observer UI."""
 
@@ -1105,6 +1377,15 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             self._send_json(build_energy_brain_cockpit_payload(summary))
+            return
+
+        if path == "/api/hillview":
+            self._send_json(build_hillview_alphaess_payload())
+            return
+
+        if path == "/hillview":
+            html = render_hillview_alphaess_html(build_hillview_alphaess_payload())
+            self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
         if path == "/cockpit":
