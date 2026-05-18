@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from energy_brain.ui.layouts.responsive import build_layout_view
+
 
 def build_mobile_hero(payload: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -73,17 +75,7 @@ def build_mobile_statusbar(payload: dict[str, Any]) -> dict[str, Any]:
 def render_mobile_cockpit(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-
-    return {
-        "schema_version": "phase_ui_c.mobile_renderer.v1",
-        "layout": "mobile",
-        "mode": "operator_companion",
-        "observer_only": True,
-        "sections": [
-            build_mobile_hero(payload),
-            build_mobile_powerflow(payload),
-            build_mobile_explainability(payload),
-            build_mobile_timeline(payload),
-            build_mobile_statusbar(payload),
-        ],
-    }
+    result = build_layout_view(payload, "mobile")
+    result["schema_version"] = "phase_ui_c.mobile_renderer.v2"
+    result["mode"] = "operator_companion"
+    return result

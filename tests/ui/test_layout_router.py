@@ -41,4 +41,13 @@ def test_auto_layout():
         "auto",
     )
 
-    assert result["layout"] == "auto"
+    assert result["layout"] == "desktop"
+
+
+def test_invalid_layout_falls_back_to_desktop():
+    result = build_layout_view(
+        PAYLOAD,
+        "wall-panel",
+    )
+
+    assert result["layout"] == "desktop"

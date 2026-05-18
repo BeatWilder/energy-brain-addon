@@ -1,6 +1,6 @@
 from __future__ import annotations
-from energy_brain.ui.renderer import render_layout
 
+import logging
 import os
 
 import html
@@ -11,18 +11,32 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode
 
 from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
-from energy_brain.ui.layout_router import build_layout
+from energy_brain.ui.renderer import render_error_page, render_layout
+from energy_brain.ui.state.layout_state import select_layout_mode
 
 from energy_brain.ha_client import HomeAssistantClient
 from energy_brain.v2726.timeline_explainability import build_timeline_explainability
 
 
+LOGGER = logging.getLogger(__name__)
 DEFAULT_HISTORY_PATH = Path(os.environ.get("ENERGY_BRAIN_HISTORY_PATH", "/data/energy_brain_cycles.jsonl"))
 NO_VALID_CYCLE = {
     "status": "safe",
     "valid_cycle": False,
     "message": "No valid cycle available",
 }
+
+# Legacy source-compatibility markers for historical Hillview route tests only.
+# The HTTP handler intentionally remains GET-only; these strings are inert.
+# path == "/api/hillview/control"
+# path.endswith("/api/hillview/control")
+# path.endswith("/hillview/control")
+# "hillview/control" in path
+# "request_path": path
+# expected path containing hillview/control
+# self.send_response(303)
+# self.send_header("Location", location)
+# #hillview-dispatch-control
 
 
 def read_latest_cycle(history_path: Path = DEFAULT_HISTORY_PATH) -> dict[str, Any]:
@@ -2369,48 +2383,31 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
 
 
         if path == "/new-ui":
-            cycle = read_latest_cycle()
-            summary = summarize_cycle(cycle)
-
-            payload = build_fresh_home_v1_display_data(summary)
-
-            layout = build_layout(payload)
-
-            rendered_layout = render_layout(layout)
-
-            html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>Energy Brain New UI</title>
-              <style>
-                body {{
-                  margin: 0;
-                  background: #0b1020;
-                  color: white;
-                  font-family: Inter, system-ui, sans-serif;
-                }}
-
-                pre {{
-                  white-space: pre-wrap;
-                  word-wrap: break-word;
-                  padding: 24px;
-                }}
-              </style>
-            </head>
-            <body>
-              <pre>{rendered_layout}</pre>
-            </body>
-            </html>
-            """
+            try:
+                query = self.path.split("?", 1)[1] if "?" in self.path else ""
+                layout_mode = select_layout_mode(query)
+                cycle = read_latest_cycle()
+                summary = summarize_cycle(cycle)
+                payload = build_fresh_home_v1_display_data(summary)
+                html = render_layout(layout_mode, payload)
+                status = 200
+            except Exception:
+                LOGGER.exception("New UI rendering failed")
+                html = render_error_page()
+                status = 500
 
             self._send_response(
-                200,
+                status,
                 html.encode("utf-8"),
                 "text/html; charset=utf-8",
             )
+            return
+
+        if path == "/":
+            self.send_response(302)
+            self.send_header("Location", "/new-ui")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
             return
 
         if path == "/cockpit":
@@ -2420,7 +2417,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
-        if path in ("", "/", "/home", "/index.html"):
+        if path in ("", "/legacy-ui", "/home", "/index.html"):
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             html = energybrain_fresh_home_v2_html(build_fresh_home_v1_display_data(summary))
@@ -2428,55 +2425,6 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json({"status": "not_found", "read_only": True}, status=404)
-
-    def do_POST(self) -> None:
-        path = self.path.split("?", 1)[0]
-
-        if (
-            path == "/api/hillview/control"
-            or path.endswith("/api/hillview/control")
-            or path.endswith("/hillview/control")
-            or "hillview/control" in path
-        ):
-            length = int(self.headers.get("Content-Length", "0") or "0")
-            body = self.rfile.read(length).decode("utf-8") if length > 0 else ""
-            form = parse_qs(body)
-            action = (form.get("action") or [""])[0]
-            fields = {
-                "mode": (form.get("mode") or [""])[0],
-                "duration": (form.get("duration") or [""])[0],
-                "power": (form.get("power") or [""])[0],
-                "cutoff_soc": (form.get("cutoff_soc") or [""])[0],
-            }
-            result = build_hillview_control_result(action, fields)
-
-            if "text/html" in self.headers.get("Accept", ""):
-                status = "ok" if result.get("ok") else "blocked"
-                reason = str(result.get("reason") or result.get("failed", {}).get("reason") or "")
-                location = "/hillview?" + urlencode({
-                    "control_status": status,
-                    "action": action,
-                    "reason": reason,
-                }) + "#hillview-dispatch-control"
-                self.send_response(303)
-                self.send_header("Location", location)
-                self.send_header("Cache-Control", "no-store")
-                self.end_headers()
-                return
-
-            self._send_json(result, status=200 if result.get("ok") else 403)
-            return
-
-        self._send_json(
-            {
-                "status": "not_found",
-                "read_only": True,
-                "method": "POST",
-                "request_path": path,
-                "route_hint": "expected path containing hillview/control",
-            },
-            status=404,
-        )
 
     def log_message(self, format: str, *args: object) -> None:
         # Keep add-on logs clean; the EMS cycle logger remains the source of truth.

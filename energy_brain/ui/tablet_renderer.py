@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from energy_brain.ui.layouts.responsive import build_layout_view
+
 
 def build_tablet_hero(payload: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -105,22 +107,7 @@ def build_tablet_safety(
 def render_tablet_cockpit(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-
-    return {
-        "schema_version": "phase_ui_d.tablet_renderer.v1",
-        "layout": "tablet",
-        "mode": "control_panel",
-        "observer_only": True,
-        "sections": [
-            build_tablet_hero(payload),
-            build_tablet_powerflow(payload),
-            {
-                "type": "split_panel",
-                "left": build_tablet_planner(payload),
-                "right": [
-                    build_tablet_explainability(payload),
-                    build_tablet_safety(payload),
-                ],
-            },
-        ],
-    }
+    result = build_layout_view(payload, "tablet")
+    result["schema_version"] = "phase_ui_d.tablet_renderer.v2"
+    result["mode"] = "control_panel"
+    return result

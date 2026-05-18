@@ -2,35 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from energy_brain.ui.components.shared_components import (
-    explainability_component,
-    powerflow_component,
-    runtime_component,
-    safety_component,
-)
+from energy_brain.ui.layouts.responsive import build_layout_view
 
 
-def build_desktop_renderer() -> dict[str, Any]:
-    return {
-        "schema_version": "phase_ui_e.desktop_renderer.v1",
-        "layout": "desktop",
-        "mode": "mission_control",
-        "observer_only": True,
-        "sections": [
-            {
-                "type": "topbar",
-                "title": "Energy Brain",
-            },
-            {
-                "left": powerflow_component(),
-                "center": {
-                    "type": "planner_timeline",
-                },
-                "right": [
-                    explainability_component(),
-                    safety_component(),
-                    runtime_component(),
-                ],
-            },
-        ],
-    }
+def build_desktop_renderer(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    result = build_layout_view(payload or {}, "desktop")
+    result["schema_version"] = "phase_ui_e.desktop_renderer.v2"
+    result["mode"] = "mission_control"
+    return result

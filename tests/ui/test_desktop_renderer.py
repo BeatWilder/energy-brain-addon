@@ -24,22 +24,25 @@ def test_observer_only():
 def test_has_powerflow():
     payload = build_desktop_renderer()
 
-    grid = payload["sections"][1]
+    hero = payload["sections"][0]
 
-    assert grid["left"]["type"] == "powerflow"
+    assert hero["type"] == "powerflow_hero"
 
 
 def test_has_explainability():
     payload = build_desktop_renderer()
 
-    right = payload["sections"][1]["right"]
+    section_types = [
+        section["type"]
+        for section in payload["sections"]
+    ]
 
-    assert right[0]["type"] == "explainability"
+    assert "explainability" in section_types
 
 
 def test_no_dispatch():
     payload = build_desktop_renderer()
 
-    runtime = payload["sections"][1]["right"][2]
+    safety = payload["sections"][3]
 
-    assert runtime["dispatch_allowed"] is False
+    assert safety["readonly"] is True

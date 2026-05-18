@@ -23,4 +23,9 @@ def test_tablet_has_split_panel():
         for section in result["sections"]
     ]
 
-    assert "split_panel" in section_types
+    assert section_types == [
+        "powerflow_hero",
+        "planner_summary",
+        "explainability",
+        "safety",
+    ]
