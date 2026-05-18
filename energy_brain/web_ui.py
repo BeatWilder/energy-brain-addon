@@ -2375,6 +2375,10 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
 
             layout = build_layout(payload)
 
+            import json
+
+            layout_json = json.dumps(layout, indent=2)
+
             html = f"""
             <!DOCTYPE html>
             <html>
@@ -2398,7 +2402,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
               </style>
             </head>
             <body>
-              <pre>{layout}</pre>
+              <pre><pre>{layout_json}</pre></pre>
             </body>
             </html>
             """
