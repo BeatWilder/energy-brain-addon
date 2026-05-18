@@ -2373,7 +2373,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
 
             payload = build_fresh_home_v1_display_data(summary)
 
-            layout = build_layout()
+            layout = build_layout(payload)
 
             html = f"""
             <!DOCTYPE html>
