@@ -10,6 +10,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode
 
 from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
+from energy_brain.ui.layout_router import build_layout
+
 from energy_brain.ha_client import HomeAssistantClient
 from energy_brain.v2726.timeline_explainability import build_timeline_explainability
 
@@ -2362,6 +2364,50 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             notice = _hillview_notice_from_query(query)
             html = render_hillview_alphaess_html(build_hillview_alphaess_payload(), notice)
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+
+        if path == "/new-ui":
+            cycle = read_latest_cycle()
+            summary = summarize_cycle(cycle)
+
+            payload = build_fresh_home_v1_display_data(summary)
+
+            layout = build_layout()
+
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>Energy Brain New UI</title>
+              <style>
+                body {{
+                  margin: 0;
+                  background: #0b1020;
+                  color: white;
+                  font-family: Inter, system-ui, sans-serif;
+                }}
+
+                pre {{
+                  white-space: pre-wrap;
+                  word-wrap: break-word;
+                  padding: 24px;
+                }}
+              </style>
+            </head>
+            <body>
+              <pre>{layout}</pre>
+            </body>
+            </html>
+            """
+
+            self._send_response(
+                200,
+                html.encode("utf-8"),
+                "text/html; charset=utf-8",
+            )
             return
 
         if path == "/cockpit":
