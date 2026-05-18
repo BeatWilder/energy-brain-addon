@@ -2417,7 +2417,14 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
-        if path in ("", "/legacy-ui", "/home", "/index.html"):
+        if path in ("", "/", "/home", "/index.html"):
+            self.send_response(302)
+            self.send_header("Location", "/new-ui")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+
+        if path == "/legacy-ui":
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
             html = energybrain_fresh_home_v2_html(build_fresh_home_v1_display_data(summary))
