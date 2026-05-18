@@ -2418,8 +2418,11 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             return
 
         if path in ("", "/", "/home", "/index.html"):
+            forwarded_prefix = self.headers.get("X-Ingress-Path", "")
+            location = f"{forwarded_prefix}/new-ui" if forwarded_prefix else "/new-ui"
+
             self.send_response(302)
-            self.send_header("Location", "/new-ui")
+            self.send_header("Location", location)
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             return
