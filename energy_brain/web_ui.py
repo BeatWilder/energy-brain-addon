@@ -1,3 +1,4 @@
+from energy_brain.ui.renderer import render_layout
 from __future__ import annotations
 
 import os
@@ -2375,9 +2376,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
 
             layout = build_layout(payload)
 
-            import json
-
-            layout_json = json.dumps(layout, indent=2)
+            rendered_layout = render_layout(layout)
 
             html = f"""
             <!DOCTYPE html>
@@ -2402,7 +2401,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
               </style>
             </head>
             <body>
-              <pre><pre>{layout_json}</pre></pre>
+              <pre>{rendered_layout}</pre>
             </body>
             </html>
             """
