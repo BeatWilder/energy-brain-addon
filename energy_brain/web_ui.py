@@ -1,5 +1,5 @@
-from energy_brain.ui.renderer import render_layout
 from __future__ import annotations
+from energy_brain.ui.renderer import render_layout
 
 import os
 
