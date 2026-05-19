@@ -355,6 +355,76 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
     margin-bottom: 12px;
 }
 
+
+
+.eb-thermostat-panel {
+    margin-top: 24px;
+}
+
+.eb-thermostat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(240px,1fr));
+    gap: 18px;
+    margin-top: 18px;
+}
+
+.eb-thermo-card {
+    border-radius: 28px;
+    padding: 22px;
+    background:
+        radial-gradient(circle at top left,
+        rgba(90,255,180,0.18),
+        rgba(15,18,22,0.96));
+
+    box-shadow:
+        0 0 30px rgba(90,255,180,0.18),
+        0 0 80px rgba(90,255,180,0.12);
+}
+
+.eb-thermo-title {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.eb-thermo-current {
+    font-size: 52px;
+    font-weight: 800;
+    margin-top: 12px;
+}
+
+.eb-thermo-target {
+    opacity: 0.7;
+    margin-top: 6px;
+}
+
+.eb-thermo-controls {
+    display: flex;
+    gap: 14px;
+    margin-top: 20px;
+}
+
+.eb-thermo-btn {
+    flex: 1;
+    border: 0;
+    border-radius: 18px;
+    padding: 18px;
+    font-size: 30px;
+    font-weight: 800;
+    cursor: pointer;
+
+    color: white;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(90,255,180,0.32),
+            rgba(90,255,180,0.18)
+        );
+
+    box-shadow:
+        0 0 24px rgba(90,255,180,0.22);
+}
+
 </style>
 
 
@@ -3518,6 +3588,124 @@ def render_thermal_intelligence_panel() -> str:
     """
 
 
+
+
+def render_ir_thermostat_card(
+    title: str,
+    entity_id: str,
+    current_temp: str,
+    target_temp: str,
+) -> str:
+
+    return f"""
+    <div class="eb-thermo-card">
+
+      <div class="eb-thermo-header">
+        <div class="eb-thermo-title">{title}</div>
+      </div>
+
+      <div class="eb-thermo-current">
+        {current_temp}°
+      </div>
+
+      <div class="eb-thermo-target">
+        ingesteld {target_temp}°
+      </div>
+
+      <div class="eb-thermo-controls">
+
+        <button
+          class="eb-thermo-btn"
+          onclick="
+            fetch('/api/services/climate/set_temperature', {{
+              method:'POST',
+              headers: {{
+                'Content-Type':'application/json'
+              }},
+              body: JSON.stringify({{
+                entity_id:'{entity_id}',
+                temperature: Number({target_temp}) - 0.5
+              }})
+            }})
+          ">
+          −
+        </button>
+
+        <button
+          class="eb-thermo-btn"
+          onclick="
+            fetch('/api/services/climate/set_temperature', {{
+              method:'POST',
+              headers: {{
+                'Content-Type':'application/json'
+              }},
+              body: JSON.stringify({{
+                entity_id:'{entity_id}',
+                temperature: Number({target_temp}) + 0.5
+              }})
+            }})
+          ">
+          +
+        </button>
+
+      </div>
+    </div>
+    """
+
+
+def render_ir_thermostat_panel(summary: dict[str, Any]) -> str:
+
+    woonkamer_current = summary.get(
+        "climate.ir_woonkamer.current_temperature",
+        "20"
+    )
+
+    woonkamer_target = summary.get(
+        "climate.ir_woonkamer.temperature",
+        "21"
+    )
+
+    keuken_current = summary.get(
+        "climate.w100_keuken.current_temperature",
+        "20"
+    )
+
+    keuken_target = summary.get(
+        "climate.w100_keuken.temperature",
+        "21"
+    )
+
+    return f"""
+    <section class="card eb-thermostat-panel">
+
+      <div class="eyebrow">
+        THERMAL INTELLIGENCE
+      </div>
+
+      <h2>IR Verwarming</h2>
+
+      <div class="eb-thermostat-grid">
+
+        {render_ir_thermostat_card(
+            "Woonkamer",
+            "climate.ir_woonkamer",
+            woonkamer_current,
+            woonkamer_target,
+        )}
+
+        {render_ir_thermostat_card(
+            "Keuken",
+            "climate.w100_keuken",
+            keuken_current,
+            keuken_target,
+        )}
+
+      </div>
+
+    </section>
+    """
+
+
 def _eb4_empty_dashboard(no_disp: str) -> str:
     return f'''<!doctype html>
 <html lang="nl">
@@ -3865,6 +4053,12 @@ THERMOSTAT_PANEL = """
 
 def render_dashboard_html(summary: dict[str, Any]) -> str:
     rendered = _original_render_dashboard_html_v7(summary)
+
+    rendered = rendered.replace(
+        "</main>",
+        render_ir_thermostat_panel(summary) + "</main>"
+    )
+
 
     rendered = rendered.replace(
         "</main>",
