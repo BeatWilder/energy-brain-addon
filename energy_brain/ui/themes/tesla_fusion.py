@@ -18,7 +18,7 @@ pointer-events:none;
     /* Tokens */
     :root {{
       color-scheme: dark;
-      {{css_vars()}}
+      {css_vars()}
       --bg: #04070a;
       --surface: rgba(8, 12, 17, 0.62);
       --surface-strong: rgba(12, 18, 25, 0.82);
