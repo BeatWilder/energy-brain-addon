@@ -52,7 +52,7 @@ def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         "<title>Energy Brain</title>",
         f"<style>{render_theme_css()}</style>",
-        f'</head><body class="{html.escape(viewport.css_class, quote=True)} preference-{html.escape(preference, quote=True)}" data-ui-version="energy-os-v5" data-layout-preference="{html.escape(preference, quote=True)}" data-viewport="{html.escape(mode, quote=True)}" data-viewport-density="{html.escape(viewport.density, quote=True)}">',
+        f'</head><body class="{html.escape(viewport.css_class, quote=True)} preference-{html.escape(preference, quote=True)}" data-ui-version="energy-os-v11" data-layout-preference="{html.escape(preference, quote=True)}" data-viewport="{html.escape(mode, quote=True)}" data-viewport-density="{html.escape(viewport.density, quote=True)}">',
         f"<script>{render_viewport_runtime()}</script>",
         '<main class="shell">',
         '<header class="topline">',

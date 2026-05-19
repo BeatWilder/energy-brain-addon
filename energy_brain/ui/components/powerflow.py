@@ -31,7 +31,7 @@ def powerflow_hero_component(data: dict) -> dict:
     return {
         "type": "powerflow_hero",
         "title": "Energy Brain",
-        "status": "Observer actief",
+        "status": "Live",
         "soc_percent": data.get("soc_percent", data.get("battery_soc_percent", 0)),
         "solar_kw": data.get("solar_kw", data.get("pv_power_kw", 0)),
         "house_kw": data.get("house_kw", data.get("household_load_kw", 0)),

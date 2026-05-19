@@ -39,7 +39,7 @@ def test_rendered_ui_contains_health_strip_and_responsive_script():
     assert "health-strip" in html
     assert "data-layout-option=\"auto\"" in html
     assert "window.addEventListener(\"resize\"" in html
-    assert "quality-live" in html
+    assert '<span class="quality-chip' not in html
     assert "Komende uren" in html
     assert "Realtime energiestroom" in html
 
@@ -57,7 +57,7 @@ def test_import_export_state_is_visible():
     )
 
     assert 'data-grid-flow="exporting"' in html
-    assert ">Teruglevering</span>" in html
+    assert ">Net</span>" in html
 
 
 def test_visible_cockpit_copy_is_dutch():

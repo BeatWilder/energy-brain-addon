@@ -28,14 +28,14 @@ def _direction(value: float, positive: str, negative: str) -> str:
 
 
 def _flow_vars(intensity: float) -> dict[str, str]:
-    speed = max(1.7, 6.4 - intensity * 3.7)
-    density = 0 if intensity <= 0.02 else 1 + int(intensity >= 0.34) + int(intensity >= 0.72)
+    speed = max(3.6, 9.0 - intensity * 2.9)
+    density = 0 if intensity <= 0.08 else 1 + int(intensity >= 0.9)
     return {
         "intensity": f"{intensity:.3f}",
         "speed": f"{speed:.2f}s",
         "density": str(density),
-        "glow": f"{0.08 + intensity * 0.52:.3f}",
-        "thickness": f"{3.4 + intensity * 6.2:.2f}",
+        "glow": f"{0.024 + intensity * 0.15:.3f}",
+        "thickness": f"{2.3 + intensity * 3.2:.2f}",
     }
 
 

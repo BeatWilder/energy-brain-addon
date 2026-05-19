@@ -211,14 +211,16 @@ def _market_text(value: Any) -> str:
 
 
 def _mode_text(value: Any) -> str:
-    lower = _text_value(value, "observer actief").lower()
+    lower = _text_value(value, "bewaking actief").lower()
     if "shadow" in lower:
         return "Schaduw actief"
     if "comparison" in lower or "vergelijk" in lower:
         return "Vergelijkingsmodus"
     if "active" in lower:
         return "Actief bewaakt"
-    return "Observer actief"
+    if "observer" in lower:
+        return "Actief bewaakt"
+    return "Bewaking actief"
 
 
 def _status_text(value: Any, default: str) -> str:
@@ -279,7 +281,7 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
             {
                 "type": "powerflow_hero",
                 "title": "Energy Brain",
-                "status": "Observer actief",
+                "status": "Live",
                 "strategy": strategy,
                 "soc_percent": soc["value"],
                 "soc_label": soc["label"],
@@ -351,7 +353,7 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
                 "observer_state": _mode_text(payload.get("shadow_state") or payload.get("mode")),
                 "forecast_valid": _forecast_text(payload.get("degraded")),
                 "market_status": _market_text(payload.get("grid_price") or payload.get("price_now")),
-                "planner_status": "Plan actief" if timeline else "Plan beperkt",
+                "planner_status": "Actief" if timeline else "Beperkt",
                 "reserve_status": _status_text(payload.get("reserve_status"), "Reserve beschermd"),
                 "fault_status": _status_text(payload.get("fault_status"), "Geen storingen"),
                 "last_update": _text_value(payload.get("last_update"), "laatste cyclus"),
