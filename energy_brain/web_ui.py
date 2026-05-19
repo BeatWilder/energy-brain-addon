@@ -1,5 +1,4 @@
 from __future__ import annotations
-from energy_brain.ui.layout_router import resolve_layout_profile
 
 import logging
 import os
@@ -1244,33 +1243,6 @@ def _display(value: Any) -> str:
 
 
 def _escape(value: str) -> str:
-    
-    profile = resolve_layout_profile(
-        getattr(request, "args", {})
-    )
-
-    profile_selector = f"""
-    <div style="
-        display:flex;
-        gap:12px;
-        margin-bottom:20px;
-        align-items:center;
-        font-size:14px;
-    ">
-        <strong>UI Profile</strong>
-
-        <a href="?layout=mobile">📱 Mobile</a>
-        <a href="?layout=tablet">📲 Tablet</a>
-        <a href="?layout=workstation">🖥️ Workstation</a>
-
-        <span style="opacity:0.7;">
-            active: {profile}
-        </span>
-    </div>
-    """
-
-    html = profile_selector + html
-
     return html.escape(value, quote=True)
 
 

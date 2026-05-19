@@ -1,42 +1,20 @@
 from __future__ import annotations
 
-VALID_LAYOUTS = {
-    "mobile",
-    "tablet",
-    "workstation",
-}
+from typing import Any
+
+from energy_brain.ui.live.live_payload_adapter import (
+    build_live_payload,
+)
+from energy_brain.ui.layouts.responsive import build_layout_view as build_responsive_layout_view
+from energy_brain.ui.state.layout_state import select_layout_mode
 
 
-def normalize_layout_profile(value: str | None) -> str:
-    if not value:
-        return "tablet"
-
-    value = str(value).strip().lower()
-
-    if value not in VALID_LAYOUTS:
-        return "tablet"
-
-    return value
+def build_layout(layout: str = "desktop", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    return build_layout_view(payload or build_live_payload(), layout)
 
 
-def resolve_layout_profile(
-    request_args: dict | None = None,
-) -> str:
-    request_args = request_args or {}
-
-    requested = request_args.get("layout")
-
-    return normalize_layout_profile(requested)
-
-
-# --------------------------------------------------
-# BACKWARD COMPATIBILITY
-# renderer.py verwacht deze functie nog steeds
-# --------------------------------------------------
-
-def build_layout_view(*args, **kwargs):
-    return {
-        "layout_profile": "tablet",
-        "args": args,
-        "kwargs": kwargs,
-    }
+def build_layout_view(
+    payload: dict[str, Any],
+    layout: str,
+) -> dict[str, Any]:
+    return build_responsive_layout_view(payload, select_layout_mode({"layout": layout}))
