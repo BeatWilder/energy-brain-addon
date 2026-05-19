@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlencode
 from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
 from energy_brain.ui.live.live_payload_adapter import build_live_payload
 from energy_brain.ui.renderer import render_error_page, render_layout
+from energy_brain.ui.semantic_state import CANONICAL_ENTITIES
 from energy_brain.ui.state.layout_state import select_layout_mode
 
 from energy_brain.ha_client import HomeAssistantClient
@@ -1120,6 +1121,24 @@ def hillview_controls_enabled() -> bool:
     except Exception:
         return False
     return bool(options.get("hillview_controls_enabled") is True)
+
+
+def canonical_live_entity_states() -> dict[str, Any]:
+    """Best-effort read-only snapshot for the canonical EMS UI entities."""
+    try:
+        client = HomeAssistantClient()
+    except Exception:
+        return {}
+
+    states: dict[str, Any] = {}
+    for entity_id in CANONICAL_ENTITIES.values():
+        try:
+            state = client.get_state_object(entity_id)
+        except Exception:
+            state = None
+        if isinstance(state, dict):
+            states[entity_id] = state
+    return states
 
 
 
@@ -2466,6 +2485,9 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             layout_mode = select_layout_mode(query)
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
+            live_entities = canonical_live_entity_states()
+            if live_entities:
+                summary = {**summary, "entity_states": live_entities}
             payload = build_live_payload(summary)
             html = render_layout(layout_mode, payload)
             status = 200
