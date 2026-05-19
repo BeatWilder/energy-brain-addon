@@ -267,7 +267,17 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
     .pill {{ display: inline-flex; padding: 7px 11px; border-radius: 999px; background: rgba(130,240,194,.14); color: var(--ok); border: 1px solid rgba(130,240,194,.28); }}
     a {{ color: var(--accent); }}
     @media (max-width: 760px) {{ .grid {{ grid-template-columns: 1fr; }} }}
-  </style>
+  
+
+.energy-line,
+.flow-line,
+.energy-stream svg,
+.energy-stream path {
+    transform-origin: center center !important;
+}
+
+
+</style>
 
 
 
