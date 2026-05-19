@@ -289,20 +289,20 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
 .flow-node,
 .power-node,
 .ecosystem-node {
-    filter: brightness(1.35) saturate(1.35);
+    filter: brightness(1.08) saturate(1.08);
 
     box-shadow:
       0 0 25px rgba(80,255,180,0.95),
       0 0 55px rgba(80,255,180,0.72),
       0 0 120px rgba(80,255,180,0.38),
-      0 0 240px rgba(80,255,180,0.18);
+      0 0 140px rgba(80,255,180,0.12);
 }
 
 .energy-node.pv,
 .pv-node {
     filter:
-      brightness(1.45)
-      saturate(1.55);
+      brightness(1.15)
+      saturate(1.12);
 
     box-shadow:
       0 0 30px rgba(255,220,80,0.95),
@@ -313,7 +313,7 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
 .energy-node.house,
 .house-node {
     filter:
-      brightness(1.35)
+      brightness(1.08)
       saturate(1.25);
 
     box-shadow:
@@ -328,6 +328,47 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
       0 0 25px rgba(120,180,255,0.82),
       0 0 65px rgba(120,180,255,0.42),
       0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
+
+
+<style>
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-card,
+.eb-panel {
+
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(80,255,180,0.12) 0%,
+        rgba(80,255,180,0.06) 22%,
+        rgba(20,30,26,0.72) 58%,
+        rgba(4,10,14,0.82) 100%
+      ) !important;
+
+    box-shadow:
+      inset 0 0 120px rgba(80,255,180,0.08),
+      inset 0 0 200px rgba(80,255,180,0.04),
+      0 0 50px rgba(80,255,180,0.08);
+
+}
+
+.energy-line,
+.flow-line {
+    opacity: 0.62 !important;
+}
+
+.energy-node,
+.flow-node,
+.ecosystem-node {
+    filter:
+      brightness(1.08)
+      saturate(1.08);
 }
 
 </style>
@@ -742,20 +783,20 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 .flow-node,
 .power-node,
 .ecosystem-node {
-    filter: brightness(1.35) saturate(1.35);
+    filter: brightness(1.08) saturate(1.08);
 
     box-shadow:
       0 0 25px rgba(80,255,180,0.95),
       0 0 55px rgba(80,255,180,0.72),
       0 0 120px rgba(80,255,180,0.38),
-      0 0 240px rgba(80,255,180,0.18);
+      0 0 140px rgba(80,255,180,0.12);
 }
 
 .energy-node.pv,
 .pv-node {
     filter:
-      brightness(1.45)
-      saturate(1.55);
+      brightness(1.15)
+      saturate(1.12);
 
     box-shadow:
       0 0 30px rgba(255,220,80,0.95),
@@ -766,7 +807,7 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 .energy-node.house,
 .house-node {
     filter:
-      brightness(1.35)
+      brightness(1.08)
       saturate(1.25);
 
     box-shadow:
@@ -781,6 +822,47 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
       0 0 25px rgba(120,180,255,0.82),
       0 0 65px rgba(120,180,255,0.42),
       0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
+
+
+<style>
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-card,
+.eb-panel {
+
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(80,255,180,0.12) 0%,
+        rgba(80,255,180,0.06) 22%,
+        rgba(20,30,26,0.72) 58%,
+        rgba(4,10,14,0.82) 100%
+      ) !important;
+
+    box-shadow:
+      inset 0 0 120px rgba(80,255,180,0.08),
+      inset 0 0 200px rgba(80,255,180,0.04),
+      0 0 50px rgba(80,255,180,0.08);
+
+}
+
+.energy-line,
+.flow-line {
+    opacity: 0.62 !important;
+}
+
+.energy-node,
+.flow-node,
+.ecosystem-node {
+    filter:
+      brightness(1.08)
+      saturate(1.08);
 }
 
 </style>
@@ -1188,20 +1270,20 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
 .flow-node,
 .power-node,
 .ecosystem-node {
-    filter: brightness(1.35) saturate(1.35);
+    filter: brightness(1.08) saturate(1.08);
 
     box-shadow:
       0 0 25px rgba(80,255,180,0.95),
       0 0 55px rgba(80,255,180,0.72),
       0 0 120px rgba(80,255,180,0.38),
-      0 0 240px rgba(80,255,180,0.18);
+      0 0 140px rgba(80,255,180,0.12);
 }
 
 .energy-node.pv,
 .pv-node {
     filter:
-      brightness(1.45)
-      saturate(1.55);
+      brightness(1.15)
+      saturate(1.12);
 
     box-shadow:
       0 0 30px rgba(255,220,80,0.95),
@@ -1212,7 +1294,7 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
 .energy-node.house,
 .house-node {
     filter:
-      brightness(1.35)
+      brightness(1.08)
       saturate(1.25);
 
     box-shadow:
@@ -1227,6 +1309,47 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
       0 0 25px rgba(120,180,255,0.82),
       0 0 65px rgba(120,180,255,0.42),
       0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
+
+
+<style>
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-card,
+.eb-panel {
+
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(80,255,180,0.12) 0%,
+        rgba(80,255,180,0.06) 22%,
+        rgba(20,30,26,0.72) 58%,
+        rgba(4,10,14,0.82) 100%
+      ) !important;
+
+    box-shadow:
+      inset 0 0 120px rgba(80,255,180,0.08),
+      inset 0 0 200px rgba(80,255,180,0.04),
+      0 0 50px rgba(80,255,180,0.08);
+
+}
+
+.energy-line,
+.flow-line {
+    opacity: 0.62 !important;
+}
+
+.energy-node,
+.flow-node,
+.ecosystem-node {
+    filter:
+      brightness(1.08)
+      saturate(1.08);
 }
 
 </style>
@@ -2147,20 +2270,20 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 .flow-node,
 .power-node,
 .ecosystem-node {
-    filter: brightness(1.35) saturate(1.35);
+    filter: brightness(1.08) saturate(1.08);
 
     box-shadow:
       0 0 25px rgba(80,255,180,0.95),
       0 0 55px rgba(80,255,180,0.72),
       0 0 120px rgba(80,255,180,0.38),
-      0 0 240px rgba(80,255,180,0.18);
+      0 0 140px rgba(80,255,180,0.12);
 }
 
 .energy-node.pv,
 .pv-node {
     filter:
-      brightness(1.45)
-      saturate(1.55);
+      brightness(1.15)
+      saturate(1.12);
 
     box-shadow:
       0 0 30px rgba(255,220,80,0.95),
@@ -2171,7 +2294,7 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 .energy-node.house,
 .house-node {
     filter:
-      brightness(1.35)
+      brightness(1.08)
       saturate(1.25);
 
     box-shadow:
@@ -2186,6 +2309,47 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
       0 0 25px rgba(120,180,255,0.82),
       0 0 65px rgba(120,180,255,0.42),
       0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
+
+
+<style>
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-card,
+.eb-panel {
+
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(80,255,180,0.12) 0%,
+        rgba(80,255,180,0.06) 22%,
+        rgba(20,30,26,0.72) 58%,
+        rgba(4,10,14,0.82) 100%
+      ) !important;
+
+    box-shadow:
+      inset 0 0 120px rgba(80,255,180,0.08),
+      inset 0 0 200px rgba(80,255,180,0.04),
+      0 0 50px rgba(80,255,180,0.08);
+
+}
+
+.energy-line,
+.flow-line {
+    opacity: 0.62 !important;
+}
+
+.energy-node,
+.flow-node,
+.ecosystem-node {
+    filter:
+      brightness(1.08)
+      saturate(1.08);
 }
 
 </style>
@@ -3084,20 +3248,20 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 .flow-node,
 .power-node,
 .ecosystem-node {
-    filter: brightness(1.35) saturate(1.35);
+    filter: brightness(1.08) saturate(1.08);
 
     box-shadow:
       0 0 25px rgba(80,255,180,0.95),
       0 0 55px rgba(80,255,180,0.72),
       0 0 120px rgba(80,255,180,0.38),
-      0 0 240px rgba(80,255,180,0.18);
+      0 0 140px rgba(80,255,180,0.12);
 }
 
 .energy-node.pv,
 .pv-node {
     filter:
-      brightness(1.45)
-      saturate(1.55);
+      brightness(1.15)
+      saturate(1.12);
 
     box-shadow:
       0 0 30px rgba(255,220,80,0.95),
@@ -3108,7 +3272,7 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 .energy-node.house,
 .house-node {
     filter:
-      brightness(1.35)
+      brightness(1.08)
       saturate(1.25);
 
     box-shadow:
@@ -3123,6 +3287,47 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
       0 0 25px rgba(120,180,255,0.82),
       0 0 65px rgba(120,180,255,0.42),
       0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
+
+
+<style>
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-card,
+.eb-panel {
+
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(80,255,180,0.12) 0%,
+        rgba(80,255,180,0.06) 22%,
+        rgba(20,30,26,0.72) 58%,
+        rgba(4,10,14,0.82) 100%
+      ) !important;
+
+    box-shadow:
+      inset 0 0 120px rgba(80,255,180,0.08),
+      inset 0 0 200px rgba(80,255,180,0.04),
+      0 0 50px rgba(80,255,180,0.08);
+
+}
+
+.energy-line,
+.flow-line {
+    opacity: 0.62 !important;
+}
+
+.energy-node,
+.flow-node,
+.ecosystem-node {
+    filter:
+      brightness(1.08)
+      saturate(1.08);
 }
 
 </style>
@@ -3257,20 +3462,20 @@ def _eb4_empty_dashboard(no_disp: str) -> str:
 .flow-node,
 .power-node,
 .ecosystem-node {
-    filter: brightness(1.35) saturate(1.35);
+    filter: brightness(1.08) saturate(1.08);
 
     box-shadow:
       0 0 25px rgba(80,255,180,0.95),
       0 0 55px rgba(80,255,180,0.72),
       0 0 120px rgba(80,255,180,0.38),
-      0 0 240px rgba(80,255,180,0.18);
+      0 0 140px rgba(80,255,180,0.12);
 }
 
 .energy-node.pv,
 .pv-node {
     filter:
-      brightness(1.45)
-      saturate(1.55);
+      brightness(1.15)
+      saturate(1.12);
 
     box-shadow:
       0 0 30px rgba(255,220,80,0.95),
@@ -3281,7 +3486,7 @@ def _eb4_empty_dashboard(no_disp: str) -> str:
 .energy-node.house,
 .house-node {
     filter:
-      brightness(1.35)
+      brightness(1.08)
       saturate(1.25);
 
     box-shadow:
@@ -3296,6 +3501,47 @@ def _eb4_empty_dashboard(no_disp: str) -> str:
       0 0 25px rgba(120,180,255,0.82),
       0 0 65px rgba(120,180,255,0.42),
       0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
+
+
+<style>
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-card,
+.eb-panel {
+
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(80,255,180,0.12) 0%,
+        rgba(80,255,180,0.06) 22%,
+        rgba(20,30,26,0.72) 58%,
+        rgba(4,10,14,0.82) 100%
+      ) !important;
+
+    box-shadow:
+      inset 0 0 120px rgba(80,255,180,0.08),
+      inset 0 0 200px rgba(80,255,180,0.04),
+      0 0 50px rgba(80,255,180,0.08);
+
+}
+
+.energy-line,
+.flow-line {
+    opacity: 0.62 !important;
+}
+
+.energy-node,
+.flow-node,
+.ecosystem-node {
+    filter:
+      brightness(1.08)
+      saturate(1.08);
 }
 
 </style>
