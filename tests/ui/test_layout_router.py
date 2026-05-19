@@ -41,13 +41,13 @@ def test_auto_layout():
         "auto",
     )
 
-    assert result["layout"] == "desktop"
+    assert result["layout"] == "mobile"
 
 
-def test_invalid_layout_falls_back_to_desktop():
+def test_invalid_layout_falls_back_to_mobile_first_auto():
     result = build_layout_view(
         PAYLOAD,
         "wall-panel",
     )
 
-    assert result["layout"] == "desktop"
+    assert result["layout"] == "mobile"

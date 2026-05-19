@@ -3,7 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 
 from energy_brain.ui.renderer import render_error_page, render_layout
-from energy_brain.ui.state.layout_state import select_layout_mode
+from energy_brain.ui.state.layout_state import effective_layout_mode, select_layout_mode
 from energy_brain.web_ui import EnergyBrainWebUIHandler
 
 
@@ -24,15 +24,20 @@ def test_layout_selection_query_param():
     assert select_layout_mode("layout=desktop") == "desktop"
 
 
-def test_layout_selection_defaults_to_desktop():
-    assert select_layout_mode("") == "desktop"
-    assert select_layout_mode("layout=debug") == "desktop"
+def test_layout_selection_defaults_to_auto():
+    assert select_layout_mode("") == "auto"
+    assert select_layout_mode("layout=debug") == "auto"
+    assert effective_layout_mode("auto", viewport_width=430) == "mobile"
+    assert effective_layout_mode("auto", viewport_width=900) == "tablet"
+    assert effective_layout_mode("auto", viewport_width=1600) == "desktop"
 
 
-def test_renderer_invalid_layout_falls_back_to_desktop():
+def test_renderer_invalid_layout_falls_back_to_mobile_first_auto():
     html = render_layout("debug", {"soc_percent": 68})
 
-    assert 'class="layout-desktop"' in html
+    assert 'class="layout-mobile preference-auto"' in html
+    assert 'data-layout-preference="auto"' in html
+    assert "energy-brain.layout" in html
     assert "<pre>" not in html
     assert "Powerflow" in html
 

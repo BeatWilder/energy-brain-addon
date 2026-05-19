@@ -10,6 +10,7 @@ def hero_component() -> dict[str, Any]:
         "status": "SAFE",
         "soc_percent": 68,
         "current_action": "charge",
+        "headline": "Charging from solar surplus",
         "price": -0.12,
     }
 
@@ -46,18 +47,22 @@ def explainability_component() -> dict[str, Any]:
 def timeline_component() -> dict[str, Any]:
     return {
         "type": "planner_timeline",
+        "style": "segmented_glow",
         "entries": [
             {
                 "time": "20:00",
                 "action": "charge",
+                "tone": "charge",
             },
             {
                 "time": "23:00",
                 "action": "hold",
+                "tone": "hold",
             },
             {
                 "time": "07:00",
                 "action": "discharge",
+                "tone": "discharge",
             },
         ],
     }

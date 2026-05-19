@@ -1,20 +1,35 @@
 from __future__ import annotations
 
+import html
+
 
 def render_timeline(data: dict) -> str:
-    return """
-    <div class="card">
-      <div class="title">Planner Timeline</div>
-
-      <div style="
-        height:220px;
-        border-radius:16px;
-        background:linear-gradient(
-          180deg,
-          rgba(255,255,255,0.04),
-          rgba(255,255,255,0.01)
-        );
-        margin-top:20px;
-      "></div>
+    entries = data.get("entries") if isinstance(data.get("entries"), list) else []
+    blocks = []
+    for entry in entries[:8]:
+        if not isinstance(entry, dict):
+            continue
+        tone = html.escape(str(entry.get("tone", "hold")), quote=True)
+        width = html.escape(str(entry.get("width", "16")), quote=True)
+        time = html.escape(str(entry.get("time", "nu")), quote=True)
+        action = html.escape(str(entry.get("action", "hold")), quote=True)
+        blocks.append(
+            f'<div class="timeline-block tone-{tone}" style="--span:{width}">'
+            f"<span>{time}</span><b>{action}</b></div>"
+        )
+    body = "".join(blocks) or '<div class="timeline-block tone-hold"><span>now</span><b>observing</b></div>'
+    return f"""
+    <div class="timeline" aria-label="Planner timeline">
+      {body}
     </div>
     """
+
+
+def timeline_component(entries: list[dict] | None = None) -> dict:
+    return {
+        "type": "planner_timeline",
+        "entries": entries or [
+            {"time": "now", "action": "observe", "tone": "hold", "width": "18"},
+        ],
+        "animated": True,
+    }

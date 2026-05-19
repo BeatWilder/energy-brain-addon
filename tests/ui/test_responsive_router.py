@@ -13,7 +13,7 @@ def test_tablet_detection():
 
 
 def test_desktop_detection():
-    assert detect_layout_mode(1600) == "desktop"
+    assert detect_layout_mode(1200) == "desktop"
 
 
 def test_manual_override():
@@ -30,6 +30,8 @@ def test_payload():
     payload = build_responsive_payload(1024)
 
     assert payload["selected_layout"] == "tablet"
+    assert payload["manual_override"] == "auto"
+    assert payload["preference_storage_key"] == "energy-brain.layout"
 
 
 def test_observer_only():
