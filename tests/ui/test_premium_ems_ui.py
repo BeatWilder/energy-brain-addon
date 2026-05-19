@@ -17,10 +17,11 @@ def test_power_values_are_sanitized_for_display():
     hero = next(section for section in layout["sections"] if section["type"] == "powerflow_hero")
 
     assert hero["soc_label"] == "100%"
-    assert hero["solar_label"] == "30.0 kW"
-    assert hero["house_label"] == "unavailable"
-    assert "solar" in hero["data_quality"]["clamped"]
-    assert "home" in hero["data_quality"]["unknown"]
+    assert hero["solar_label"] == "onbekend"
+    assert hero["house_label"] == "onbekend"
+    assert "zon" in hero["data_quality"]["clamped"]
+    assert "zon" in hero["data_quality"]["unknown"]
+    assert "huis" in hero["data_quality"]["unknown"]
 
 
 def test_rendered_ui_contains_health_strip_and_responsive_script():
@@ -39,6 +40,8 @@ def test_rendered_ui_contains_health_strip_and_responsive_script():
     assert "data-layout-option=\"auto\"" in html
     assert "window.addEventListener(\"resize\"" in html
     assert "quality-live" in html
+    assert "Komende uren" in html
+    assert "Realtime energiestroom" in html
 
 
 def test_import_export_state_is_visible():
@@ -54,4 +57,35 @@ def test_import_export_state_is_visible():
     )
 
     assert 'data-grid-flow="exporting"' in html
-    assert ">Export</span>" in html
+    assert ">Teruglevering</span>" in html
+
+
+def test_visible_cockpit_copy_is_dutch():
+    html = render_layout("mobile", {"battery_soc_percent": 64})
+
+    assert "Waarom wacht Energy Brain?" in html
+    assert "Systeemstatus" in html
+    assert "Verwachte besparing" in html
+    assert "Volgende verwachting" in html
+    assert "Aansturing beveiligd" in html
+    for english_label in [
+        ">Why<",
+        ">System health<",
+        ">Expected savings<",
+        ">Next action<",
+        ">Battery<",
+        ">Solar<",
+        ">Home<",
+        ">Grid<",
+        "Live Powerflow",
+    ]:
+        assert english_label not in html
+
+
+def test_missing_live_values_render_as_degraded_not_demo_data():
+    html = render_layout("mobile", {})
+
+    assert "onbekend" in html
+    assert "30.0 kW" not in html
+    assert "3.2 kW" not in html
+    assert "Meetdata mist" in html

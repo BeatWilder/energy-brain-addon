@@ -5,6 +5,7 @@ from typing import Any
 
 from energy_brain.ui.components.responsive import (
     render_explainability_panel,
+    render_battery_panel,
     render_health_strip,
     render_planner_summary,
     render_powerflow_hero,
@@ -31,22 +32,28 @@ def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
     )
     safety = next((section for section in sections if section.get("type") == "safety"), {})
 
+    labels = {
+        "auto": "Automatisch",
+        "mobile": "Mobiel",
+        "tablet": "Tablet",
+        "desktop": "Desktop",
+    }
     links = "".join(
-        f'<a href="?layout={name}" data-layout-option="{name}" class="layout-link layout-link-{name} {"active" if name == preference else ""}">{name.title()}</a>'
+        f'<a href="?layout={name}" data-layout-option="{name}" class="layout-link layout-link-{name} {"active" if name == preference else ""}">{labels[name]}</a>'
         for name in ("auto", "mobile", "tablet", "desktop")
     )
 
     html_parts: list[str] = [
         "<!DOCTYPE html>",
-        f'<html lang="en"><head><meta charset="utf-8">',
+        f'<html lang="nl"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         "<title>Energy Brain</title>",
         f"<style>{render_theme_css()}</style>",
         f'</head><body class="layout-{html.escape(mode, quote=True)} preference-{html.escape(preference, quote=True)}" data-layout-preference="{html.escape(preference, quote=True)}">',
         '<main class="shell">',
         '<header class="topline">',
-        '<div><div class="brand">Energy Brain</div><div class="eyebrow">Autonomous home energy operating system</div></div>',
-        f'<nav class="layout-switcher" aria-label="Layout selector">{links}</nav>',
+        '<div><div class="brand">Energy Brain</div><div class="eyebrow">Autonoom energie besturingssysteem</div></div>',
+        f'<nav class="layout-switcher" aria-label="Layoutkeuze">{links}</nav>',
         "</header>",
         render_health_strip(safety),
         '<div class="dashboard">',
@@ -58,6 +65,9 @@ def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
         section_type = section.get("type")
         if section_type == "planner_summary":
             html_parts.append(render_planner_summary(section))
+            continue
+        if section_type == "battery_status":
+            html_parts.append(render_battery_panel(section))
             continue
         if section_type == "explainability":
             html_parts.append(render_explainability_panel(section))
@@ -113,15 +123,15 @@ def _layout_script() -> str:
 """
 
 
-def render_error_page(message: str = "New UI unavailable") -> str:
+def render_error_page(message: str = "Nieuwe UI niet beschikbaar") -> str:
     safe_message = html.escape(message, quote=True)
     return (
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<!DOCTYPE html><html lang=\"nl\"><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
         f"<style>{render_theme_css()}</style><title>Energy Brain</title></head>"
         "<body><main class=\"error-page\"><section class=\"panel\">"
-        "<h2>Energy Brain UI unavailable</h2>"
+        "<h2>Energy Brain UI niet beschikbaar</h2>"
         f"<p>{safe_message}</p>"
-        "<p>The read-only web server is still running.</p>"
+        "<p>De alleen-lezen webserver blijft actief.</p>"
         "</section></main></body></html>"
     )

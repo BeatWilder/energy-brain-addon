@@ -29,10 +29,10 @@ def normalize_layout_mode(value: str | None) -> LayoutMode:
 
 def get_layout_description(mode: LayoutMode) -> str:
     descriptions = {
-        "auto": "Automatic device detection",
-        "desktop": "Desktop mission control layout",
-        "tablet": "Tablet control panel layout",
-        "mobile": "Mobile operator companion layout",
+        "auto": "Automatische apparaatdetectie",
+        "desktop": "Desktop command center",
+        "tablet": "Tablet bedienpaneel",
+        "mobile": "Mobiele cockpit",
     }
 
     return descriptions[mode]

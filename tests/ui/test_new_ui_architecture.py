@@ -39,13 +39,13 @@ def test_renderer_invalid_layout_falls_back_to_mobile_first_auto():
     assert 'data-layout-preference="auto"' in html
     assert "energy-brain.layout" in html
     assert "<pre>" not in html
-    assert "Powerflow" in html
+    assert "Realtime energiestroom" in html
 
 
 def test_renderer_error_page_is_simple_html():
     html = render_error_page("boom")
 
-    assert "Energy Brain UI unavailable" in html
+    assert "Energy Brain UI niet beschikbaar" in html
     assert "boom" in html
 
 

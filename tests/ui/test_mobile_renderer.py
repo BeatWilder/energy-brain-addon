@@ -19,7 +19,7 @@ def test_mobile_has_sections():
 
     result = render_mobile_cockpit(payload)
 
-    assert len(result["sections"]) == 4
+    assert len(result["sections"]) == 5
 
 
 def test_mobile_has_explainability():

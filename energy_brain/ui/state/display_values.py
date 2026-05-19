@@ -4,8 +4,8 @@ import math
 from typing import Any
 
 
-UNKNOWN_LABEL = "unavailable"
-MAX_DISPLAY_POWER_KW = 30.0
+UNKNOWN_LABEL = "onbekend"
+MAX_DISPLAY_POWER_KW = 18.0
 
 
 def number_or_none(value: Any) -> float | None:
@@ -35,7 +35,7 @@ def sanitize_power_kw(
 
     clamped = abs(number) > max_abs_kw
     if clamped:
-        number = max_abs_kw if number > 0 else -max_abs_kw
+        return {"value": 0.0, "label": UNKNOWN_LABEL, "known": False, "clamped": True}
 
     return {
         "value": round(number, 3),

@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode
 
 from energy_brain.v2000.read_only_tesla_cockpit import build_read_only_cockpit_payload, render_tesla_cockpit_html
+from energy_brain.ui.live.live_payload_adapter import build_live_payload
 from energy_brain.ui.renderer import render_error_page, render_layout
 from energy_brain.ui.state.layout_state import select_layout_mode
 
@@ -75,6 +76,7 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
         "valid_cycle": True,
         "message": "Latest cycle available",
         "mode": cycle.get("mode"),
+        "last_update": cycle.get("last_update") or cycle.get("updated_at") or cycle.get("timestamp"),
         "controller": {
             "approved": controller.get("approved"),
             "execute": controller.get("execute"),
@@ -87,6 +89,8 @@ def summarize_cycle(cycle: dict[str, Any]) -> dict[str, Any]:
             "battery_soc_percent": snapshot.get("battery_soc_percent"),
             "pv_power_kw": snapshot.get("pv_power_kw"),
             "household_load_kw": snapshot.get("household_load_kw"),
+            "grid_power_kw": snapshot.get("grid_power_kw"),
+            "battery_power_kw": snapshot.get("battery_power_kw"),
             "grid_price": snapshot.get("grid_price"),
         },
         "plan": {
@@ -2125,7 +2129,7 @@ def build_fresh_home_v1_display_data(summary=None):
         ("telemetry", "battery_soc_percent"),
         ("current", "battery_soc_percent"),
         ("cards", "battery_predbat", "soc_percent"),
-    ], "sensor.alphaess_soc_battery")
+    ])
 
     pv = first_value([
         ("pv_power_kw",),
@@ -2135,7 +2139,7 @@ def build_fresh_home_v1_display_data(summary=None):
         ("telemetry", "pv_power_w"),
         ("current", "pv_power_w"),
         ("cards", "energy_flow", "pv_power_kw"),
-    ], "sensor.alphaess_current_pv_production")
+    ])
 
     house = first_value([
         ("household_load_kw",),
@@ -2146,7 +2150,7 @@ def build_fresh_home_v1_display_data(summary=None):
         ("telemetry", "household_load_w"),
         ("current", "household_load_w"),
         ("cards", "energy_flow", "household_load_kw"),
-    ], "sensor.alphaess_current_house_load")
+    ])
 
     grid = first_value([
         ("grid_power_kw",),
@@ -2154,7 +2158,7 @@ def build_fresh_home_v1_display_data(summary=None):
         ("state", "grid_power_w"),
         ("telemetry", "grid_power_w"),
         ("current", "grid_power_w"),
-    ], "sensor.alphaess_power_grid")
+    ])
 
     mode = first_value([
         ("mode",),
@@ -2462,7 +2466,7 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             layout_mode = select_layout_mode(query)
             cycle = read_latest_cycle()
             summary = summarize_cycle(cycle)
-            payload = build_fresh_home_v1_display_data(summary)
+            payload = build_live_payload(summary)
             html = render_layout(layout_mode, payload)
             status = 200
         except Exception:

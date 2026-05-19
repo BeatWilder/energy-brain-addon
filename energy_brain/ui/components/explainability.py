@@ -13,7 +13,7 @@ def render_explainability(data: dict) -> str:
 
     return f"""
     <div class="explain-compact">
-      <div class="eyebrow">Why</div>
+      <div class="eyebrow">Waarom</div>
       <div class="reason-stack">{items}</div>
     </div>
     """

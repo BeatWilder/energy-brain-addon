@@ -84,9 +84,9 @@ def build_tablet_explainability(
         "reasons": payload.get(
             "reasons",
             [
-                "Negative price detected",
-                "Reserve protected",
-                "PV surplus expected",
+                "Gunstige prijs gedetecteerd",
+                "Reserve beschermd",
+                "Zonne-overschot verwacht",
             ],
         ),
     }

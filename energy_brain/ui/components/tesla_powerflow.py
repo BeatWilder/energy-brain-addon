@@ -27,23 +27,23 @@ def build_tesla_powerflow() -> dict[str, Any]:
         "layout": "center_hub",
         "nodes": {
             "solar": {
-                "label": "Solar",
+                "label": "Zon",
                 "kw": solar_kw,
                 "active": solar_kw > 0,
             },
             "house": {
-                "label": "Home",
+                "label": "Huis",
                 "kw": house_kw,
                 "active": house_kw > 0,
             },
             "battery": {
-                "label": "Battery",
+                "label": "Batterij",
                 "kw": battery_kw,
                 "soc_percent": 68,
                 "state": "charging",
             },
             "grid": {
-                "label": "Grid",
+                "label": "Net",
                 "kw": grid_kw,
                 "state": "exporting",
             },

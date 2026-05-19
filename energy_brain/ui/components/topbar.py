@@ -16,7 +16,7 @@ def render_topbar(data: dict) -> str:
       </div>
 
       <div class="pill">
-        Observer Only
+        Alleen observeren
       </div>
     </div>
     """

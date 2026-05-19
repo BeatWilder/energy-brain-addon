@@ -9,7 +9,7 @@ def build_mobile_hero(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": "hero",
         "status": "SAFE",
-        "action": payload.get("current_action", "unknown"),
+        "action": payload.get("current_action", "onbekend"),
         "price": payload.get("price"),
         "soc_percent": payload.get("soc_percent"),
     }
@@ -33,7 +33,7 @@ def build_mobile_explainability(payload: dict[str, Any]) -> dict[str, Any]:
             "reasons",
             [
                 "Negative price detected",
-                "Reserve remains protected",
+                "Reserve blijft beschermd",
                 "PV surplus expected",
             ],
         ),

@@ -28,4 +28,5 @@ def test_tablet_has_split_panel():
         "planner_summary",
         "explainability",
         "safety",
+        "battery_status",
     ]

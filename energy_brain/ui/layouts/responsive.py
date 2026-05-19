@@ -21,7 +21,7 @@ def _text_value(value: Any, default: str) -> str:
     return str(value)
 
 
-def _money_value(value: Any, default: str = "calculating") -> str:
+def _money_value(value: Any, default: str = "berekenen") -> str:
     if value in (None, "", "unknown", "unavailable", "none", "None", "—"):
         return default
     try:
@@ -32,7 +32,7 @@ def _money_value(value: Any, default: str = "calculating") -> str:
     return f"{sign}€{abs(number):.2f}"
 
 
-def _percent_value(value: Any, default: str = "medium") -> str:
+def _percent_value(value: Any, default: str = "gemiddeld") -> str:
     if value in (None, "", "unknown", "unavailable", "none", "None", "—"):
         return default
     try:
@@ -46,11 +46,11 @@ def _strategy_text(payload: dict[str, Any]) -> str:
     if explicit:
         lower = explicit.lower()
         if any(word in lower for word in ("charge", "laden")):
-            return "Charging from the best available energy window"
+            return "Laden in het gunstigste energiemoment"
         if any(word in lower for word in ("discharge", "export", "ontladen")):
-            return "Using stored energy during an expensive window"
+            return "Opgeslagen energie gebruiken tijdens dure uren"
         if any(word in lower for word in ("hold", "wacht", "wait")):
-            return "Holding battery until conditions improve"
+            return "Batterij vasthouden tot omstandigheden verbeteren"
         return explicit
 
     solar = _float_value(payload.get("pv_power_kw") or payload.get("pv_now_kw"))
@@ -58,12 +58,52 @@ def _strategy_text(payload: dict[str, Any]) -> str:
     grid = _float_value(payload.get("grid_power_kw"))
     price = _float_value(payload.get("grid_price") or payload.get("price_now"))
     if solar > 0.4 and battery > 0.1:
-        return "Charging from solar surplus"
+        return "Laden met zonne-overschot"
     if grid < -0.1:
-        return "Exporting surplus to the grid"
+        return "Overschot terugleveren aan het net"
     if price < 0:
-        return "Waiting for cheaper electricity"
-    return "Protecting reserve while observing the next window"
+        return "Wachten op goedkopere stroom"
+    return "Reserve beschermen en volgende kans bewaken"
+
+
+def _action_text(value: Any) -> str:
+    text = _text_value(value, "vasthouden")
+    lower = text.lower()
+    if "charge" in lower or "laden" in lower:
+        return "Laden"
+    if "discharge" in lower or "ontladen" in lower:
+        return "Ontladen"
+    if "export" in lower or "terug" in lower:
+        return "Terugleveren"
+    if "cheap" in lower or "negative" in lower or "goedkoop" in lower:
+        return "Goedkoop uur"
+    if "expensive" in lower or "peak" in lower or "duur" in lower:
+        return "Duur uur"
+    if "observer" in lower:
+        return "Observeren"
+    if "hold" in lower or "wait" in lower or "wacht" in lower:
+        return "Vasthouden"
+    return text
+
+
+def _reason_text(value: Any, default: str = "Laatste plancyclus bewaakt deze keuze.") -> str:
+    text = _text_value(value, default)
+    lower = text.lower()
+    if "negative" in lower and "price" in lower:
+        return "Er wordt een gunstig prijsmoment verwacht."
+    if "battery" in lower and ("target" in lower or "below" in lower):
+        return "De batterij zit nog onder het gewenste doel."
+    if "reserve" in lower:
+        return "De batterijreserve blijft beschermd."
+    if "solar" in lower or "pv" in lower or "surplus" in lower:
+        return "Later wordt meer zonne-opwek verwacht."
+    if "price" in lower:
+        return "De huidige stroomprijs is nog niet gunstig genoeg."
+    if "degraded" in lower or "forecast" in lower or "prognose" in lower:
+        return "Een deel van de voorspelling is beperkt beschikbaar."
+    if "no plan" in lower or "geen plan" in lower:
+        return "Er is nog geen bruikbare plancyclus beschikbaar."
+    return text
 
 
 def _display_power(payload: dict[str, Any], *keys: str, pv_generation: bool = False) -> dict[str, Any]:
@@ -99,10 +139,10 @@ def _timeline_entries(payload: dict[str, Any]) -> list[dict[str, str]]:
         entries.append(
             {
                 "time": _text_value(item.get("start") or item.get("time"), "nu"),
-                "action": action,
-                "reason": _text_value(
+                "action": _action_text(action),
+                "reason": _reason_text(
                     item.get("reason"),
-                    "Observer-plan uit laatste cyclus.",
+                    "Laatste plancyclus bewaakt deze keuze.",
                 ),
                 "tone": tone,
                 "width": str(12 + (index % 3) * 4),
@@ -113,8 +153,8 @@ def _timeline_entries(payload: dict[str, Any]) -> list[dict[str, str]]:
     return [
         {
             "time": "nu",
-            "action": _text_value(payload.get("decision"), "observer"),
-            "reason": _text_value(
+            "action": _action_text(payload.get("decision")),
+            "reason": _reason_text(
                 payload.get("decision_reason"),
                 "Geen planregels beschikbaar.",
             ),
@@ -130,7 +170,44 @@ def _reasons(payload: dict[str, Any]) -> list[str]:
         payload.get("predbat_summary"),
         payload.get("degraded_text"),
     ]
-    return [_text_value(value, "") for value in values if _text_value(value, "")]
+    return [_reason_text(value, "") for value in values if _text_value(value, "")]
+
+
+def _forecast_text(degraded: Any) -> str:
+    return "Voorspelling beperkt" if degraded else "Voorspelling actief"
+
+
+def _market_text(value: Any) -> str:
+    return "Marktdata actief" if value not in (None, "", "unknown", "unavailable", "none", "None", "—") else "Marktdata onbekend"
+
+
+def _mode_text(value: Any) -> str:
+    lower = _text_value(value, "observer actief").lower()
+    if "shadow" in lower:
+        return "Schaduw actief"
+    if "comparison" in lower or "vergelijk" in lower:
+        return "Vergelijkingsmodus"
+    if "active" in lower:
+        return "Actief bewaakt"
+    return "Observer actief"
+
+
+def _status_text(value: Any, default: str) -> str:
+    text = _text_value(value, default)
+    lower = text.lower()
+    if "reserve" in lower and ("protect" in lower or "bescherm" in lower):
+        return "Reserve beschermd"
+    if "no active faults" in lower or "geen stor" in lower:
+        return "Geen storingen"
+    if "read-only" in lower or "write protection" in lower:
+        return "Aansturing beveiligd. Deze cockpit is alleen-lezen."
+    if lower == "valid":
+        return "Geldig"
+    if lower == "degraded":
+        return "Beperkt"
+    if lower == "blocked":
+        return "Geblokkeerd"
+    return text
 
 
 def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, Any]:
@@ -164,7 +241,7 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
             {
                 "type": "powerflow_hero",
                 "title": "Energy Brain",
-                "status": "Observer",
+                "status": "Observer actief",
                 "strategy": strategy,
                 "soc_percent": soc["value"],
                 "soc_label": soc["label"],
@@ -185,22 +262,22 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
                     "clamped": [
                         name
                         for name, value in {
-                            "solar": solar,
-                            "home": house,
-                            "battery": battery,
-                            "grid": grid,
-                            "battery_soc": soc,
+                            "zon": solar,
+                            "huis": house,
+                            "batterij": battery,
+                            "net": grid,
+                            "batterij-SOC": soc,
                         }.items()
                         if value["clamped"]
                     ],
                     "unknown": [
                         name
                         for name, value in {
-                            "solar": solar,
-                            "home": house,
-                            "battery": battery,
-                            "grid": grid,
-                            "battery_soc": soc,
+                            "zon": solar,
+                            "huis": house,
+                            "batterij": battery,
+                            "net": grid,
+                            "batterij-SOC": soc,
                         }.items()
                         if not value["known"]
                     ],
@@ -211,8 +288,8 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
             },
             {
                 "type": "planner_summary",
-                "title": "Now / next",
-                "mode": _text_value(payload.get("mode"), "observer"),
+                "title": "Wat denkt Energy Brain nu?",
+                "mode": _mode_text(payload.get("mode")),
                 "execution": _text_value(payload.get("execution"), "Geen aansturing"),
                 "headline": strategy,
                 "confidence": _percent_value(payload.get("forecast_confidence")),
@@ -221,27 +298,38 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
                     or payload.get("delta_vs_baseline")
                     or payload.get("savings")
                 ),
-                "next_action_time": timeline[0]["time"] if timeline else "next cycle",
+                "next_action_time": timeline[0]["time"] if timeline else "volgende cyclus",
                 "entries": timeline,
             },
             {
                 "type": "explainability",
-                "title": "Why",
+                "title": "Waarom wacht Energy Brain?",
                 "reasons": _reasons(payload),
             },
             {
                 "type": "safety",
-                "title": "System health",
-                "observer_state": _text_value(payload.get("shadow_state"), "observer/shadow"),
-                "forecast_valid": "valid" if not payload.get("degraded") else "degraded",
-                "reserve_status": _text_value(payload.get("reserve_status"), "reserve protected"),
-                "fault_status": _text_value(payload.get("fault_status"), "no active faults"),
-                "last_update": _text_value(payload.get("last_update"), "latest cycle"),
+                "title": "Systeemstatus",
+                "observer_state": _mode_text(payload.get("shadow_state") or payload.get("mode")),
+                "forecast_valid": _forecast_text(payload.get("degraded")),
+                "market_status": _market_text(payload.get("grid_price") or payload.get("price_now")),
+                "planner_status": "Plan actief" if timeline else "Plan beperkt",
+                "reserve_status": _status_text(payload.get("reserve_status"), "Reserve beschermd"),
+                "fault_status": _status_text(payload.get("fault_status"), "Geen storingen"),
+                "last_update": _text_value(payload.get("last_update"), "laatste cyclus"),
                 "readonly": True,
-                "blocked_reason": _text_value(
+                "blocked_reason": _status_text(
                     payload.get("execution_blocked_reason"),
-                    "Write protection active. UI is read-only.",
+                    "Aansturing beveiligd. Deze cockpit is alleen-lezen.",
                 ),
+            },
+            {
+                "type": "battery_status",
+                "title": "Batterijstatus",
+                "soc_percent": soc["value"],
+                "soc_label": soc["label"],
+                "battery_kw": battery["value"],
+                "battery_label": battery["label"],
+                "updated": _text_value(payload.get("last_update"), "laatste cyclus"),
             },
         ],
     }

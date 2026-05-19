@@ -7,10 +7,10 @@ def hero_component() -> dict[str, Any]:
     return {
         "type": "hero",
         "title": "Energy Brain",
-        "status": "SAFE",
+        "status": "VEILIG",
         "soc_percent": 68,
         "current_action": "charge",
-        "headline": "Charging from solar surplus",
+        "headline": "Laden met zonne-overschot",
         "price": -0.12,
     }
 
@@ -37,9 +37,9 @@ def explainability_component() -> dict[str, Any]:
         "type": "explainability",
         "title": "Waarom gebeurt dit?",
         "reasons": [
-            "Negative energy price",
-            "Battery below target",
-            "Reserve remains protected",
+            "Gunstige stroomprijs verwacht",
+            "Batterij zit onder het doel",
+            "Reserve blijft beschermd",
         ],
     }
 
@@ -51,17 +51,17 @@ def timeline_component() -> dict[str, Any]:
         "entries": [
             {
                 "time": "20:00",
-                "action": "charge",
+                "action": "laden",
                 "tone": "charge",
             },
             {
                 "time": "23:00",
-                "action": "hold",
+                "action": "vasthouden",
                 "tone": "hold",
             },
             {
                 "time": "07:00",
-                "action": "discharge",
+                "action": "ontladen",
                 "tone": "discharge",
             },
         ],
