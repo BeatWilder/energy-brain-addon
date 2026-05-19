@@ -43,7 +43,7 @@ def _action_from_setpoint(value: Any) -> str:
     if number > 0.05:
         return "Laden gepland"
     if number < -0.05:
-        return "Ontladen gepland"
+        return "Huis voeden gepland"
     return "Vasthouden"
 
 
@@ -55,7 +55,7 @@ def _reason_from_live_data(payload: dict[str, Any]) -> str:
     battery = _number(payload.get("battery_power_kw"))
 
     if battery is not None and battery > 0.05:
-        return "De batterij wordt geladen op basis van het actuele EMS-plan."
+        return "De batterij neemt nu energie op."
     if battery is not None and battery < -0.05:
         return "De batterij ondersteunt het huis of beperkt dure netafname."
     if price is not None and price < 0:
@@ -78,7 +78,7 @@ def _timeline(summary: dict[str, Any]) -> list[dict[str, Any]]:
         action = row.get("action") or row.get("kind") or _action_from_setpoint(setpoint)
         preview.append(
             {
-                "time": row.get("start") or row.get("time") or f"+{row.get('index', index)} stap",
+                "time": row.get("start") or row.get("time") or ("nu" if index == 0 else "straks"),
                 "action": action,
                 "reason": row.get("reason") or _reason_from_live_data(
                     {

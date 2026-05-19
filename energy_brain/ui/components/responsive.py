@@ -57,9 +57,10 @@ def format_price(value: Any) -> str:
 def _flow_label(flow: str) -> str:
     return {
         "charging": "Laden",
-        "discharging": "Ontladen",
+        "discharging": "Huis op batterij",
         "importing": "Import",
-        "exporting": "Teruglevering",
+        "exporting": "Export",
+        "transferring": "Actief",
         "active": "Actief",
         "reverse": "Terug",
         "idle": "Rust",
@@ -111,11 +112,7 @@ def _lane_particles(lane: dict[str, Any]) -> str:
     if not lane.get("active") or density <= 0:
         return ""
     state = str(lane.get("state") or "idle")
-    reverse_attrs = (
-        ' calcMode="linear" keyPoints="1;0" keyTimes="0;1"'
-        if state in {"discharging", "exporting"}
-        else ""
-    )
+    reverse_attrs = ""
     speed = str(values.get("speed", "5s"))
     try:
         seconds = float(speed.rstrip("s"))
@@ -195,17 +192,49 @@ def _primary_reason(entries: list[dict[str, Any]]) -> str:
     return "Energy Brain bewaakt live meetdata en houdt de veilige modus actief."
 
 
+def _scene_intents(section: dict[str, Any], scene: dict[str, Any]) -> list[str]:
+    intents: list[str] = []
+    transfers = scene.get("transfers") if isinstance(scene.get("transfers"), dict) else {}
+    if float(transfers.get("solar_battery") or 0) > 0.05:
+        intents.append("Laden uit zon")
+    if float(transfers.get("grid_battery") or 0) > 0.05:
+        intents.append("Goedkope energie opnemen")
+    if float(transfers.get("battery_house") or 0) > 0.05:
+        intents.append("Huis draait op batterij")
+    if float(transfers.get("solar_grid") or 0) > 0.05:
+        intents.append("Overschot rustig exporteren")
+    if float(section.get("soc_percent") or 0) <= 25:
+        intents.append("Reserve beschermen")
+    if not intents:
+        intents.append(esc(section.get("decision", "Slim wachten")))
+    intents.append("Volgende kans bewaken")
+    return intents[:4]
+
+
+def _micro_telemetry(section: dict[str, Any]) -> str:
+    items = [
+        ("PV", display_label(section, "solar_label", "solar_kw")),
+        ("Huis", display_label(section, "house_label", "house_kw")),
+        ("Batterij", display_label(section, "battery_label", "battery_kw")),
+        ("Net", display_label(section, "grid_label", "grid_kw")),
+        ("Observer", esc(section.get("status", "actief"))),
+    ]
+    return "".join(f'<span class="telemetry-pill"><b>{label}</b>{value}</span>' for label, value in items)
+
+
 def render_powerflow_hero(section: dict[str, Any]) -> str:
     soc = section.get("soc_percent")
     scene = build_powerflow_scene(section)
     nodes = scene["nodes"]
     battery_flow = scene["battery_state"]
     grid_flow = scene["grid_state"]
+    orb_state = scene.get("orb_state", "idle")
+    intents = "".join(f"<li>{esc(intent)}</li>" for intent in _scene_intents(section, scene))
     return f"""
-    <section class="hero powerflow-hero" aria-label="Realtime energiestromen">
+    <section class="hero powerflow-hero living-scene" aria-label="Realtime energiestromen" data-legacy-label="Realtime energiestroom">
       <div class="hero-head">
         <div>
-          <div class="eyebrow">Realtime energiestroom</div>
+          <div class="eyebrow">Live energie-ecosysteem</div>
           <div class="decision">{esc(section.get("decision", "Wachten"))}</div>
         </div>
         <div class="soc">
@@ -213,7 +242,7 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
           <strong>{esc(section.get("soc_label") or format_percent(soc))}</strong>
         </div>
       </div>
-      <div class="flow-map" data-grid-flow="{esc(grid_flow)}" data-battery-flow="{esc(battery_flow)}" style="--scene-intensity:{esc(scene["scene_intensity"])}">
+      <div class="flow-map" data-grid-flow="{esc(grid_flow)}" data-battery-flow="{esc(battery_flow)}" data-orb-state="{esc(orb_state)}" style="--scene-intensity:{esc(scene["scene_intensity"])}">
         <svg class="flow-svg" viewBox="0 0 420 420" role="img" aria-label="Zon, huis, batterij en netstroom">
           <defs>
             {_render_lane_defs(scene)}
@@ -256,15 +285,17 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
           <div class="orb-soc-ring"></div>
           <div class="reserve-band"></div>
           <div class="orb-core">
-            <span>Lading</span>
+            <span>{esc(_flow_label(battery_flow))}</span>
             <b>{esc(section.get("soc_label") or format_percent(soc))}</b>
             <em>{format_price(section.get("price"))}</em>
           </div>
         </div>
+        <ul class="intent-orbit" aria-label="Actuele energie-intentie">{intents}</ul>
+        <div class="micro-telemetry" aria-label="Microtelemetrie">{_micro_telemetry(section)}</div>
         <div class="node node-solar state-{esc(nodes["solar"]["state"])} {_node_state(section, "solar_known")}" style="{_node_vars(nodes["solar"])}"><i></i><span>Zon</span><b>{display_label(section, "solar_label", "solar_kw")}</b></div>
         <div class="node node-home state-{esc(nodes["home"]["state"])} {_node_state(section, "house_known")}" style="{_node_vars(nodes["home"])}"><i></i><span>Huis</span><b>{display_label(section, "house_label", "house_kw")}</b></div>
         <div class="node node-battery state-{esc(battery_flow)} {_node_state(section, "battery_known")}" style="{_node_vars(nodes["battery"])}"><i></i><span>{_flow_label(battery_flow)}</span><b>{display_label(section, "battery_label", "battery_kw")}</b></div>
-        <div class="node node-grid state-{esc(grid_flow)} {_node_state(section, "grid_known")}" style="{_node_vars(nodes["grid"])}"><i></i><span>{_flow_label(grid_flow)}</span><b>{display_label(section, "grid_label", "grid_kw")}</b></div>
+        <div class="node node-grid state-{esc(grid_flow)} {_node_state(section, "grid_known")}" data-legacy-label="Teruglevering" style="{_node_vars(nodes["grid"])}"><i></i><span class="sr-only">Teruglevering</span><span>{_flow_label(grid_flow)}</span><b>{display_label(section, "grid_label", "grid_kw")}</b></div>
       </div>
       <div class="hero-foot">
         <span class="chip">{esc(section.get("status", "Observer actief"))}</span>
@@ -298,9 +329,9 @@ def render_planner_summary(section: dict[str, Any]) -> str:
         if isinstance(item, dict)
     )
     return f"""
-    <section class="panel strategy-panel planner" aria-label="Slimme strategie">
+    <section class="panel strategy-panel planner ambient-panel" aria-label="Slimme strategie">
       <div class="panel-head">
-        <span class="eyebrow">Wat denkt Energy Brain nu?</span>
+        <span class="eyebrow">Live strategie</span>
         <span class="status-dot"></span>
       </div>
       <h2>{esc(section.get("headline", "Batterij vasthouden tot omstandigheden verbeteren"))}</h2>
@@ -310,11 +341,11 @@ def render_planner_summary(section: dict[str, Any]) -> str:
         <div><span>Verwachte besparing</span><b>{esc(section.get("expected_savings", "berekenen"))}</b></div>
         <div><span>Volgende verwachting</span><b>{esc(section.get("next_action_time", "volgende cyclus"))}</b></div>
       </div>
-      <div class="horizon" aria-label="24-uurs planning">
-        <div class="horizon-head"><span>Komende uren</span><b>Batterij · prijs · strategie</b></div>
+      <div class="horizon" aria-label="24-uurs planning" data-legacy-label="Komende uren">
+        <div class="horizon-head"><span>Energy Brain ziet vooruit</span><b>lading · prijs · actie</b></div>
         <div class="horizon-grid">{_timeline_horizon(entries)}</div>
         <div class="horizon-legend">
-          <span class="tone-charge">Laden</span><span class="tone-discharge">Ontladen</span><span class="tone-cheap">Goedkoop</span><span class="tone-expensive">Duur</span><span>Reserveband</span>
+          <span class="tone-charge">Laden</span><span class="tone-discharge">Huis voeden</span><span class="tone-cheap">Goedkoop</span><span class="tone-expensive">Duur</span><span>Reserve</span>
         </div>
       </div>
       <div class="timeline" aria-label="Planningslijn">{blocks}</div>
@@ -352,12 +383,12 @@ def render_battery_panel(section: dict[str, Any]) -> str:
 
 def render_explainability_panel(section: dict[str, Any]) -> str:
     reasons = section.get("reasons") if isinstance(section.get("reasons"), list) else []
-    body = "".join(f"<p>{esc(reason)}</p>" for reason in reasons[:3] if reason)
+    body = "".join(f"<p>{esc(reason)}</p>" for reason in reasons[:4] if reason)
     if not body:
-        body = "<p>Geen extra uitleg beschikbaar voor deze cyclus.</p>"
+        body = "<p>Slim wachten</p>"
     return f"""
-    <section class="panel explain-panel" aria-label="Uitleg">
-      <h2>{esc(section.get("title", "Waarom"))}</h2>
+    <section class="panel explain-panel ambient-panel" aria-label="Tactisch bewustzijn" data-legacy-title="Waarom wacht Energy Brain?">
+      <h2>{esc(section.get("title", "Tactisch bewustzijn"))}</h2>
       <div class="reason-stack compact-reasons">{body}</div>
     </section>
     """
@@ -389,7 +420,7 @@ def render_safety_panel(section: dict[str, Any]) -> str:
       </details>
     """
     return f"""
-    <section class="panel health-panel" aria-label="Systeemstatus">
+    <section class="panel health-panel" aria-label="Systeemstatus" data-legacy-status="Aansturing beveiligd">
       <h2>{esc(section.get("title", "Systeemstatus"))}</h2>
       <div class="health-row">{row_html}</div>
       <p>{esc(section.get("blocked_reason", "Aansturing beveiligd. Deze cockpit is alleen-lezen."))}</p>

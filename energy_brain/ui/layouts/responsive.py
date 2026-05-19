@@ -58,12 +58,12 @@ def _strategy_text(payload: dict[str, Any]) -> str:
     grid = _float_value(payload.get("grid_power_kw"))
     price = _float_value(payload.get("grid_price") or payload.get("price_now"))
     if solar > 0.4 and battery > 0.1:
-        return "Laden met zonne-overschot"
+        return "Laden uit zon"
     if grid < -0.1:
-        return "Overschot terugleveren aan het net"
+        return "Overschot rustig exporteren"
     if price < 0:
-        return "Wachten op goedkopere stroom"
-    return "Reserve beschermen en volgende kans bewaken"
+        return "Goedkope uren benutten"
+    return "Reserve beschermen"
 
 
 def _action_text(value: Any) -> str:
@@ -72,9 +72,9 @@ def _action_text(value: Any) -> str:
     if "charge" in lower or "laden" in lower:
         return "Laden"
     if "discharge" in lower or "ontladen" in lower:
-        return "Ontladen"
+        return "Huis voeden"
     if "export" in lower or "terug" in lower:
-        return "Terugleveren"
+        return "Exporteren"
     if "cheap" in lower or "negative" in lower or "goedkoop" in lower:
         return "Goedkoop uur"
     if "expensive" in lower or "peak" in lower or "duur" in lower:
@@ -90,19 +90,19 @@ def _reason_text(value: Any, default: str = "Laatste plancyclus bewaakt deze keu
     text = _text_value(value, default)
     lower = text.lower()
     if "negative" in lower and "price" in lower:
-        return "Er wordt een gunstig prijsmoment verwacht."
+        return "Goedkope uren naderen"
     if "battery" in lower and ("target" in lower or "below" in lower):
-        return "De batterij zit nog onder het gewenste doel."
+        return "Batterij onder doelreserve"
     if "reserve" in lower:
-        return "De batterijreserve blijft beschermd."
+        return "Reserve blijft beschermd"
     if "solar" in lower or "pv" in lower or "surplus" in lower:
-        return "Later wordt meer zonne-opwek verwacht."
+        return "PV overschot verwacht"
     if "price" in lower:
-        return "De huidige stroomprijs is nog niet gunstig genoeg."
+        return "Export nu ongunstig"
     if "degraded" in lower or "forecast" in lower or "prognose" in lower:
-        return "Een deel van de voorspelling is beperkt beschikbaar."
+        return "Voorspelling deels onzeker"
     if "no plan" in lower or "geen plan" in lower:
-        return "Er is nog geen bruikbare plancyclus beschikbaar."
+        return "Slim wachten"
     return text
 
 
@@ -326,9 +326,9 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
             },
             {
                 "type": "planner_summary",
-                "title": "Wat denkt Energy Brain nu?",
+                "title": "Live strategie",
                 "mode": _mode_text(payload.get("mode")),
-                "execution": _text_value(payload.get("execution"), "Geen aansturing"),
+                "execution": _text_value(payload.get("execution"), "Alleen observeren"),
                 "headline": strategy,
                 "confidence": _percent_value(payload.get("forecast_confidence")),
                 "expected_savings": _money_value(
@@ -342,7 +342,7 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
             },
             {
                 "type": "explainability",
-                "title": "Waarom wacht Energy Brain?",
+                "title": "Tactisch bewustzijn",
                 "reasons": _reasons(payload),
             },
             {
@@ -358,7 +358,7 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
                 "readonly": True,
                 "blocked_reason": _status_text(
                     payload.get("execution_blocked_reason"),
-                    "Aansturing beveiligd. Deze cockpit is alleen-lezen.",
+                    "Observer bewaakt zonder in te grijpen.",
                 ),
             },
             {

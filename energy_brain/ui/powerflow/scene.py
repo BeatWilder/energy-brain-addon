@@ -61,6 +61,41 @@ def _lane(
     }
 
 
+def _energy_transfers(solar_kw: float, battery_kw: float, grid_kw: float, house_kw: float) -> dict[str, float]:
+    solar = max(0.0, solar_kw)
+    house = max(0.0, house_kw)
+    battery_charge = max(0.0, battery_kw)
+    battery_discharge = max(0.0, -battery_kw)
+    grid_import = max(0.0, grid_kw)
+    grid_export = max(0.0, -grid_kw)
+
+    solar_to_house = min(solar, house)
+    unmet_house = max(0.0, house - solar_to_house)
+    spare_solar = max(0.0, solar - solar_to_house)
+
+    battery_to_house = min(battery_discharge, unmet_house)
+    unmet_house = max(0.0, unmet_house - battery_to_house)
+
+    solar_to_battery = min(spare_solar, battery_charge)
+    spare_solar = max(0.0, spare_solar - solar_to_battery)
+    grid_to_battery = min(grid_import, max(0.0, battery_charge - solar_to_battery))
+
+    grid_to_house = min(grid_import, unmet_house)
+
+    solar_to_grid = min(grid_export, spare_solar) if grid_export > 0.0 else 0.0
+    if grid_export > solar_to_grid and spare_solar > solar_to_grid:
+        solar_to_grid = min(grid_export, spare_solar)
+
+    return {
+        "solar_house": solar_to_house,
+        "solar_battery": solar_to_battery,
+        "solar_grid": solar_to_grid,
+        "grid_battery": grid_to_battery,
+        "grid_house": grid_to_house,
+        "battery_house": battery_to_house,
+    }
+
+
 def _house_mix(solar_kw: float, battery_kw: float, grid_kw: float, house_kw: float) -> list[dict[str, Any]]:
     if house_kw <= 0.05:
         return [{"source": "idle", "share": 1.0, "color": "rgba(255,255,255,0.16)"}]
@@ -112,6 +147,7 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
     grid_state = _direction(grid_kw, "importing", "exporting")
     house_state = "consuming" if house_kw > 0.05 else "idle"
     solar_state = "generating" if solar_kw > 0.05 else "idle"
+    transfers = _energy_transfers(solar_kw, battery_kw, grid_kw, house_kw)
     scene_intensity = max(
         power_intensity(solar_kw),
         power_intensity(house_kw),
@@ -125,40 +161,58 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
         "scene_intensity": round(scene_intensity, 3),
         "battery_state": battery_state,
         "grid_state": grid_state,
+        "orb_state": _orb_state(battery_state, grid_state, transfers, soc),
+        "transfers": {key: round(value, 3) for key, value in transfers.items()},
         "house_mix": mix,
         "house_mix_gradient": _mix_gradient(mix),
         "lanes": [
             _lane(
                 lane_id="solar-home",
-                path_id="pf-path-solar",
-                path="M 210 58 C 210 108, 210 148, 210 184",
-                kw=solar_kw,
-                state=solar_state,
+                path_id="pf-path-solar-home",
+                path="M 210 58 C 250 88, 318 136, 352 210",
+                kw=transfers["solar_house"],
+                state="transferring" if transfers["solar_house"] > 0.05 else "idle",
                 tone="solar",
             ),
             _lane(
-                lane_id="battery-home",
-                path_id="pf-path-battery",
-                path="M 72 210 C 122 210, 148 210, 184 210",
-                kw=battery_kw,
-                state=battery_state,
-                tone="battery",
+                lane_id="solar-battery",
+                path_id="pf-path-solar-battery",
+                path="M 210 58 C 168 92, 106 140, 72 210",
+                kw=transfers["solar_battery"],
+                state="transferring" if transfers["solar_battery"] > 0.05 else "idle",
+                tone="solar",
             ),
             _lane(
-                lane_id="home-grid",
-                path_id="pf-path-grid",
-                path="M 236 210 C 274 210, 304 210, 352 210",
-                kw=grid_kw,
-                state=grid_state,
+                lane_id="solar-grid",
+                path_id="pf-path-solar-grid",
+                path="M 210 58 C 252 148, 252 278, 210 360",
+                kw=transfers["solar_grid"],
+                state="exporting" if transfers["solar_grid"] > 0.05 else "idle",
+                tone="export",
+            ),
+            _lane(
+                lane_id="grid-battery",
+                path_id="pf-path-grid-battery",
+                path="M 210 360 C 156 326, 96 278, 72 210",
+                kw=transfers["grid_battery"],
+                state="importing" if transfers["grid_battery"] > 0.05 else "idle",
                 tone="grid",
             ),
             _lane(
-                lane_id="home-load",
-                path_id="pf-path-load",
-                path="M 210 236 C 210 276, 210 310, 210 360",
-                kw=house_kw,
-                state=house_state,
-                tone="home",
+                lane_id="grid-home",
+                path_id="pf-path-grid-home",
+                path="M 210 360 C 268 326, 326 278, 352 210",
+                kw=transfers["grid_house"],
+                state="importing" if transfers["grid_house"] > 0.05 else "idle",
+                tone="grid",
+            ),
+            _lane(
+                lane_id="battery-home",
+                path_id="pf-path-battery-home",
+                path="M 72 210 C 132 174, 292 174, 352 210",
+                kw=transfers["battery_house"],
+                state="discharging" if transfers["battery_house"] > 0.05 else "idle",
+                tone="battery",
             ),
         ],
         "nodes": {
@@ -193,3 +247,22 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
             },
         },
     }
+
+
+def _orb_state(
+    battery_state: str,
+    grid_state: str,
+    transfers: dict[str, float],
+    soc: float,
+) -> str:
+    if soc <= 25.0:
+        return "reserve-protected"
+    if transfers.get("solar_grid", 0.0) > 0.05 or grid_state == "exporting":
+        return "export-mode"
+    if transfers.get("grid_battery", 0.0) > 0.05:
+        return "cheap-charging"
+    if battery_state == "charging":
+        return "charging"
+    if battery_state == "discharging":
+        return "discharging"
+    return "idle"

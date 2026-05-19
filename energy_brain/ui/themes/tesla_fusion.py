@@ -12,8 +12,8 @@ def render_theme_css() -> str:
       --bg: #04070a;
       --surface: rgba(8, 12, 17, 0.74);
       --surface-strong: rgba(12, 18, 25, 0.9);
-      --glass: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.024));
-      --line: rgba(255, 255, 255, 0.105);
+      --glass: linear-gradient(180deg, rgba(255,255,255,0.052), rgba(255,255,255,0.016));
+      --line: rgba(255, 255, 255, 0.075);
       --line-strong: rgba(255, 255, 255, 0.18);
       --text: #f5f8fb;
       --muted: #98a5b2;
@@ -36,17 +36,29 @@ def render_theme_css() -> str:
       min-height: 100vh;
       color: var(--text);
       background:
-        radial-gradient(circle at 50% 18%, rgba(88, 232, 182, 0.14), transparent 32rem),
-        radial-gradient(circle at 82% 12%, rgba(127, 199, 255, 0.10), transparent 26rem),
+        radial-gradient(circle at 50% 22%, rgba(88, 232, 182, 0.16), transparent 34rem),
+        radial-gradient(circle at 82% 12%, rgba(255, 209, 102, 0.08), transparent 26rem),
+        radial-gradient(circle at 12% 72%, rgba(127, 199, 255, 0.08), transparent 24rem),
         linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px),
         linear-gradient(180deg, rgba(255,255,255,0.014) 1px, transparent 1px),
         linear-gradient(180deg, #071017 0%, #04070a 58%, #020304 100%);
-      background-size: auto, auto, 76px 76px, 76px 76px, auto;
+      background-size: auto, auto, auto, 76px 76px, 76px 76px, auto;
       font-family: var(--font-ui);
       letter-spacing: 0;
       overflow-x: hidden;
     }}
     a {{ color: inherit; }}
+    .sr-only {{
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }}
 
     /* Layout */
     .shell {{
@@ -68,9 +80,9 @@ def render_theme_css() -> str:
       justify-content: space-between;
       gap: 12px;
       padding: 8px;
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: var(--radius-lg);
-      background: linear-gradient(180deg, rgba(4, 7, 10, 0.88), rgba(4, 7, 10, 0.56));
+      border: 0;
+      border-radius: 0;
+      background: linear-gradient(180deg, rgba(4, 7, 10, 0.82), rgba(4, 7, 10, 0.26));
       backdrop-filter: blur(18px);
     }}
     .brand-block {{ min-width: 0; }}
@@ -134,9 +146,9 @@ def render_theme_css() -> str:
       gap: 8px;
       overflow-x: auto;
       padding: 8px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: var(--glass), rgba(6, 10, 14, 0.68);
+      border: 0;
+      border-radius: 0;
+      background: transparent;
       scrollbar-width: none;
     }}
     .health-strip-item {{
@@ -179,9 +191,9 @@ def render_theme_css() -> str:
 
     /* Panels */
     .hero, .panel {{
-      border: 1px solid var(--line);
+      border: 1px solid rgba(255,255,255,0.055);
       border-radius: var(--radius-lg);
-      background: var(--glass), var(--surface);
+      background: var(--glass), rgba(8, 12, 17, 0.54);
       backdrop-filter: blur(22px);
       box-shadow: var(--shadow-panel);
     }}
@@ -193,17 +205,19 @@ def render_theme_css() -> str:
       display: grid;
       grid-template-rows: auto minmax(330px, 1fr) auto;
       background:
-        radial-gradient(circle at 50% 46%, rgba(101,240,167,calc(0.08 + var(--scene-intensity) * 0.12)), transparent 34%),
-        linear-gradient(180deg, rgba(255,255,255,0.074), rgba(255,255,255,0.024)),
-        rgba(8,12,17,0.82);
-      box-shadow: var(--shadow-hero), inset 0 1px 0 rgba(255,255,255,0.08);
+        radial-gradient(circle at 50% 50%, rgba(101,240,167,calc(0.10 + var(--scene-intensity) * 0.16)), transparent 31%),
+        radial-gradient(circle at 50% 18%, rgba(255,209,102,0.08), transparent 28%),
+        linear-gradient(180deg, rgba(255,255,255,0.052), rgba(255,255,255,0.012)),
+        rgba(5,8,12,0.72);
+      border-color: rgba(255,255,255,0.035);
+      box-shadow: var(--shadow-hero), inset 0 1px 0 rgba(255,255,255,0.06);
     }}
     .hero:before {{
       content: "";
       position: absolute;
       inset: 9% 7%;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(88,232,182,0.18), transparent 60%), radial-gradient(circle at 40% 35%, rgba(127,199,255,0.13), transparent 46%);
+      background: radial-gradient(circle, rgba(88,232,182,0.18), transparent 58%), radial-gradient(circle at 40% 35%, rgba(255,209,102,0.12), transparent 44%), radial-gradient(circle at 66% 64%, rgba(127,199,255,0.11), transparent 42%);
       filter: blur(16px);
       opacity: calc(0.55 + var(--scene-intensity) * 0.3);
       animation: liveGlow 5.4s ease-in-out infinite;
@@ -230,6 +244,11 @@ def render_theme_css() -> str:
     .quality-chip {{ border-color: var(--line); background: rgba(255,255,255,0.035); }}
     .quality-live {{ color: var(--battery); border-color: rgba(101,240,167,0.25); background: rgba(101,240,167,0.08); }}
     .panel {{ padding: var(--panel-pad, 14px); min-width: 0; }}
+    .ambient-panel {{
+      border-color: rgba(255,255,255,0.04);
+      background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
+      box-shadow: none;
+    }}
     .panel h2 {{ margin: 0; font-size: 20px; line-height: 1.14; }}
     .panel p {{ color: var(--muted); margin: 7px 0 0; line-height: 1.42; }}
     .panel-head {{ position: relative; display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }}
@@ -245,6 +264,17 @@ def render_theme_css() -> str:
       aspect-ratio: 1;
       isolation: isolate;
     }}
+    .flow-map:before {{
+      content: "";
+      position: absolute;
+      inset: 7%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, transparent 47%, rgba(255,255,255,0.045) 48%, transparent 49%),
+        conic-gradient(from 25deg, rgba(88,232,182,0.10), rgba(255,209,102,0.07), rgba(127,199,255,0.09), rgba(88,232,182,0.10));
+      opacity: calc(0.36 + var(--scene-intensity) * 0.28);
+      pointer-events: none;
+    }}
     .flow-svg {{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }}
     .flow-svg defs path {{ fill: none; }}
     .flow-backbone, .flow-ribbons, .flow-particles {{ pointer-events: none; }}
@@ -258,6 +288,7 @@ def render_theme_css() -> str:
       transition: stroke var(--motion-base), stroke-width var(--motion-base), opacity var(--motion-base), filter var(--motion-base);
     }}
     .flow-lane.tone-solar, .flow-pulse.tone-solar {{ stroke: url(#solar-flow); }}
+    .flow-lane.tone-export, .flow-pulse.tone-export {{ stroke: url(#export-flow); }}
     .flow-lane.tone-home, .flow-pulse.tone-home {{ stroke: url(#solar-flow); }}
     .flow-lane.tone-battery, .flow-pulse.tone-battery {{ stroke: url(#grid-flow); }}
     .flow-lane.tone-grid.state-importing, .flow-pulse.tone-grid.state-importing {{ stroke: url(#import-flow); }}
@@ -273,13 +304,14 @@ def render_theme_css() -> str:
       mix-blend-mode: screen;
     }}
     .flow-pulse.state-idle {{ opacity: 0; }}
-    .flow-pulse.state-discharging, .flow-pulse.state-exporting {{ animation-direction: reverse; }}
+    .flow-pulse.state-discharging, .flow-pulse.state-exporting {{ animation-timing-function: cubic-bezier(0.2, 0.72, 0.22, 1); }}
     .flow-dot {{
       opacity: calc(0.28 + var(--flow-intensity) * 0.62);
       fill: #f9fff8;
       filter: drop-shadow(0 0 8px rgba(101,240,167,0.66)) drop-shadow(0 0 18px rgba(101,240,167,0.34));
     }}
     .flow-dot.tone-solar, .flow-dot.tone-home {{ fill: #fff0a6; filter: drop-shadow(0 0 8px rgba(255,209,102,0.72)) drop-shadow(0 0 18px rgba(88,232,182,0.32)); }}
+    .flow-dot.tone-export {{ fill: #ffe58f; filter: drop-shadow(0 0 8px rgba(255,209,102,0.74)) drop-shadow(0 0 20px rgba(255,209,102,0.34)); }}
     .flow-dot.tone-battery {{ fill: #8fd7ff; }}
     .flow-dot.tone-grid.state-importing {{ fill: #ffad7a; filter: drop-shadow(0 0 8px rgba(255,139,95,0.74)) drop-shadow(0 0 20px rgba(255,139,95,0.34)); }}
     .flow-dot.tone-grid.state-exporting {{ fill: #ffe58f; filter: drop-shadow(0 0 8px rgba(255,209,102,0.74)) drop-shadow(0 0 20px rgba(255,209,102,0.34)); }}
@@ -308,6 +340,23 @@ def render_theme_css() -> str:
       box-shadow: 0 0 calc(54px + var(--scene-intensity) * 56px) rgba(88,232,182,0.22), inset 0 0 34px rgba(255,255,255,0.055);
       animation: orbPulse 4.2s ease-in-out infinite;
     }}
+    .flow-map[data-orb-state="charging"] .orb,
+    .flow-map[data-orb-state="cheap-charging"] .orb {{
+      background: radial-gradient(circle at 42% 32%, rgba(255,255,255,0.16), transparent 25%), radial-gradient(circle, rgba(10,18,22,0.98) 52%, rgba(101,240,167,0.28) 75%, rgba(127,199,255,0.14));
+      box-shadow: 0 0 calc(62px + var(--scene-intensity) * 70px) rgba(101,240,167,0.28), inset 0 0 38px rgba(101,240,167,0.07);
+    }}
+    .flow-map[data-orb-state="discharging"] .orb {{
+      background: radial-gradient(circle at 42% 32%, rgba(255,255,255,0.15), transparent 25%), radial-gradient(circle, rgba(10,17,24,0.98) 51%, rgba(127,199,255,0.30) 76%, rgba(101,240,167,0.08));
+      box-shadow: 0 0 calc(58px + var(--scene-intensity) * 62px) rgba(127,199,255,0.26), inset 0 0 34px rgba(127,199,255,0.07);
+    }}
+    .flow-map[data-orb-state="reserve-protected"] .orb {{
+      background: radial-gradient(circle at 42% 32%, rgba(255,255,255,0.10), transparent 24%), radial-gradient(circle, rgba(13,15,18,0.98) 52%, rgba(255,139,95,0.22) 76%, rgba(101,240,167,0.06));
+      box-shadow: 0 0 44px rgba(255,139,95,0.18), inset 0 0 30px rgba(255,139,95,0.06);
+    }}
+    .flow-map[data-orb-state="export-mode"] .orb {{
+      background: radial-gradient(circle at 42% 32%, rgba(255,255,255,0.17), transparent 25%), radial-gradient(circle, rgba(18,16,10,0.98) 51%, rgba(255,209,102,0.33) 75%, rgba(255,241,168,0.12));
+      box-shadow: 0 0 calc(66px + var(--scene-intensity) * 78px) rgba(255,209,102,0.30), inset 0 0 40px rgba(255,209,102,0.08);
+    }}
     .orb:after {{
       content: "";
       position: absolute;
@@ -330,7 +379,7 @@ def render_theme_css() -> str:
       border-radius: inherit;
       background: conic-gradient(from -90deg, #65f0a7 calc(var(--soc) * 1%), rgba(255,255,255,0.075) 0);
       mask: radial-gradient(circle, transparent 63%, #000 64% 70%, transparent 71%);
-      animation: socOrbit 18s linear infinite;
+      animation: orbChargeBreath 5.8s ease-in-out infinite;
       pointer-events: none;
     }}
     .reserve-band {{
@@ -371,7 +420,7 @@ def render_theme_css() -> str:
       background: conic-gradient(from 140deg, var(--node-ring), rgba(255,255,255,0.05), var(--node-ring));
       opacity: calc(0.24 + var(--node-intensity) * 0.38);
       mask: radial-gradient(circle, transparent 57%, #000 58% 69%, transparent 70%);
-      animation: nodeRing 12s linear infinite;
+      animation: nodeHalo 6.8s ease-in-out infinite;
       pointer-events: none;
     }}
     .node i {{
@@ -395,6 +444,69 @@ def render_theme_css() -> str:
     .node-battery.state-discharging b {{ color: var(--grid); }}
     .node-battery.state-charging b {{ color: var(--battery); }}
 
+    .intent-orbit {{
+      position: absolute;
+      left: 50%;
+      top: 9%;
+      z-index: 3;
+      width: min(300px, 76%);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 7px;
+      pointer-events: none;
+    }}
+    .intent-orbit li, .telemetry-pill {{
+      border: 1px solid rgba(255,255,255,0.075);
+      border-radius: var(--radius-round);
+      background: rgba(4,8,12,0.56);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.055);
+      backdrop-filter: blur(14px);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 740;
+      padding: 6px 9px;
+      white-space: nowrap;
+    }}
+    .intent-orbit li:before {{
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-right: 7px;
+      border-radius: 50%;
+      background: var(--battery);
+      box-shadow: 0 0 12px rgba(101,240,167,0.55);
+      vertical-align: 1px;
+    }}
+    .micro-telemetry {{
+      position: absolute;
+      left: 50%;
+      bottom: 9%;
+      z-index: 3;
+      width: min(360px, 86%);
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      pointer-events: none;
+    }}
+    .telemetry-pill {{
+      color: var(--muted);
+      font-size: 10px;
+      padding: 5px 8px;
+    }}
+    .telemetry-pill b {{
+      color: var(--text);
+      margin-right: 5px;
+      font-size: 10px;
+    }}
+
     /* Timeline */
     .strategy-why {{ color: var(--muted); margin: 10px 0 0; font-size: 14px; line-height: 1.42; }}
     .strategy-metrics {{
@@ -404,17 +516,17 @@ def render_theme_css() -> str:
       margin: 13px 0;
     }}
     .strategy-metrics div, .health-pill {{
-      border: 1px solid var(--line);
+      border: 1px solid rgba(255,255,255,0.06);
       border-radius: var(--radius-md);
-      background: rgba(255,255,255,0.035);
+      background: rgba(255,255,255,0.026);
       padding: 9px;
     }}
     .strategy-metrics b, .health-pill b {{ display: block; margin-top: 3px; font-size: 14px; }}
     .horizon {{
       margin: 13px 0 8px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02)), rgba(3,6,9,0.46);
+      border: 1px solid rgba(255,255,255,0.055);
+      border-radius: var(--radius-md);
+      background: linear-gradient(180deg, rgba(255,255,255,0.038), rgba(255,255,255,0.012)), rgba(3,6,9,0.34);
       overflow: hidden;
     }}
     .horizon-head {{
@@ -423,7 +535,7 @@ def render_theme_css() -> str:
       justify-content: space-between;
       gap: var(--space-sm);
       padding: 10px 12px;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid rgba(255,255,255,0.055);
     }}
     .horizon-head span {{ color: var(--text); font-size: 13px; font-weight: 760; }}
     .horizon-head b {{ color: var(--muted); font-size: 11px; font-weight: 680; }}
@@ -458,7 +570,7 @@ def render_theme_css() -> str:
     .horizon-hour.tone-cheap {{ background: linear-gradient(180deg, rgba(88,232,182,0.16), rgba(255,255,255,0.025)); }}
     .horizon-hour.tone-expensive {{ background: linear-gradient(180deg, rgba(255,139,95,0.18), rgba(255,255,255,0.025)); }}
     .horizon-legend {{ display: flex; flex-wrap: wrap; gap: 7px; padding: 0 11px 10px; }}
-    .horizon-legend span {{ border: 1px solid var(--line); border-radius: var(--radius-round); color: var(--muted); background: rgba(255,255,255,0.035); padding: 5px 8px; font-size: 10px; font-weight: 720; }}
+    .horizon-legend span {{ border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-round); color: var(--muted); background: rgba(255,255,255,0.026); padding: 5px 8px; font-size: 10px; font-weight: 720; }}
     .timeline {{
       min-height: 86px;
       display: flex;
@@ -471,7 +583,7 @@ def render_theme_css() -> str:
     .timeline-block {{
       flex: 0 0 calc(var(--span) * 1%);
       min-width: 112px;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(255,255,255,0.06);
       border-radius: var(--radius-md);
       padding: 9px;
       background: rgba(255,255,255,0.04);
@@ -607,13 +719,13 @@ def render_theme_css() -> str:
     /* Animation */
     @keyframes flowTravel {{ from {{ stroke-dashoffset: 0; }} to {{ stroke-dashoffset: -96; }} }}
     @keyframes orbPulse {{ 0%, 100% {{ transform: scale(1); filter: brightness(1); }} 50% {{ transform: scale(1.018); filter: brightness(1.08); }} }}
-    @keyframes socOrbit {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
+    @keyframes orbChargeBreath {{ 0%, 100% {{ opacity: 0.72; transform: scale(0.992); }} 50% {{ opacity: 1; transform: scale(1.018); }} }}
     @keyframes orbitBreath {{ 0%, 100% {{ opacity: 0.42; transform: scale(0.985); }} 50% {{ opacity: 0.82; transform: scale(1.018); }} }}
     @keyframes liveGlow {{ 0%, 100% {{ opacity: 0.68; transform: scale(0.98); }} 50% {{ opacity: 1; transform: scale(1.03); }} }}
     @keyframes dotPulse {{ 0%, 100% {{ opacity: 0.72; transform: scale(0.92); }} 50% {{ opacity: 1; transform: scale(1.12); }} }}
     @keyframes junctionBreath {{ 0%, 100% {{ opacity: 0.34; transform: scale(0.94); }} 50% {{ opacity: 0.78; transform: scale(1.08); }} }}
     @keyframes corePulse {{ 0%, 100% {{ opacity: 0.74; transform: scale(0.86); }} 50% {{ opacity: 1; transform: scale(1.16); }} }}
-    @keyframes nodeRing {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
+    @keyframes nodeHalo {{ 0%, 100% {{ opacity: 0.22; transform: scale(0.985); }} 50% {{ opacity: 0.54; transform: scale(1.018); }} }}
     @keyframes nodeBreathe {{ 0%, 100% {{ filter: brightness(1); }} 50% {{ filter: brightness(1.07); }} }}
 
     @media (prefers-reduced-motion: reduce) {{
