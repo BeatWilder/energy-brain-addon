@@ -13,7 +13,8 @@ from energy_brain.v2000.read_only_tesla_cockpit import (
 
 def test_querystring_route_parsing_is_used_in_web_ui_source():
     source = Path("energy_brain/web_ui.py").read_text(encoding="utf-8")
-    assert "path = self.path.split('?', 1)[0]" in source
+    assert "raw_path = self.path.split('?', 1)[0]" in source
+    assert "path = self._normalize_ingress_path(raw_path)" in source
     assert 'if path == "/"' in source
     assert 'if path == "/api/tesla-cockpit"' in source
     assert 'if path == "/health"' in source

@@ -2346,7 +2346,13 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     server_version = "EnergyBrainReadOnlyUI/1.0"
 
     def do_GET(self) -> None:
-        path = self.path.split('?', 1)[0]
+        raw_path = self.path.split('?', 1)[0]
+        path = self._normalize_ingress_path(raw_path)
+        LOGGER.info(
+            "Ingress route request raw_path=%r normalized_path=%r",
+            raw_path,
+            path,
+        )
 
         if path == "/health":
             self._send_json({"status": "ok", "read_only": True})
@@ -2383,31 +2389,20 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
 
 
         if path == "/new-ui":
-            try:
-                query = self.path.split("?", 1)[1] if "?" in self.path else ""
-                layout_mode = select_layout_mode(query)
-                cycle = read_latest_cycle()
-                summary = summarize_cycle(cycle)
-                payload = build_fresh_home_v1_display_data(summary)
-                html = render_layout(layout_mode, payload)
-                status = 200
-            except Exception:
-                LOGGER.exception("New UI rendering failed")
-                html = render_error_page()
-                status = 500
-
-            self._send_response(
-                status,
-                html.encode("utf-8"),
-                "text/html; charset=utf-8",
-            )
+            self._send_new_ui_response()
             return
 
         if path == "/":
-            self.send_response(302)
-            self.send_header("Location", "/new-ui")
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
+            LOGGER.info(
+                "Serving new UI at ingress root request_path=%r normalized_path=%r",
+                self.path,
+                path,
+            )
+            self._send_new_ui_response()
+            return
+
+        if path == "/legacy-ui":
+            self._send_legacy_ui_response()
             return
 
         if path == "/cockpit":
@@ -2419,8 +2414,10 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
 
         
         
-        if path in ("", "/", "/home", "/index.html"):
-            path = "/new-ui"
+        if path in ("", "/home", "/index.html"):
+            LOGGER.info("Serving new UI at compatibility root request_path=%r", self.path)
+            self._send_new_ui_response()
+            return
 
 
         self._send_json({"status": "not_found", "read_only": True}, status=404)
@@ -2432,6 +2429,58 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
     def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
         body = json.dumps(payload, sort_keys=True).encode("utf-8")
         self._send_response(status, body, "application/json; charset=utf-8")
+
+    def _normalize_ingress_path(self, path: str) -> str:
+        parsed_path = path
+        scheme_index = parsed_path.find("://")
+        if scheme_index >= 0:
+            path_index = parsed_path.find("/", scheme_index + 3)
+            parsed_path = "/" if path_index < 0 else parsed_path[path_index:]
+        if not parsed_path:
+            return "/"
+        if not parsed_path.startswith("/"):
+            parsed_path = "/" + parsed_path
+
+        ingress_marker = "/api/hassio_ingress/"
+        marker_index = parsed_path.find(ingress_marker)
+        if marker_index >= 0:
+            rest = parsed_path[marker_index + len(ingress_marker):]
+            token_and_route = rest.split("/", 1)
+            parsed_path = "/" if len(token_and_route) == 1 else "/" + token_and_route[1]
+
+        while "//" in parsed_path:
+            parsed_path = parsed_path.replace("//", "/")
+
+        if len(parsed_path) > 1 and parsed_path.endswith("/"):
+            parsed_path = parsed_path.rstrip("/")
+
+        return parsed_path or "/"
+
+    def _send_new_ui_response(self) -> None:
+        try:
+            query = self.path.split("?", 1)[1] if "?" in self.path else ""
+            layout_mode = select_layout_mode(query)
+            cycle = read_latest_cycle()
+            summary = summarize_cycle(cycle)
+            payload = build_fresh_home_v1_display_data(summary)
+            html = render_layout(layout_mode, payload)
+            status = 200
+        except Exception:
+            LOGGER.exception("New UI rendering failed")
+            html = render_error_page()
+            status = 500
+
+        self._send_response(
+            status,
+            html.encode("utf-8"),
+            "text/html; charset=utf-8",
+        )
+
+    def _send_legacy_ui_response(self) -> None:
+        cycle = read_latest_cycle()
+        summary = summarize_cycle(cycle)
+        html = render_dashboard_html(summary)
+        self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _send_response(self, status: int, body: bytes, content_type: str) -> None:
         self.send_response(status)
