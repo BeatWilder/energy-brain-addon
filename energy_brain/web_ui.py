@@ -268,6 +268,101 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
     a {{ color: var(--accent); }}
     @media (max-width: 760px) {{ .grid {{ grid-template-columns: 1fr; }} }}
   </style>
+
+<style>
+
+@keyframes eb_led_breathe {
+  0% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+}
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-panel,
+.eb-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center,
+      rgba(40,255,170,0.10) 0%,
+      rgba(0,0,0,0.0) 70%),
+    linear-gradient(
+      180deg,
+      rgba(0,18,12,0.92) 0%,
+      rgba(0,8,12,0.96) 100%
+    ) !important;
+
+  box-shadow:
+    inset 0 0 80px rgba(60,255,180,0.12),
+    inset 0 0 140px rgba(60,255,180,0.08),
+    0 0 40px rgba(60,255,180,0.18),
+    0 0 120px rgba(60,255,180,0.10);
+
+  border: 1px solid rgba(80,255,180,0.10);
+}
+
+.energy-flow-card::before,
+.energy-ecosystem-card::before,
+.eb-panel::before,
+.eb-card::before {
+  content: "";
+
+  position: absolute;
+  inset: -30%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(80,255,180,0.18) 0%,
+      rgba(80,255,180,0.08) 30%,
+      rgba(80,255,180,0.00) 72%
+    );
+
+  filter: blur(50px);
+
+  animation: eb_led_breathe 3.2s ease-in-out infinite;
+
+  pointer-events: none;
+}
+
+.energy-node,
+.flow-node,
+.eb-orb {
+  box-shadow:
+    0 0 25px rgba(80,255,180,0.45),
+    0 0 55px rgba(80,255,180,0.32),
+    0 0 120px rgba(80,255,180,0.18);
+
+  animation-duration: 1.8s !important;
+}
+
+.energy-line,
+.flow-line,
+.energy-stream {
+  opacity: 0.88 !important;
+  filter: blur(0.4px);
+
+  box-shadow:
+    0 0 18px rgba(80,255,180,0.45),
+    0 0 42px rgba(80,255,180,0.22);
+
+  animation-duration: 1.4s !important;
+}
+
+</style>
+
 </head>
 <body>
   <main>
@@ -666,6 +761,101 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
       }}
     }}
   </style>
+
+<style>
+
+@keyframes eb_led_breathe {
+  0% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+}
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-panel,
+.eb-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center,
+      rgba(40,255,170,0.10) 0%,
+      rgba(0,0,0,0.0) 70%),
+    linear-gradient(
+      180deg,
+      rgba(0,18,12,0.92) 0%,
+      rgba(0,8,12,0.96) 100%
+    ) !important;
+
+  box-shadow:
+    inset 0 0 80px rgba(60,255,180,0.12),
+    inset 0 0 140px rgba(60,255,180,0.08),
+    0 0 40px rgba(60,255,180,0.18),
+    0 0 120px rgba(60,255,180,0.10);
+
+  border: 1px solid rgba(80,255,180,0.10);
+}
+
+.energy-flow-card::before,
+.energy-ecosystem-card::before,
+.eb-panel::before,
+.eb-card::before {
+  content: "";
+
+  position: absolute;
+  inset: -30%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(80,255,180,0.18) 0%,
+      rgba(80,255,180,0.08) 30%,
+      rgba(80,255,180,0.00) 72%
+    );
+
+  filter: blur(50px);
+
+  animation: eb_led_breathe 3.2s ease-in-out infinite;
+
+  pointer-events: none;
+}
+
+.energy-node,
+.flow-node,
+.eb-orb {
+  box-shadow:
+    0 0 25px rgba(80,255,180,0.45),
+    0 0 55px rgba(80,255,180,0.32),
+    0 0 120px rgba(80,255,180,0.18);
+
+  animation-duration: 1.8s !important;
+}
+
+.energy-line,
+.flow-line,
+.energy-stream {
+  opacity: 0.88 !important;
+  filter: blur(0.4px);
+
+  box-shadow:
+    0 0 18px rgba(80,255,180,0.45),
+    0 0 42px rgba(80,255,180,0.22);
+
+  animation-duration: 1.4s !important;
+}
+
+</style>
+
 </head>
 <body>
   <main>
@@ -1057,6 +1247,101 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
       .kpi {{ min-height: auto; }}
     }}
   </style>
+
+<style>
+
+@keyframes eb_led_breathe {
+  0% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+}
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-panel,
+.eb-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center,
+      rgba(40,255,170,0.10) 0%,
+      rgba(0,0,0,0.0) 70%),
+    linear-gradient(
+      180deg,
+      rgba(0,18,12,0.92) 0%,
+      rgba(0,8,12,0.96) 100%
+    ) !important;
+
+  box-shadow:
+    inset 0 0 80px rgba(60,255,180,0.12),
+    inset 0 0 140px rgba(60,255,180,0.08),
+    0 0 40px rgba(60,255,180,0.18),
+    0 0 120px rgba(60,255,180,0.10);
+
+  border: 1px solid rgba(80,255,180,0.10);
+}
+
+.energy-flow-card::before,
+.energy-ecosystem-card::before,
+.eb-panel::before,
+.eb-card::before {
+  content: "";
+
+  position: absolute;
+  inset: -30%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(80,255,180,0.18) 0%,
+      rgba(80,255,180,0.08) 30%,
+      rgba(80,255,180,0.00) 72%
+    );
+
+  filter: blur(50px);
+
+  animation: eb_led_breathe 3.2s ease-in-out infinite;
+
+  pointer-events: none;
+}
+
+.energy-node,
+.flow-node,
+.eb-orb {
+  box-shadow:
+    0 0 25px rgba(80,255,180,0.45),
+    0 0 55px rgba(80,255,180,0.32),
+    0 0 120px rgba(80,255,180,0.18);
+
+  animation-duration: 1.8s !important;
+}
+
+.energy-line,
+.flow-line,
+.energy-stream {
+  opacity: 0.88 !important;
+  filter: blur(0.4px);
+
+  box-shadow:
+    0 0 18px rgba(80,255,180,0.45),
+    0 0 42px rgba(80,255,180,0.22);
+
+  animation-duration: 1.4s !important;
+}
+
+</style>
+
 </head>
 <body>
   <main>
@@ -1961,6 +2246,101 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
       header, .card {{ border-radius: 22px; }}
     }}
   </style>
+
+<style>
+
+@keyframes eb_led_breathe {
+  0% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+}
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-panel,
+.eb-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center,
+      rgba(40,255,170,0.10) 0%,
+      rgba(0,0,0,0.0) 70%),
+    linear-gradient(
+      180deg,
+      rgba(0,18,12,0.92) 0%,
+      rgba(0,8,12,0.96) 100%
+    ) !important;
+
+  box-shadow:
+    inset 0 0 80px rgba(60,255,180,0.12),
+    inset 0 0 140px rgba(60,255,180,0.08),
+    0 0 40px rgba(60,255,180,0.18),
+    0 0 120px rgba(60,255,180,0.10);
+
+  border: 1px solid rgba(80,255,180,0.10);
+}
+
+.energy-flow-card::before,
+.energy-ecosystem-card::before,
+.eb-panel::before,
+.eb-card::before {
+  content: "";
+
+  position: absolute;
+  inset: -30%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(80,255,180,0.18) 0%,
+      rgba(80,255,180,0.08) 30%,
+      rgba(80,255,180,0.00) 72%
+    );
+
+  filter: blur(50px);
+
+  animation: eb_led_breathe 3.2s ease-in-out infinite;
+
+  pointer-events: none;
+}
+
+.energy-node,
+.flow-node,
+.eb-orb {
+  box-shadow:
+    0 0 25px rgba(80,255,180,0.45),
+    0 0 55px rgba(80,255,180,0.32),
+    0 0 120px rgba(80,255,180,0.18);
+
+  animation-duration: 1.8s !important;
+}
+
+.energy-line,
+.flow-line,
+.energy-stream {
+  opacity: 0.88 !important;
+  filter: blur(0.4px);
+
+  box-shadow:
+    0 0 18px rgba(80,255,180,0.45),
+    0 0 42px rgba(80,255,180,0.22);
+
+  animation-duration: 1.4s !important;
+}
+
+</style>
+
 </head>
 <body>
   <main>
@@ -2843,6 +3223,101 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
       td {{ padding-top: 2px; }}
     }}
   </style>
+
+<style>
+
+@keyframes eb_led_breathe {
+  0% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+}
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-panel,
+.eb-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center,
+      rgba(40,255,170,0.10) 0%,
+      rgba(0,0,0,0.0) 70%),
+    linear-gradient(
+      180deg,
+      rgba(0,18,12,0.92) 0%,
+      rgba(0,8,12,0.96) 100%
+    ) !important;
+
+  box-shadow:
+    inset 0 0 80px rgba(60,255,180,0.12),
+    inset 0 0 140px rgba(60,255,180,0.08),
+    0 0 40px rgba(60,255,180,0.18),
+    0 0 120px rgba(60,255,180,0.10);
+
+  border: 1px solid rgba(80,255,180,0.10);
+}
+
+.energy-flow-card::before,
+.energy-ecosystem-card::before,
+.eb-panel::before,
+.eb-card::before {
+  content: "";
+
+  position: absolute;
+  inset: -30%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(80,255,180,0.18) 0%,
+      rgba(80,255,180,0.08) 30%,
+      rgba(80,255,180,0.00) 72%
+    );
+
+  filter: blur(50px);
+
+  animation: eb_led_breathe 3.2s ease-in-out infinite;
+
+  pointer-events: none;
+}
+
+.energy-node,
+.flow-node,
+.eb-orb {
+  box-shadow:
+    0 0 25px rgba(80,255,180,0.45),
+    0 0 55px rgba(80,255,180,0.32),
+    0 0 120px rgba(80,255,180,0.18);
+
+  animation-duration: 1.8s !important;
+}
+
+.energy-line,
+.flow-line,
+.energy-stream {
+  opacity: 0.88 !important;
+  filter: blur(0.4px);
+
+  box-shadow:
+    0 0 18px rgba(80,255,180,0.45),
+    0 0 42px rgba(80,255,180,0.22);
+
+  animation-duration: 1.4s !important;
+}
+
+</style>
+
 </head>
 <body>
   <main>
@@ -2961,6 +3436,101 @@ def _eb4_empty_dashboard(no_disp: str) -> str:
     p {{ color: #9aa7b5; }}
     .compat {{ display: none; }}
   </style>
+
+<style>
+
+@keyframes eb_led_breathe {
+  0% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+}
+
+.energy-flow-card,
+.energy-ecosystem-card,
+.eb-panel,
+.eb-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center,
+      rgba(40,255,170,0.10) 0%,
+      rgba(0,0,0,0.0) 70%),
+    linear-gradient(
+      180deg,
+      rgba(0,18,12,0.92) 0%,
+      rgba(0,8,12,0.96) 100%
+    ) !important;
+
+  box-shadow:
+    inset 0 0 80px rgba(60,255,180,0.12),
+    inset 0 0 140px rgba(60,255,180,0.08),
+    0 0 40px rgba(60,255,180,0.18),
+    0 0 120px rgba(60,255,180,0.10);
+
+  border: 1px solid rgba(80,255,180,0.10);
+}
+
+.energy-flow-card::before,
+.energy-ecosystem-card::before,
+.eb-panel::before,
+.eb-card::before {
+  content: "";
+
+  position: absolute;
+  inset: -30%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(80,255,180,0.18) 0%,
+      rgba(80,255,180,0.08) 30%,
+      rgba(80,255,180,0.00) 72%
+    );
+
+  filter: blur(50px);
+
+  animation: eb_led_breathe 3.2s ease-in-out infinite;
+
+  pointer-events: none;
+}
+
+.energy-node,
+.flow-node,
+.eb-orb {
+  box-shadow:
+    0 0 25px rgba(80,255,180,0.45),
+    0 0 55px rgba(80,255,180,0.32),
+    0 0 120px rgba(80,255,180,0.18);
+
+  animation-duration: 1.8s !important;
+}
+
+.energy-line,
+.flow-line,
+.energy-stream {
+  opacity: 0.88 !important;
+  filter: blur(0.4px);
+
+  box-shadow:
+    0 0 18px rgba(80,255,180,0.45),
+    0 0 42px rgba(80,255,180,0.22);
+
+  animation-duration: 1.4s !important;
+}
+
+</style>
+
 </head>
 <body>
   <main>
