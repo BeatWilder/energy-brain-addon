@@ -1,38 +1,19 @@
 from __future__ import annotations
 
-from typing import Literal
-
-LayoutMode = Literal[
-    "auto",
-    "desktop",
-    "tablet",
+VALID_LAYOUTS = {
     "mobile",
-]
+    "tablet",
+    "workstation",
+}
 
 
-DEFAULT_LAYOUT_MODE: LayoutMode = "auto"
+def normalize_layout_profile(value: str | None) -> str:
+    if not value:
+        return "tablet"
 
+    value = str(value).strip().lower()
 
-def normalize_layout_mode(value: str | None) -> LayoutMode:
-    allowed = {
-        "auto",
-        "desktop",
-        "tablet",
-        "mobile",
-    }
+    if value not in VALID_LAYOUTS:
+        return "tablet"
 
-    if value in allowed:
-        return value  # type: ignore[return-value]
-
-    return DEFAULT_LAYOUT_MODE
-
-
-def get_layout_description(mode: LayoutMode) -> str:
-    descriptions = {
-        "auto": "Automatische apparaatdetectie",
-        "desktop": "Desktop command center",
-        "tablet": "Tablet bedienpaneel",
-        "mobile": "Mobiele cockpit",
-    }
-
-    return descriptions[mode]
+    return value
