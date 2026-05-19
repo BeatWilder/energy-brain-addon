@@ -1,20 +1,28 @@
-from __future__ import annotations
+from energy_brain.ui.powerflow_v2.styles import render_powerflow_v2_css
 
+def render_powerflow_v2():
+    return f"""
+<style>
+{render_powerflow_v2_css()}
+</style>
 
-def render_powerflow_v2() -> str:
-    return """
-<div style="
-  height:420px;
-  background:red;
-  color:white;
-  font-size:48px;
-  font-weight:900;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:30px;
-  margin:20px;
-">
-PFV2 LIVE OK
+<div class="pf-v2">
+
+  <div class="pf-node pf-solar">
+    <span>Zon</span>
+  </div>
+
+  <div class="pf-node pf-home">
+    <span>Huis</span>
+  </div>
+
+  <div class="pf-node pf-grid">
+    <span>Net</span>
+  </div>
+
+  <div class="pf-node pf-battery">
+    <span>Batterij</span>
+  </div>
+
 </div>
 """
