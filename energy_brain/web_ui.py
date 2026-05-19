@@ -245,7 +245,7 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
       min-height: 100vh;
       font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--text);
-      background: radial-gradient(circle at top left, rgba(115,215,255,.18), transparent 34rem), var(--bg);
+      background: radial-gradient(circle at center at top left, rgba(115,215,255,.18), transparent 34rem), var(--bg);
     }}
     main {{ max-width: 1120px; margin: 0 auto; padding: 28px; }}
     header, section {{
@@ -996,7 +996,7 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
       top: -120px;
       width: 260px;
       height: 260px;
-      background: radial-gradient(circle, rgba(115,215,255,.22), transparent 66%);
+      background: radial-gradient(circle at center, rgba(115,215,255,.22), transparent 66%);
       pointer-events: none;
     }}
     .hero > * {{ position: relative; z-index: 1; }}
