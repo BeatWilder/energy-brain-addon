@@ -107,7 +107,7 @@ def build_tablet_safety(
 def render_tablet_cockpit(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    result = build_layout_view(payload, "tablet")
+    result = build_layout_view(payload, "tablet", include_living_layers=False)
     result["schema_version"] = "phase_ui_d.tablet_renderer.v2"
     result["mode"] = "control_panel"
     return result

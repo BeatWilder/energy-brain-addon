@@ -6,7 +6,9 @@ from typing import Any
 from energy_brain.ui.components.responsive import (
     render_explainability_panel,
     render_battery_panel,
+    render_comfort_panel,
     render_health_strip,
+    render_living_controls,
     render_planner_summary,
     render_powerflow_hero,
     render_safety_panel,
@@ -69,6 +71,12 @@ def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
         section_type = section.get("type")
         if section_type == "planner_summary":
             html_parts.append(render_planner_summary(section))
+            continue
+        if section_type == "comfort_intelligence":
+            html_parts.append(render_comfort_panel(section))
+            continue
+        if section_type == "living_controls":
+            html_parts.append(render_living_controls(section))
             continue
         if section_type == "battery_status":
             html_parts.append(render_battery_panel(section))

@@ -75,7 +75,7 @@ def build_mobile_statusbar(payload: dict[str, Any]) -> dict[str, Any]:
 def render_mobile_cockpit(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    result = build_layout_view(payload, "mobile")
+    result = build_layout_view(payload, "mobile", include_living_layers=False)
     result["schema_version"] = "phase_ui_c.mobile_renderer.v2"
     result["mode"] = "operator_companion"
     return result

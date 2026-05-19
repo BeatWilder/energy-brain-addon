@@ -209,6 +209,11 @@ def _primary_reason(entries: list[dict[str, Any]]) -> str:
 
 def _scene_intents(section: dict[str, Any], scene: dict[str, Any]) -> list[str]:
     intents: list[str] = []
+    semantic = section.get("semantic_state") if isinstance(section.get("semantic_state"), dict) else {}
+    for key in ("battery_strategy", "reserve_state"):
+        value = semantic.get(key) or section.get(key)
+        if value and value != "onbekend":
+            intents.append(str(value))
     transfers = scene.get("transfers") if isinstance(scene.get("transfers"), dict) else {}
     if float(transfers.get("solar_battery") or 0) > 0.05:
         intents.append("Laden uit zon")
@@ -340,6 +345,13 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
 
 def render_planner_summary(section: dict[str, Any]) -> str:
     entries = section.get("entries") if isinstance(section.get("entries"), list) else []
+    reserve_state = section.get("reserve_state", "Reserve onbekend")
+    solar_state = section.get("solar_state", "Niet beschikbaar")
+    grid_dependency = section.get("grid_dependency", "Niet beschikbaar")
+    if solar_state == "onbekend":
+        solar_state = "Niet beschikbaar"
+    if grid_dependency == "onbekend":
+        grid_dependency = "Niet beschikbaar"
     blocks = "".join(
         f"""
         <div class="timeline-block tone-{esc(item.get("tone", "hold"))}" style="--span:{esc(item.get("width", "16"))}">
@@ -373,6 +385,11 @@ def render_planner_summary(section: dict[str, Any]) -> str:
         <div><span>Verwachte besparing</span><b>{esc(section.get("expected_savings", "berekenen"))}</b></div>
         <div><span>Volgende verwachting</span><b>{esc(section.get("next_action_time", "volgende cyclus"))}</b></div>
       </div>
+      <div class="semantic-grid" aria-label="Semantische EMS-status">
+        <span><b>Reserve</b>{esc(reserve_state)}</span>
+        <span><b>Zon</b>{esc(solar_state)}</span>
+        <span><b>Net</b>{esc(grid_dependency)}</span>
+      </div>
       <div class="horizon" aria-label="24-uurs planning" data-legacy-label="Komende uren">
         <div class="horizon-head"><span>Energy Brain ziet vooruit</span><b>lading · prijs · actie</b></div>
         <div class="horizon-grid">{_timeline_horizon(entries)}</div>
@@ -383,6 +400,66 @@ def render_planner_summary(section: dict[str, Any]) -> str:
       <div class="timeline" aria-label="Planningslijn">{blocks}</div>
       <div class="plan-list">{items}</div>
       <div class="metric-row"><span>Aansturing</span><b>{esc(section.get("execution", "Geen aansturing"))}</b></div>
+    </section>
+    """
+
+
+def _state_row(label: str, value: Any) -> str:
+    display = "Niet beschikbaar" if value in (None, "", "onbekend") else value
+    return f'<div class="comfort-row"><span>{esc(label)}</span><b>{esc(display)}</b></div>'
+
+
+def render_comfort_panel(section: dict[str, Any]) -> str:
+    rows = "".join(
+        [
+            _state_row("Woonkamer", section.get("living_state")),
+            _state_row("Keuken", section.get("kitchen_state")),
+            _state_row("Aanwezig woonkamer", section.get("presence_living")),
+            _state_row("Aanwezig keuken", section.get("presence_kitchen")),
+            _state_row("Override woonkamer", section.get("override_living")),
+            _state_row("Override keuken", section.get("override_kitchen")),
+        ]
+    )
+    comfort_mode = section.get("comfort_mode", "Comfort niet beschikbaar")
+    thermal_strategy = section.get("thermal_strategy", "Thermiek niet beschikbaar")
+    if comfort_mode == "Comfort onbekend":
+        comfort_mode = "Comfort niet beschikbaar"
+    if thermal_strategy == "Thermiek onbekend":
+        thermal_strategy = "Thermiek niet beschikbaar"
+    return f"""
+    <section class="panel comfort-panel ambient-panel" aria-label="Comfort Intelligence">
+      <div class="panel-head">
+        <span class="eyebrow">Comfort Intelligence</span>
+        <span class="thermal-chip">{esc(section.get("heating_allowed") if section.get("heating_allowed") != "onbekend" else "Niet beschikbaar")}</span>
+      </div>
+      <h2>{esc(comfort_mode)}</h2>
+      <p>{esc(thermal_strategy)}</p>
+      <div class="comfort-grid">{rows}</div>
+    </section>
+    """
+
+
+def render_living_controls(section: dict[str, Any]) -> str:
+    rows = [
+        ("Dispatch", section.get("dispatch_state", "Dispatch onbekend")),
+        ("Modus", section.get("dispatch_mode", "Niet beschikbaar")),
+        ("Vermogen", section.get("dispatch_power", "Niet beschikbaar")),
+        ("Duur", section.get("dispatch_duration", "Niet beschikbaar")),
+        ("Cutoff SOC", section.get("dispatch_cutoff_soc", "Niet beschikbaar")),
+        ("Schrijven", "Alleen-lezen"),
+    ]
+    row_html = "".join(
+        f'<div class="control-row"><span>{esc(label)}</span><b>{esc("Niet beschikbaar" if value == "onbekend" else value)}</b></div>'
+        for label, value in rows
+    )
+    return f"""
+    <section class="panel controls-panel ambient-panel" aria-label="Living Controls">
+      <div class="panel-head">
+        <span class="eyebrow">Living Controls</span>
+        <span class="thermal-chip">observer</span>
+      </div>
+      <h2>Handmatige laag beveiligd</h2>
+      <div class="control-grid">{row_html}</div>
     </section>
     """
 

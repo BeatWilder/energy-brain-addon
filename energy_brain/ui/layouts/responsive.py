@@ -241,7 +241,17 @@ def _status_text(value: Any, default: str) -> str:
     return text
 
 
-def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, Any]:
+def _semantic(payload: dict[str, Any]) -> dict[str, Any]:
+    value = payload.get("semantic_state") or payload.get("living_state")
+    return value if isinstance(value, dict) else {}
+
+
+def build_layout_view(
+    payload: dict[str, Any],
+    layout_mode: str,
+    *,
+    include_living_layers: bool = True,
+) -> dict[str, Any]:
     mode = effective_layout_mode(layout_mode)
     compact = mode == "mobile"
     tablet = mode == "tablet"
@@ -253,86 +263,87 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
     battery = _display_power(payload, "battery_power_kw")
     grid = _display_power(payload, "grid_power_kw")
     soc = sanitize_percent(payload.get("soc_percent") or payload.get("battery_soc_percent"))
-    return {
-        "schema_version": "energy_brain.ui.layout.v2",
-        "layout": mode,
-        "layout_preference": layout_mode if layout_mode in {"auto", "mobile", "tablet", "desktop"} else "auto",
-        "observer_only": True,
-        "density": "compact" if compact else "balanced" if tablet else "wide",
-        "viewport": {
-            "mobile_first": True,
-            "breakpoints": {
-                "mobile_max": 767,
-                "tablet_min": 768,
-                "tablet_max": 1199,
-                "desktop_min": 1200,
+    semantic = _semantic(payload)
+    sections = [
+        {
+            "type": "powerflow_hero",
+            "title": "Energy Brain",
+            "status": "Live",
+            "strategy": strategy,
+            "soc_percent": soc["value"],
+            "soc_label": soc["label"],
+            "soc_known": soc["known"],
+            "solar_kw": solar["value"],
+            "solar_label": solar["label"],
+            "solar_known": solar["known"],
+            "house_kw": house["value"],
+            "house_label": house["label"],
+            "house_known": house["known"],
+            "battery_kw": battery["value"],
+            "battery_label": battery["label"],
+            "battery_known": battery["known"],
+            "grid_kw": grid["value"],
+            "grid_label": grid["label"],
+            "grid_known": grid["known"],
+            "data_quality": {
+                "clamped": [
+                    name
+                    for name, value in {
+                        "zon": solar,
+                        "huis": house,
+                        "batterij": battery,
+                        "net": grid,
+                        "batterij-SOC": soc,
+                    }.items()
+                    if value["clamped"]
+                ],
+                "unknown": [
+                    name
+                    for name, value in {
+                        "zon": solar,
+                        "huis": house,
+                        "batterij": battery,
+                        "net": grid,
+                        "batterij-SOC": soc,
+                    }.items()
+                    if not value["known"]
+                ],
             },
+            "price": price,
+            "decision": _text_value(semantic.get("energy_mode"), strategy),
+            "semantic_state": semantic,
+            "reserve_state": _text_value(semantic.get("reserve_state"), "Reserve onbekend"),
+            "planner_intent": _text_value(semantic.get("battery_strategy"), strategy),
+            "updated": _text_value(payload.get("last_update"), "laatste cyclus"),
         },
-        "responsive": {
-            "mobile_first": True,
-            "breakpoints": {
-                "mobile_max": 767,
-                "tablet_min": 768,
-                "tablet_max": 1199,
-                "desktop_min": 1200,
-            },
-        },
-        "sections": [
+    ]
+
+    if include_living_layers:
+        sections.append(
             {
-                "type": "powerflow_hero",
-                "title": "Energy Brain",
-                "status": "Live",
-                "strategy": strategy,
-                "soc_percent": soc["value"],
-                "soc_label": soc["label"],
-                "soc_known": soc["known"],
-                "solar_kw": solar["value"],
-                "solar_label": solar["label"],
-                "solar_known": solar["known"],
-                "house_kw": house["value"],
-                "house_label": house["label"],
-                "house_known": house["known"],
-                "battery_kw": battery["value"],
-                "battery_label": battery["label"],
-                "battery_known": battery["known"],
-                "grid_kw": grid["value"],
-                "grid_label": grid["label"],
-                "grid_known": grid["known"],
-                "data_quality": {
-                    "clamped": [
-                        name
-                        for name, value in {
-                            "zon": solar,
-                            "huis": house,
-                            "batterij": battery,
-                            "net": grid,
-                            "batterij-SOC": soc,
-                        }.items()
-                        if value["clamped"]
-                    ],
-                    "unknown": [
-                        name
-                        for name, value in {
-                            "zon": solar,
-                            "huis": house,
-                            "batterij": battery,
-                            "net": grid,
-                            "batterij-SOC": soc,
-                        }.items()
-                        if not value["known"]
-                    ],
-                },
-                "price": price,
-                "decision": strategy,
-                "updated": _text_value(payload.get("last_update"), "laatste cyclus"),
-            },
+                "type": "comfort_intelligence",
+                "title": "Comfort Intelligence",
+                "comfort_mode": _text_value(semantic.get("comfort_mode"), "Comfort onbekend"),
+                "thermal_strategy": _text_value(semantic.get("thermal_strategy"), "Thermiek onbekend"),
+                "living_state": _text_value(payload.get("climate_living"), "onbekend"),
+                "kitchen_state": _text_value(payload.get("climate_kitchen"), "onbekend"),
+                "presence_living": _text_value(payload.get("presence_living"), "onbekend"),
+                "presence_kitchen": _text_value(payload.get("presence_kitchen"), "onbekend"),
+                "override_living": _text_value(payload.get("ir_override_living"), "onbekend"),
+                "override_kitchen": _text_value(payload.get("ir_override_kitchen"), "onbekend"),
+                "heating_allowed": _text_value(payload.get("heating_allowed"), "onbekend"),
+            }
+        )
+
+    sections.extend(
+        [
             {
                 "type": "planner_summary",
                 "title": "Live strategie",
                 "mode": _mode_text(payload.get("mode")),
                 "execution": _text_value(payload.get("execution"), "Alleen observeren"),
-                "headline": strategy,
-                "confidence": _percent_value(payload.get("forecast_confidence")),
+                "headline": _text_value(semantic.get("battery_strategy"), strategy),
+                "confidence": _percent_value(semantic.get("forecast_confidence") or payload.get("forecast_confidence")),
                 "expected_savings": _money_value(
                     payload.get("expected_savings")
                     or payload.get("delta_vs_baseline")
@@ -340,8 +351,31 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
                 ),
                 "next_action_time": timeline[0]["time"] if timeline else "volgende cyclus",
                 "entries": timeline,
+                "semantic_state": semantic,
+                "reserve_state": _text_value(semantic.get("reserve_state"), "Reserve onbekend"),
+                "grid_dependency": _text_value(semantic.get("grid_dependency"), "onbekend"),
+                "solar_state": _text_value(semantic.get("solar_state"), "onbekend"),
                 "source_entry_count": len(payload.get("plan_windows") or payload.get("timeline") or []),
             },
+        ]
+    )
+
+    if include_living_layers:
+        sections.append(
+            {
+                "type": "living_controls",
+                "title": "Living Controls",
+                "dispatch_state": _text_value(semantic.get("dispatch_state"), "Dispatch onbekend"),
+                "dispatch_mode": _text_value(payload.get("dispatch_mode"), "onbekend"),
+                "dispatch_power": _text_value(payload.get("dispatch_power"), "onbekend"),
+                "dispatch_duration": _text_value(payload.get("dispatch_duration"), "onbekend"),
+                "dispatch_cutoff_soc": _text_value(payload.get("dispatch_cutoff_soc"), "onbekend"),
+                "readonly": True,
+            }
+        )
+
+    sections.extend(
+        [
             {
                 "type": "explainability",
                 "title": "Tactisch bewustzijn",
@@ -372,7 +406,34 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
                 "battery_label": battery["label"],
                 "updated": _text_value(payload.get("last_update"), "laatste cyclus"),
             },
-        ],
+        ]
+    )
+
+    return {
+        "schema_version": "energy_brain.ui.layout.v2",
+        "layout": mode,
+        "layout_preference": layout_mode if layout_mode in {"auto", "mobile", "tablet", "desktop"} else "auto",
+        "observer_only": True,
+        "density": "compact" if compact else "balanced" if tablet else "wide",
+        "viewport": {
+            "mobile_first": True,
+            "breakpoints": {
+                "mobile_max": 767,
+                "tablet_min": 768,
+                "tablet_max": 1199,
+                "desktop_min": 1200,
+            },
+        },
+        "responsive": {
+            "mobile_first": True,
+            "breakpoints": {
+                "mobile_max": 767,
+                "tablet_min": 768,
+                "tablet_max": 1199,
+                "desktop_min": 1200,
+            },
+        },
+        "sections": sections,
     }
 
 

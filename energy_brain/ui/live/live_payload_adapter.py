@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from energy_brain.ui.semantic_state import build_semantic_state, merge_entity_values
+
 
 UNKNOWN = "onbekend"
 
@@ -103,6 +105,10 @@ def build_live_payload(
 ) -> dict[str, Any]:
 
     raw = raw or {}
+    entity_states = _dict(raw.get("entity_states"))
+    if entity_states:
+        raw = merge_entity_values(raw, entity_states)
+
     snapshot = _dict(raw.get("snapshot"))
     plan = _dict(raw.get("plan"))
     controller = _dict(raw.get("controller"))
@@ -134,7 +140,7 @@ def build_live_payload(
     degraded = bool(missing) or raw.get("valid_cycle") is False or bool(raw.get("degraded"))
     timeline = _timeline(raw) if raw else []
 
-    return {
+    payload = {
         "schema_version": "phase_ui_i.live_payload.v1",
         "observer_only": True,
         "read_only": True,
@@ -184,7 +190,41 @@ def build_live_payload(
         "execution_attempted": execution.get("attempted"),
         "execution_blocked_reason": "Alleen observeren. Geen Home Assistant schrijfacties of dienstaanroepen.",
         "shadow_state": raw.get("shadow_state") or raw.get("mode") or "observer",
+        "battery_usable_capacity": raw.get("battery_usable_capacity"),
+        "battery_soft_reserve_soc": raw.get("battery_soft_reserve_soc"),
+        "battery_required_reserve_soc": raw.get("battery_required_reserve_soc"),
+        "battery_hard_floor_soc": raw.get("battery_hard_floor_soc"),
+        "pv_forecast_now_kw": raw.get("pv_forecast_now_kw"),
+        "pv_forecast_30m_kw": raw.get("pv_forecast_30m_kw"),
+        "pv_forecast_1h_kw": raw.get("pv_forecast_1h_kw"),
+        "pv_forecast_today": raw.get("pv_forecast_today"),
+        "pv_forecast_tomorrow": raw.get("pv_forecast_tomorrow"),
+        "prices_forecast": raw.get("prices_forecast"),
+        "dispatch_enabled": raw.get("dispatch_enabled"),
+        "dispatch_power": raw.get("dispatch_power"),
+        "dispatch_duration": raw.get("dispatch_duration"),
+        "dispatch_cutoff_soc": raw.get("dispatch_cutoff_soc"),
+        "dispatch_mode": raw.get("dispatch_mode"),
+        "climate_living": raw.get("climate_living"),
+        "climate_kitchen": raw.get("climate_kitchen"),
+        "ir_override_living": raw.get("ir_override_living"),
+        "ir_override_kitchen": raw.get("ir_override_kitchen"),
+        "ir_gate": raw.get("ir_gate"),
+        "heating_allowed": raw.get("heating_allowed"),
+        "presence_app": raw.get("presence_app"),
+        "presence_ping": raw.get("presence_ping"),
+        "presence_kitchen": raw.get("presence_kitchen"),
+        "presence_living": raw.get("presence_living"),
+        "battery_foundation_status": raw.get("battery_foundation_status"),
+        "battery_charge_reason": raw.get("battery_charge_reason"),
+        "battery_gate": raw.get("battery_gate"),
+        "charge_window_active": raw.get("charge_window_active"),
+        "canonical_entities": raw.get("canonical_entities", {}),
+        "canonical_entity_values": raw.get("canonical_entity_values", {}),
         "dispatch_allowed": False,
         "ha_writes_allowed": False,
         "service_calls_allowed": False,
     }
+    payload["semantic_state"] = build_semantic_state(payload)
+    payload["living_state"] = payload["semantic_state"]
+    return payload

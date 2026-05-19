@@ -728,6 +728,62 @@ def render_theme_css() -> str:
       padding: 9px;
     }}
     .strategy-metrics b, .health-pill b {{ display: block; margin-top: 3px; font-size: 14px; }}
+    .semantic-grid, .comfort-grid, .control-grid {{
+      display: grid;
+      grid-template-columns: var(--semantic-columns, repeat(3, minmax(0, 1fr)));
+      gap: 8px;
+      margin: 12px 0;
+    }}
+    .semantic-grid span, .comfort-row, .control-row {{
+      min-width: 0;
+      border: 1px solid rgba(255,255,255,0.030);
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.010);
+      padding: 9px;
+      color: rgba(152,165,178,0.68);
+      font-size: 11px;
+      line-height: 1.25;
+    }}
+    .semantic-grid b, .comfort-row span, .control-row span {{
+      display: block;
+      margin-bottom: 4px;
+      color: rgba(152,165,178,0.58);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }}
+    .comfort-row b, .control-row b {{
+      display: block;
+      overflow-wrap: anywhere;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.22;
+      font-weight: 680;
+    }}
+    .comfort-panel {{
+      background:
+        radial-gradient(circle at 88% 8%, rgba(255,209,102,0.026), transparent 16rem),
+        linear-gradient(180deg, rgba(255,255,255,0.010), rgba(255,255,255,0.001));
+    }}
+    .controls-panel {{
+      background:
+        radial-gradient(circle at 8% 0%, rgba(127,199,255,0.020), transparent 15rem),
+        linear-gradient(180deg, rgba(255,255,255,0.010), rgba(255,255,255,0.001));
+    }}
+    .thermal-chip {{
+      border: 1px solid rgba(255,209,102,0.12);
+      border-radius: var(--radius-round);
+      color: rgba(255,209,102,0.82);
+      background: rgba(255,209,102,0.034);
+      padding: 5px 9px;
+      font-size: 10px;
+      font-weight: 740;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
     .horizon {{
       margin: 13px 0 8px;
       border: 1px solid rgba(255,255,255,0.014);
@@ -877,6 +933,7 @@ def render_theme_css() -> str:
       --soc-size: 28px;
       --panel-pad: 12px;
       --metric-columns: 1fr;
+      --semantic-columns: 1fr;
       --health-columns: 1fr;
       --battery-value-size: 36px;
     }}
@@ -902,6 +959,7 @@ def render_theme_css() -> str:
       border-radius: 18px;
     }}
     body[data-viewport="mobile"] .strategy-metrics,
+    body[data-viewport="mobile"] .semantic-grid,
     body[data-viewport="mobile"] .timeline,
     body[data-viewport="mobile"] .plan-list,
     body[data-viewport="mobile"] .metric-row {{
@@ -938,6 +996,7 @@ def render_theme_css() -> str:
       --soc-size: 42px;
       --panel-pad: 16px;
       --metric-columns: repeat(3, minmax(0, 1fr));
+      --semantic-columns: repeat(3, minmax(0, 1fr));
       --health-columns: repeat(2, minmax(0, 1fr));
       --battery-value-size: 44px;
     }}
@@ -961,6 +1020,7 @@ def render_theme_css() -> str:
       --soc-size: 52px;
       --panel-pad: 18px;
       --metric-columns: repeat(3, minmax(0, 1fr));
+      --semantic-columns: repeat(3, minmax(0, 1fr));
       --health-columns: repeat(2, minmax(0, 1fr));
       --battery-value-size: 52px;
     }}
