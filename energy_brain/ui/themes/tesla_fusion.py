@@ -59,33 +59,36 @@ def render_theme_css() -> str:
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: var(--space-md);
-      padding: 2px 2px 0;
+      gap: 10px;
+      min-height: 46px;
+      padding: 6px 8px;
       position: sticky;
       top: 0;
       z-index: 20;
+      border: 1px solid rgba(255, 255, 255, 0.055);
       border-radius: var(--radius-lg);
-      background: linear-gradient(180deg, rgba(5, 7, 10, 0.92), rgba(5, 7, 10, 0.62));
+      background: linear-gradient(180deg, rgba(5, 7, 10, 0.86), rgba(5, 7, 10, 0.56));
       backdrop-filter: blur(18px);
     }}
-    .brand {{ font-size: 20px; font-weight: 700; line-height: 1.1; }}
+    .brand-block {{ min-width: 0; }}
+    .brand {{ font-size: 18px; font-weight: 760; line-height: 1.05; }}
     .eyebrow {{
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 650;
       text-transform: uppercase;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.09em;
     }}
     .layout-switcher {{
       display: inline-flex;
-      gap: var(--space-xs);
-      padding: 4px;
+      gap: 2px;
+      padding: 3px;
       border: 1px solid var(--line);
       border-radius: var(--radius-round);
-      background: rgba(255, 255, 255, 0.035);
+      background: rgba(255, 255, 255, 0.026);
     }}
     .layout-switcher a, .chip {{
-      min-height: 38px;
+      min-height: 30px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -93,16 +96,20 @@ def render_theme_css() -> str:
       text-decoration: none;
       border: 1px solid transparent;
       border-radius: var(--radius-round);
-      padding: 8px 12px;
-      font-size: 12px;
+      padding: 5px 9px;
+      font-size: 11px;
       font-weight: 680;
-      transition: color var(--motion-base), background var(--motion-base), border-color var(--motion-base);
+      transition: color var(--motion-base), background var(--motion-base), border-color var(--motion-base), box-shadow var(--motion-base), transform var(--motion-fast);
+    }}
+    .layout-switcher a:hover {{
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.045);
     }}
     .layout-switcher a.active {{
       color: var(--text);
-      border-color: rgba(88, 232, 182, 0.35);
-      background: rgba(88, 232, 182, 0.1);
-      box-shadow: 0 0 24px rgba(88, 232, 182, 0.12);
+      border-color: rgba(88, 232, 182, 0.28);
+      background: rgba(88, 232, 182, 0.085);
+      box-shadow: 0 0 18px rgba(88, 232, 182, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.055);
     }}
     .health-strip {{
       display: flex;
@@ -158,10 +165,10 @@ def render_theme_css() -> str:
     .dashboard {{
       display: grid;
       grid-template-columns: 1fr;
-      gap: var(--space-md);
+      gap: 14px;
       align-items: stretch;
     }}
-    .side {{ display: grid; gap: var(--space-md); }}
+    .side {{ display: grid; gap: 14px; }}
     .hero, .panel {{
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
@@ -307,12 +314,14 @@ def render_theme_css() -> str:
     .orb-core b {{ display: block; margin: 2px 0 4px; font-size: clamp(32px, 8vw, 54px); line-height: 1; }}
     .node {{
       position: absolute;
-      min-width: 108px;
-      padding: 11px 12px;
+      width: 118px;
+      min-height: 62px;
+      padding: 10px 11px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
       background: rgba(6, 9, 13, 0.84);
       box-shadow: 0 0 34px rgba(0, 0, 0, 0.22);
+      transition: opacity var(--motion-base), border-color var(--motion-base), transform var(--motion-base), background var(--motion-base);
     }}
     .node span {{ color: var(--muted); font-size: 12px; }}
     .node b {{ display: block; margin-top: 2px; font-size: 20px; line-height: 1.1; }}
@@ -364,10 +373,10 @@ def render_theme_css() -> str:
       background: rgba(101, 240, 167, 0.08);
     }}
 
-    .panel {{ padding: 20px; }}
-    .panel h2 {{ margin: 0; font-size: 22px; line-height: 1.12; }}
-    .panel p {{ color: var(--muted); margin: 8px 0 0; line-height: 1.45; }}
-    .panel-head {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm); }}
+    .panel {{ padding: 18px; }}
+    .panel h2 {{ margin: 0; font-size: 20px; line-height: 1.14; }}
+    .panel p {{ color: var(--muted); margin: 7px 0 0; line-height: 1.42; }}
+    .panel-head {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }}
     .status-dot {{
       width: 10px;
       height: 10px;
@@ -386,18 +395,18 @@ def render_theme_css() -> str:
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: var(--space-sm);
-      margin: var(--space-md) 0;
+      margin: 13px 0;
     }}
     .strategy-metrics div, .health-pill {{
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
       background: rgba(255, 255, 255, 0.035);
-      padding: 10px;
+      padding: 9px;
     }}
     .strategy-metrics span, .health-pill span {{ display: block; color: var(--muted); font-size: 11px; }}
     .strategy-metrics b, .health-pill b {{ display: block; margin-top: 3px; font-size: 14px; }}
     .timeline {{
-      min-height: 112px;
+      min-height: 86px;
       display: flex;
       align-items: stretch;
       gap: 6px;
@@ -406,7 +415,7 @@ def render_theme_css() -> str:
       scrollbar-width: thin;
     }}
     .horizon {{
-      margin: var(--space-md) 0 var(--space-sm);
+      margin: 13px 0 8px;
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       background:
@@ -428,8 +437,8 @@ def render_theme_css() -> str:
       position: relative;
       display: grid;
       grid-template-columns: repeat(24, minmax(14px, 1fr));
-      min-height: 132px;
-      padding: 12px 10px 20px;
+      min-height: 112px;
+      padding: 10px 9px 18px;
       gap: 3px;
     }}
     .horizon-grid:before {{
@@ -437,7 +446,7 @@ def render_theme_css() -> str:
       position: absolute;
       left: 10px;
       right: 10px;
-      bottom: 36px;
+      bottom: 32px;
       height: 18px;
       border-top: 1px solid rgba(255, 139, 95, 0.34);
       border-bottom: 1px solid rgba(255, 139, 95, 0.16);
@@ -466,8 +475,8 @@ def render_theme_css() -> str:
       position: absolute;
       left: 20%;
       right: 20%;
-      bottom: 26px;
-      height: calc(var(--soc) * 0.72px);
+      bottom: 23px;
+      height: calc(var(--soc) * 0.62px);
       border-radius: 999px 999px 3px 3px;
       background: linear-gradient(180deg, rgba(101, 240, 167, 0.92), rgba(88, 232, 182, 0.3));
       box-shadow: 0 0 16px rgba(101, 240, 167, 0.18);
@@ -476,7 +485,7 @@ def render_theme_css() -> str:
       position: absolute;
       left: 0;
       right: 0;
-      top: calc(94px - var(--price) * 0.9px);
+      top: calc(84px - var(--price) * 0.74px);
       height: 2px;
       background: rgba(255, 209, 102, 0.82);
       box-shadow: 0 0 12px rgba(255, 209, 102, 0.28);
@@ -493,7 +502,7 @@ def render_theme_css() -> str:
       display: flex;
       flex-wrap: wrap;
       gap: 7px;
-      padding: 0 12px 12px;
+      padding: 0 11px 10px;
     }}
     .horizon-legend span {{
       border: 1px solid var(--line);
@@ -506,22 +515,22 @@ def render_theme_css() -> str:
     }}
     .timeline-block {{
       flex: 0 0 calc(var(--span) * 1%);
-      min-width: 98px;
+      min-width: 92px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
-      padding: 10px;
+      padding: 9px;
       background: rgba(255, 255, 255, 0.04);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }}
     .timeline-block span {{ color: var(--muted); font-size: 11px; }}
-    .timeline-block b {{ display: block; margin-top: 12px; font-size: 13px; line-height: 1.2; }}
+    .timeline-block b {{ display: block; margin-top: 9px; font-size: 13px; line-height: 1.2; }}
     .tone-charge, .tone-cheap {{ background: linear-gradient(180deg, rgba(88, 232, 182, 0.22), rgba(88, 232, 182, 0.045)); border-color: rgba(88, 232, 182, 0.28); }}
     .tone-discharge {{ background: linear-gradient(180deg, rgba(127, 199, 255, 0.22), rgba(127, 199, 255, 0.045)); border-color: rgba(127, 199, 255, 0.28); }}
     .tone-expensive {{ background: linear-gradient(180deg, rgba(255, 104, 124, 0.18), rgba(255, 104, 124, 0.035)); border-color: rgba(255, 104, 124, 0.26); }}
     .plan-list {{ display: grid; gap: 8px; margin-top: var(--space-sm); }}
     .reason-item {{
       border-top: 1px solid var(--line);
-      padding-top: 10px;
+      padding-top: 8px;
       color: var(--muted);
     }}
     .reason-item summary {{ cursor: pointer; color: var(--text); font-size: 13px; }}
@@ -632,17 +641,17 @@ def render_theme_css() -> str:
     .error-page {{ min-height: 100vh; display: grid; place-items: center; padding: var(--space-lg); }}
     .error-page .panel {{ max-width: 520px; }}
 
-    body.layout-mobile .shell {{ padding: 10px; gap: 10px; }}
+    body.layout-mobile .shell {{ padding: 8px; gap: 8px; }}
     body.layout-mobile .topline {{ align-items: flex-start; flex-direction: column; }}
     body.layout-mobile .layout-switcher {{ width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }}
     body.layout-mobile .health-strip {{ margin-inline: -2px; }}
-    body.layout-mobile .hero {{ min-height: 470px; padding: 15px; grid-template-rows: auto 1fr auto; }}
+    body.layout-mobile .hero {{ min-height: 448px; padding: 14px; grid-template-rows: auto 1fr auto; }}
     body.layout-mobile .flow-map {{ width: min(390px, 100%); }}
-    body.layout-mobile .node {{ min-width: 96px; padding: 9px 10px; }}
+    body.layout-mobile .node {{ width: 98px; min-height: 56px; padding: 8px 9px; }}
     body.layout-mobile .node b {{ font-size: 17px; }}
     body.layout-mobile .strategy-metrics {{ grid-template-columns: 1fr; }}
     body.layout-mobile .health-row {{ grid-template-columns: 1fr; }}
-    body.layout-mobile .panel {{ padding: 15px; }}
+    body.layout-mobile .panel {{ padding: 14px; }}
     body.layout-mobile .decision {{ font-size: clamp(25px, 8vw, 36px); }}
     body.layout-mobile .timeline {{ min-height: 92px; }}
     body.layout-mobile .horizon-grid {{ min-height: 104px; grid-template-columns: repeat(24, minmax(10px, 1fr)); padding: 9px 8px 17px; gap: 2px; }}
@@ -661,17 +670,17 @@ def render_theme_css() -> str:
     body.layout-desktop .strategy-panel {{ position: sticky; top: 24px; }}
 
     @media (max-width: 767px) {{
-      .shell {{ padding: 10px; gap: 10px; }}
+      .shell {{ padding: 8px; gap: 8px; }}
       .topline {{ align-items: flex-start; flex-direction: column; }}
       .layout-switcher {{ width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }}
       .health-strip {{ margin-inline: -2px; }}
       .dashboard {{ grid-template-columns: 1fr; }}
-      .hero {{ min-height: 470px; padding: 15px; }}
+      .hero {{ min-height: 448px; padding: 14px; }}
       .flow-map {{ width: min(390px, 100%); }}
       .decision {{ font-size: clamp(25px, 8vw, 36px); }}
       .soc strong {{ font-size: 36px; }}
       .strategy-metrics, .health-row {{ grid-template-columns: 1fr; }}
-      .panel {{ padding: 15px; }}
+      .panel {{ padding: 14px; }}
       .timeline {{ min-height: 92px; }}
       .horizon-grid {{ min-height: 104px; grid-template-columns: repeat(24, minmax(10px, 1fr)); padding: 9px 8px 17px; gap: 2px; }}
     }}

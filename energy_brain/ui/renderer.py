@@ -52,7 +52,7 @@ def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
         f'</head><body class="layout-{html.escape(mode, quote=True)} preference-{html.escape(preference, quote=True)}" data-layout-preference="{html.escape(preference, quote=True)}">',
         '<main class="shell">',
         '<header class="topline">',
-        '<div><div class="brand">Energy Brain</div><div class="eyebrow">Autonoom energie besturingssysteem</div></div>',
+        '<div class="brand-block"><div class="brand">Energy Brain</div><div class="eyebrow">Autonoom energiecentrum</div></div>',
         f'<nav class="layout-switcher" aria-label="Layoutkeuze">{links}</nav>',
         "</header>",
         render_health_strip(safety),
