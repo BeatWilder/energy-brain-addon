@@ -277,154 +277,6 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
 }
 
 
-
-
-.thermal-panel {
-    margin-top: 18px;
-    border-radius: 28px;
-    padding: 24px;
-    background:
-        radial-gradient(circle at top left,
-        rgba(90,255,180,0.18),
-        rgba(15,18,22,0.96));
-    box-shadow:
-        0 0 30px rgba(90,255,180,0.18),
-        0 0 90px rgba(90,255,180,0.10);
-}
-
-.thermal-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-    gap: 18px;
-    margin-top: 18px;
-}
-
-.thermal-room {
-    border-radius: 24px;
-    padding: 20px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(90,255,180,0.18);
-    box-shadow:
-        0 0 18px rgba(90,255,180,0.12);
-}
-
-.thermal-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-
-.thermal-entity {
-    opacity: 0.82;
-    font-size: 14px;
-}
-
-
-
-.energybrain-thermostat-panel {
-    margin-top: 24px;
-    padding: 22px;
-    border-radius: 32px;
-    background:
-        radial-gradient(circle at top left,
-        rgba(90,255,180,0.22),
-        rgba(16,20,24,0.96));
-    box-shadow:
-        0 0 40px rgba(90,255,180,0.22),
-        0 0 120px rgba(90,255,180,0.12);
-}
-
-.thermostat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(320px,1fr));
-    gap: 20px;
-}
-
-.thermo-card {
-    border-radius: 28px;
-    padding: 18px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(90,255,180,0.18);
-    box-shadow:
-        0 0 24px rgba(90,255,180,0.18);
-}
-
-.thermo-title {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 12px;
-}
-
-
-
-.eb-thermostat-panel {
-    margin-top: 24px;
-}
-
-.eb-thermostat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(240px,1fr));
-    gap: 18px;
-    margin-top: 18px;
-}
-
-.eb-thermo-card {
-    border-radius: 28px;
-    padding: 22px;
-    background:
-        radial-gradient(circle at top left,
-        rgba(90,255,180,0.18),
-        rgba(15,18,22,0.96));
-
-    box-shadow:
-        0 0 30px rgba(90,255,180,0.18),
-        0 0 80px rgba(90,255,180,0.12);
-}
-
-.eb-thermo-title {
-    font-size: 22px;
-    font-weight: 700;
-}
-
-.eb-thermo-current {
-    font-size: 52px;
-    font-weight: 800;
-    margin-top: 12px;
-}
-
-.eb-thermo-target {
-    opacity: 0.7;
-    margin-top: 6px;
-}
-
-.eb-thermo-controls {
-    display: flex;
-    gap: 14px;
-    margin-top: 20px;
-}
-
-.eb-thermo-btn {
-    flex: 1;
-    border: 0;
-    border-radius: 18px;
-    padding: 18px;
-    font-size: 30px;
-    font-weight: 800;
-    cursor: pointer;
-
-    color: white;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(90,255,180,0.32),
-            rgba(90,255,180,0.18)
-        );
-
-    box-shadow:
-        0 0 24px rgba(90,255,180,0.22);
-}
-
 </style>
 
 
@@ -3555,157 +3407,6 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 </html>'''
 
 
-
-
-def render_thermal_intelligence_panel() -> str:
-    return """
-    <section class="card thermal-panel">
-      <div class="thermal-header">
-        <div>
-          <div class="eyebrow">THERMAL INTELLIGENCE</div>
-          <h2>IR Verwarming</h2>
-        </div>
-      </div>
-
-      <div class="thermal-grid">
-
-        <div class="thermal-room">
-          <div class="thermal-title">Woonkamer</div>
-          <div class="thermal-entity">
-            climate.ir_woonkamer
-          </div>
-        </div>
-
-        <div class="thermal-room">
-          <div class="thermal-title">Keuken</div>
-          <div class="thermal-entity">
-            climate.w100_keuken
-          </div>
-        </div>
-
-      </div>
-    </section>
-    """
-
-
-
-
-def render_ir_thermostat_card(
-    title: str,
-    entity_id: str,
-    current_temp: str,
-    target_temp: str,
-) -> str:
-
-    return f"""
-    <div class="eb-thermo-card">
-
-      <div class="eb-thermo-header">
-        <div class="eb-thermo-title">{title}</div>
-      </div>
-
-      <div class="eb-thermo-current">
-        {current_temp}°
-      </div>
-
-      <div class="eb-thermo-target">
-        ingesteld {target_temp}°
-      </div>
-
-      <div class="eb-thermo-controls">
-
-        <button
-          class="eb-thermo-btn"
-          onclick="
-            fetch('/api/services/climate/set_temperature', {{
-              method:'POST',
-              headers: {{
-                'Content-Type':'application/json'
-              }},
-              body: JSON.stringify({{
-                entity_id:'{entity_id}',
-                temperature: Number({target_temp}) - 0.5
-              }})
-            }})
-          ">
-          −
-        </button>
-
-        <button
-          class="eb-thermo-btn"
-          onclick="
-            fetch('/api/services/climate/set_temperature', {{
-              method:'POST',
-              headers: {{
-                'Content-Type':'application/json'
-              }},
-              body: JSON.stringify({{
-                entity_id:'{entity_id}',
-                temperature: Number({target_temp}) + 0.5
-              }})
-            }})
-          ">
-          +
-        </button>
-
-      </div>
-    </div>
-    """
-
-
-def render_ir_thermostat_panel(summary: dict[str, Any]) -> str:
-
-    woonkamer_current = summary.get(
-        "climate.ir_woonkamer.current_temperature",
-        "20"
-    )
-
-    woonkamer_target = summary.get(
-        "climate.ir_woonkamer.temperature",
-        "21"
-    )
-
-    keuken_current = summary.get(
-        "climate.w100_keuken.current_temperature",
-        "20"
-    )
-
-    keuken_target = summary.get(
-        "climate.w100_keuken.temperature",
-        "21"
-    )
-
-    return f"""
-    <section class="card eb-thermostat-panel">
-
-      <div class="eyebrow">
-        THERMAL INTELLIGENCE
-      </div>
-
-      <h2>IR Verwarming</h2>
-
-      <div class="eb-thermostat-grid">
-
-        {render_ir_thermostat_card(
-            "Woonkamer",
-            "climate.ir_woonkamer",
-            woonkamer_current,
-            woonkamer_target,
-        )}
-
-        {render_ir_thermostat_card(
-            "Keuken",
-            "climate.w100_keuken",
-            keuken_current,
-            keuken_target,
-        )}
-
-      </div>
-
-    </section>
-    """
-
-
 def _eb4_empty_dashboard(no_disp: str) -> str:
     return f'''<!doctype html>
 <html lang="nl">
@@ -4006,73 +3707,8 @@ def _eb4_escape(value: object) -> str:
 _original_render_dashboard_html_v7 = render_dashboard_html
 
 
-
-
-THERMOSTAT_PANEL = """
-<section class="card energybrain-thermostat-panel">
-  <div class="section-title">
-    Thermal Intelligence
-  </div>
-
-  <div class="thermostat-grid">
-
-    <ha-card class="thermo-card">
-      <div class="thermo-title">
-        Woonkamer
-      </div>
-
-      <hui-thermostat-card
-        .hass="hass"
-        .config='{
-          "type":"thermostat",
-          "entity":"climate.ir_woonkamer",
-          "name":"IR Woonkamer"
-        }'>
-      </hui-thermostat-card>
-    </ha-card>
-
-    <ha-card class="thermo-card">
-      <div class="thermo-title">
-        Keuken
-      </div>
-
-      <hui-thermostat-card
-        .hass="hass"
-        .config='{
-          "type":"thermostat",
-          "entity":"climate.w100_keuken",
-          "name":"IR Keuken"
-        }'>
-      </hui-thermostat-card>
-    </ha-card>
-
-  </div>
-</section>
-"""
-
-
 def render_dashboard_html(summary: dict[str, Any]) -> str:
     rendered = _original_render_dashboard_html_v7(summary)
-
-    rendered = rendered.replace(
-        "</main>",
-        render_ir_thermostat_panel(summary) + "</main>"
-    )
-
-
-    rendered = rendered.replace(
-        "</main>",
-        THERMOSTAT_PANEL + "</main>"
-    )
-
-
-    thermal_html = render_thermal_intelligence_panel()
-
-    rendered = rendered.replace(
-        "</main>",
-        thermal_html + "</main>"
-    )
-
 
     required_markers = [
         "SOC trajectory mini-chart",
@@ -4118,44 +3754,50 @@ if __name__ == "__main__":
 # FORCE_FRESH_HOME_AS_ROOT = True
 
 
+
+
 /* =========================================
-   TESLA AMBIENT BALANCED GLOW
+   ULTRA LIVING GLOW
 ========================================= */
 
-.powerflow-wrapper {
-    background:
-        radial-gradient(circle at center,
-        rgba(90,255,190,0.10) 0%,
-        rgba(90,255,190,0.04) 35%,
-        rgba(0,0,0,0) 72%);
+.energy-chip,
+.pv-chip,
+.house-chip,
+.limit-chip,
+.grid-chip {
+    box-shadow:
+        0 0 18px rgba(90,255,190,0.18),
+        0 0 34px rgba(90,255,190,0.14),
+        inset 0 0 14px rgba(90,255,190,0.06) !important;
+
+    border-color: rgba(110,255,200,0.22) !important;
 }
 
-.powerflow-center {
+.limit-chip {
     box-shadow:
-        0 0 28px rgba(90,255,190,0.16),
-        0 0 60px rgba(90,255,190,0.10),
-        inset 0 0 16px rgba(255,255,255,0.03) !important;
+        0 0 22px rgba(255,210,90,0.26),
+        0 0 46px rgba(255,210,90,0.14) !important;
 }
 
 .powerflow-node {
     filter:
-        drop-shadow(0 0 10px rgba(90,255,190,0.14))
-        drop-shadow(0 0 18px rgba(90,255,190,0.08));
+        drop-shadow(0 0 24px rgba(90,255,190,0.36))
+        drop-shadow(0 0 44px rgba(90,255,190,0.20));
 }
+
+.powerflow-center {
+    box-shadow:
+        0 0 60px rgba(90,255,190,0.20),
+        0 0 120px rgba(90,255,190,0.18),
+        0 0 180px rgba(255,210,90,0.12),
+        inset 0 0 40px rgba(255,255,255,0.04) !important;
+}
+
+/* animated flowing lines */
 
 .powerflow-line {
-    stroke-width: 3.2px !important;
-    opacity: 0.82 !important;
     filter:
-        drop-shadow(0 0 8px rgba(90,255,190,0.16));
-}
-
-.power-chip,
-.limit-chip,
-.grid-chip,
-.house-chip,
-.pv-chip {
-    box-shadow:
-        0 0 10px rgba(90,255,190,0.10) !important;
+        drop-shadow(0 0 12px rgba(90,255,190,0.32))
+        drop-shadow(0 0 22px rgba(90,255,190,0.20));
 }
 
