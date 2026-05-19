@@ -4,7 +4,19 @@ from energy_brain.ui.themes.tokens import css_vars
 
 
 def render_theme_css() -> str:
-    return f"""
+    return f
+.flow-map::after{
+content:'ENERGY_BRAIN_RUNTIME_MARKER_991';
+position:absolute;
+left:8px;
+bottom:8px;
+font-size:10px;
+color:#ff0066;
+z-index:99999;
+pointer-events:none;
+}
+
+"""
     /* Tokens */
     :root {{
       color-scheme: dark;
@@ -646,9 +658,56 @@ def render_theme_css() -> str:
     .node.unknown b {{ display: none; }}
     .node-solar {{ top: 2%; left: 50%; transform: translateX(-50%); }}
     .node-home {{ right: 2%; top: 50%; transform: translateY(-50%); }}
-    .node-battery {{ left: 2%; top: 50%; transform: translateY(-50%); }}
-    .node-grid {{ bottom: 2%; left: 50%; transform: translateX(-50%); }}
-    .node-grid.state-exporting b {{ color: var(--export); }}
+    .node-battery {{
+      bottom: 2%;
+      left: 50%;
+      top: auto;
+      transform: translateX(-50%);
+    }}
+
+    .node-grid {{
+      left: 2%;
+      top: 50%;
+      bottom: auto;
+      transform: translateY(-50%);
+    }}
+    
+
+    /* ===== FINAL POWERFLOW POSITIONS ===== */
+
+    .flow-map .node-solar{
+      top:2% !important;
+      left:50% !important;
+      right:auto !important;
+      bottom:auto !important;
+      transform:translateX(-50%) !important;
+    }
+
+    .flow-map .node-home{
+      right:2% !important;
+      top:50% !important;
+      left:auto !important;
+      bottom:auto !important;
+      transform:translateY(-50%) !important;
+    }
+
+    .flow-map .node-grid{
+      left:50% !important;
+      bottom:2% !important;
+      top:auto !important;
+      right:auto !important;
+      transform:translateX(-50%) !important;
+    }
+
+    .flow-map .node-battery{
+      left:2% !important;
+      top:50% !important;
+      bottom:auto !important;
+      right:auto !important;
+      transform:translateY(-50%) !important;
+    }
+
+.node-grid.state-exporting b {{ color: var(--export); }}
     .node-grid.state-importing b {{ color: var(--import); }}
     .node-battery.state-discharging b {{ color: var(--grid); }}
     .node-battery.state-charging b {{ color: var(--battery); }}
@@ -1081,7 +1140,44 @@ def render_theme_css() -> str:
       box-shadow: 0 14px 34px rgba(0,0,0,0.18), 0 0 calc(7px + var(--node-intensity) * 14px) rgba(101,240,167,0.070);
     }}
     body[data-viewport="desktop"] .node-solar:hover,
-    body[data-viewport="desktop"] .node-grid:hover {{ transform: translateX(-50%) scale(1.014); }}
+    
+
+    /* ===== HARD POWERFLOW OVERRIDE ===== */
+
+    .flow-map .node-solar{
+      top:2% !important;
+      left:50% !important;
+      right:auto !important;
+      bottom:auto !important;
+      transform:translateX(-50%) !important;
+    }
+
+    .flow-map .node-home{
+      right:2% !important;
+      top:50% !important;
+      left:auto !important;
+      bottom:auto !important;
+      transform:translateY(-50%) !important;
+    }
+
+    .flow-map .node-battery{
+      bottom:2% !important;
+      left:50% !important;
+      top:auto !important;
+      right:auto !important;
+      transform:translateX(-50%) !important;
+    }
+
+    .flow-map .node-grid{
+      left:50% !important;
+      bottom:2% !important;
+      top:auto !important;
+      right:auto !important;
+      transform:translateX(-50%) !important;
+    }
+
+
+body[data-viewport="desktop"] .node-grid:hover {{ transform: translateX(-50%) scale(1.014); }}
 
     /* Animation */
     @keyframes flowTravel {{ from {{ stroke-dashoffset: 10; }} to {{ stroke-dashoffset: -112; }} }}
@@ -1110,4 +1206,40 @@ def render_theme_css() -> str:
       .flow-particles, .flow-ribbons {{ display: none; }}
       .flow-lane {{ opacity: 0.78; }}
     }}
-    """
+    
+
+/* ===== HARDE FINAL POWERFLOW OVERRIDE ===== */
+
+.flow-map .node-solar{
+  top:2% !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:auto !important;
+  transform:translateX(-50%) !important;
+}
+
+.flow-map .node-home{
+  right:2% !important;
+  top:50% !important;
+  left:auto !important;
+  bottom:auto !important;
+  transform:translateY(-50%) !important;
+}
+
+.flow-map .node-grid{
+  left:2% !important;
+  top:50% !important;
+  right:auto !important;
+  bottom:auto !important;
+  transform:translateY(-50%) !important;
+}
+
+.flow-map .node-battery{
+  left:50% !important;
+  bottom:2% !important;
+  top:auto !important;
+  right:auto !important;
+  transform:translateX(-50%) !important;
+}
+
+"""

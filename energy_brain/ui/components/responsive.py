@@ -270,6 +270,10 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
     abundance = "scarcity" if soc_number is not None and float(section.get("soc_percent") or 0) <= 25 else "abundance"
     price_number = _num(section.get("price"))
     price_state = "cheap" if price_number is not None and price_number <= 0.08 else "expensive" if price_number is not None and price_number >= 0.32 else "balanced"
+    return render_powerflow_v2()
+
+    # old renderer disabled
+
     return f"""
     <section class="hero powerflow-hero living-scene" aria-label="Realtime energiestromen" data-legacy-label="Realtime energiestroom" data-energy-state="{esc(abundance)}" data-price-state="{esc(price_state)}">
       <div class="hero-head">
@@ -316,6 +320,11 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
           </g>
           <circle class="junction-aura" cx="210" cy="210" r="52" />
           <circle class="junction-core" cx="210" cy="210" r="7" />
+          <circle cx="145" cy="145" r="3" fill="rgba(255,255,255,.75)" />
+          <circle cx="275" cy="170" r="3" fill="rgba(255,255,255,.75)" />
+          <circle cx="240" cy="300" r="3" fill="rgba(255,255,255,.75)" />
+          <circle cx="110" cy="255" r="3" fill="rgba(255,255,255,.75)" />
+
           <g class="flow-particles" aria-hidden="true">
             {_render_particles(scene)}
           </g>
@@ -332,9 +341,9 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
         </div>
         <div class="node node-solar state-{esc(nodes["solar"]["state"])} {_node_state(section, "solar_known")}" style="{_node_vars(nodes["solar"])}"><i></i><span>Zon</span><b>{visible_power_label(section, "solar_known", "solar_label", "solar_kw")}</b></div>
         <div class="node node-home state-{esc(nodes["home"]["state"])} {_node_state(section, "house_known")}" style="{_node_vars(nodes["home"])}"><i></i><span>Huis</span><b>{visible_power_label(section, "house_known", "house_label", "house_kw")}</b></div>
-        <div class="node node-battery state-{esc(battery_flow)} {_node_state(section, "battery_known")}" style="{_node_vars(nodes["battery"])}"><i></i><span>Batterij</span><b>{visible_power_label(section, "battery_known", "battery_label", "battery_kw")}</b></div>
-        <div class="node node-grid state-{esc(grid_flow)} {_node_state(section, "grid_known")}" data-legacy-label="Teruglevering" style="{_node_vars(nodes["grid"])}"><i></i><span>Net</span><b>{_grid_micro_label(section)}</b></div>
-      </div>
+        <div class="node node-grid state-{esc(grid_flow)} {_node_state(section, "grid_known")}" style="{_node_vars(nodes["grid"])}"><i></i><span>Net</span><b>{visible_power_label(section, "grid_known", "grid_label", "grid_kw")}</b></div>
+
+        <div class="node node-battery state-{esc(battery_flow)} {_node_state(section, "battery_known")}" style="{_node_vars(nodes["battery"])}"><i></i><span>Batterij</span><b>{visible_power_label(section, "battery_known", "battery_label", "battery_kw")}</b></div>      </div>
       <div class="hero-foot">
         <ul class="intent-orbit" aria-label="Actuele energie-intentie">{intents}</ul>
         <div class="micro-telemetry" aria-label="Microtelemetrie">{telemetry}{quality_note(section)}</div>
