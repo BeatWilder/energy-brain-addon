@@ -277,6 +277,48 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
 }
 
 
+
+
+.thermal-panel {
+    margin-top: 18px;
+    border-radius: 28px;
+    padding: 24px;
+    background:
+        radial-gradient(circle at top left,
+        rgba(90,255,180,0.18),
+        rgba(15,18,22,0.96));
+    box-shadow:
+        0 0 30px rgba(90,255,180,0.18),
+        0 0 90px rgba(90,255,180,0.10);
+}
+
+.thermal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+    gap: 18px;
+    margin-top: 18px;
+}
+
+.thermal-room {
+    border-radius: 24px;
+    padding: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(90,255,180,0.18);
+    box-shadow:
+        0 0 18px rgba(90,255,180,0.12);
+}
+
+.thermal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.thermal-entity {
+    opacity: 0.82;
+    font-size: 14px;
+}
+
 </style>
 
 
@@ -3407,6 +3449,39 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 </html>'''
 
 
+
+
+def render_thermal_intelligence_panel() -> str:
+    return """
+    <section class="card thermal-panel">
+      <div class="thermal-header">
+        <div>
+          <div class="eyebrow">THERMAL INTELLIGENCE</div>
+          <h2>IR Verwarming</h2>
+        </div>
+      </div>
+
+      <div class="thermal-grid">
+
+        <div class="thermal-room">
+          <div class="thermal-title">Woonkamer</div>
+          <div class="thermal-entity">
+            climate.ir_woonkamer
+          </div>
+        </div>
+
+        <div class="thermal-room">
+          <div class="thermal-title">Keuken</div>
+          <div class="thermal-entity">
+            climate.w100_keuken
+          </div>
+        </div>
+
+      </div>
+    </section>
+    """
+
+
 def _eb4_empty_dashboard(no_disp: str) -> str:
     return f'''<!doctype html>
 <html lang="nl">
@@ -3709,6 +3784,14 @@ _original_render_dashboard_html_v7 = render_dashboard_html
 
 def render_dashboard_html(summary: dict[str, Any]) -> str:
     rendered = _original_render_dashboard_html_v7(summary)
+
+    thermal_html = render_thermal_intelligence_panel()
+
+    rendered = rendered.replace(
+        "</main>",
+        thermal_html + "</main>"
+    )
+
 
     required_markers = [
         "SOC trajectory mini-chart",
