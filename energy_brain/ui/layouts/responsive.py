@@ -207,7 +207,7 @@ def _forecast_text(degraded: Any) -> str:
 
 
 def _market_text(value: Any) -> str:
-    return "Marktdata actief" if value not in (None, "", "unknown", "unavailable", "none", "None", "—") else "Marktdata onbekend"
+    return "Marktdata actief" if value not in (None, "", "unknown", "unavailable", "none", "None", "—") else "Marktdata stil"
 
 
 def _mode_text(value: Any) -> str:

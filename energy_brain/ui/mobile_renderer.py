@@ -9,7 +9,7 @@ def build_mobile_hero(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": "hero",
         "status": "SAFE",
-        "action": payload.get("current_action", "onbekend"),
+        "action": payload.get("current_action", "Wachten"),
         "price": payload.get("price"),
         "soc_percent": payload.get("soc_percent"),
     }

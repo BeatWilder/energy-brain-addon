@@ -85,7 +85,8 @@ def test_visible_cockpit_copy_is_dutch():
 def test_missing_live_values_render_as_degraded_not_demo_data():
     html = render_layout("mobile", {})
 
-    assert "onbekend" in html
+    assert ">onbekend<" not in html
     assert "30.0 kW" not in html
     assert "3.2 kW" not in html
-    assert "Meetdata mist" in html
+    assert "Meetdata mist" not in html
+    assert "quality-degraded" in html

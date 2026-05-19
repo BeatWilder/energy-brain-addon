@@ -67,7 +67,9 @@ def test_renderer_exposes_v2_runtime_and_reduced_motion_hooks():
 def test_missing_telemetry_keeps_scene_readable_without_fake_particles():
     html = render_layout("mobile", {})
 
-    assert "Meetdata mist" in html
+    assert "quality-degraded" in html
+    assert "Meetdata mist" not in html
+    assert ">onbekend<" not in html
     assert '<circle class="flow-dot' not in html
     assert "state-idle" in html
 
