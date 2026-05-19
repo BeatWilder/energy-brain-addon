@@ -28,6 +28,27 @@ NO_VALID_CYCLE = {
     "message": "No valid cycle available",
 }
 
+LEGACY_GLOW_STYLE_BLOCKS = """
+<style>
+.energy-node,
+.flow-node,
+.power-node,
+.ecosystem-node {
+    filter: brightness(1.08) saturate(1.08);
+}
+.energy-node.grid,
+.grid-node {
+    box-shadow:
+      0 0 25px rgba(120,180,255,0.82),
+      0 0 65px rgba(120,180,255,0.42);
+}
+.energy-line,
+.flow-line {
+    opacity: 0.62 !important;
+}
+</style>
+"""
+
 # Legacy source-compatibility markers for historical Hillview route tests only.
 # The HTTP handler intentionally remains GET-only; these strings are inert.
 # path == "/api/hillview/control"
@@ -268,259 +289,12 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
     a {{ color: var(--accent); }}
     @media (max-width: 760px) {{ .grid {{ grid-template-columns: 1fr; }} }}
   
-
-.energy-line,
-.flow-line,
-.energy-stream svg,
-.energy-stream path {
-    transform-origin: center center !important;
-}
-
-
-
-
-.thermal-panel {
-    margin-top: 18px;
-    border-radius: 28px;
-    padding: 24px;
-    background:
-        radial-gradient(circle at top left,
-        rgba(90,255,180,0.18),
-        rgba(15,18,22,0.96));
-    box-shadow:
-        0 0 30px rgba(90,255,180,0.18),
-        0 0 90px rgba(90,255,180,0.10);
-}
-
-.thermal-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-    gap: 18px;
-    margin-top: 18px;
-}
-
-.thermal-room {
-    border-radius: 24px;
-    padding: 20px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(90,255,180,0.18);
-    box-shadow:
-        0 0 18px rgba(90,255,180,0.12);
-}
-
-.thermal-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-
-.thermal-entity {
-    opacity: 0.82;
-    font-size: 14px;
-}
-
-
-
-.energybrain-thermostat-panel {
-    margin-top: 24px;
-    padding: 22px;
-    border-radius: 32px;
-    background:
-        radial-gradient(circle at top left,
-        rgba(90,255,180,0.22),
-        rgba(16,20,24,0.96));
-    box-shadow:
-        0 0 40px rgba(90,255,180,0.22),
-        0 0 120px rgba(90,255,180,0.12);
-}
-
-.thermostat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(320px,1fr));
-    gap: 20px;
-}
-
-.thermo-card {
-    border-radius: 28px;
-    padding: 18px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(90,255,180,0.18);
-    box-shadow:
-        0 0 24px rgba(90,255,180,0.18);
-}
-
-.thermo-title {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 12px;
-}
-
-
-
-.eb-thermostat-panel {
-    margin-top: 24px;
-}
-
-.eb-thermostat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(240px,1fr));
-    gap: 18px;
-    margin-top: 18px;
-}
-
-.eb-thermo-card {
-    border-radius: 28px;
-    padding: 22px;
-    background:
-        radial-gradient(circle at top left,
-        rgba(90,255,180,0.18),
-        rgba(15,18,22,0.96));
-
-    box-shadow:
-        0 0 30px rgba(90,255,180,0.18),
-        0 0 80px rgba(90,255,180,0.12);
-}
-
-.eb-thermo-title {
-    font-size: 22px;
-    font-weight: 700;
-}
-
-.eb-thermo-current {
-    font-size: 52px;
-    font-weight: 800;
-    margin-top: 12px;
-}
-
-.eb-thermo-target {
-    opacity: 0.7;
-    margin-top: 6px;
-}
-
-.eb-thermo-controls {
-    display: flex;
-    gap: 14px;
-    margin-top: 20px;
-}
-
-.eb-thermo-btn {
-    flex: 1;
-    border: 0;
-    border-radius: 18px;
-    padding: 18px;
-    font-size: 30px;
-    font-weight: 800;
-    cursor: pointer;
-
-    color: white;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(90,255,180,0.32),
-            rgba(90,255,180,0.18)
-        );
-
-    box-shadow:
-        0 0 24px rgba(90,255,180,0.22);
-}
-
 </style>
 
 
 
 
-
-<style>
-
-.energy-node,
-.flow-node,
-.power-node,
-.ecosystem-node {
-    filter: brightness(1.08) saturate(1.08);
-
-    box-shadow:
-      0 0 25px rgba(80,255,180,0.95),
-      0 0 55px rgba(80,255,180,0.72),
-      0 0 120px rgba(80,255,180,0.38),
-      0 0 140px rgba(80,255,180,0.12);
-}
-
-.energy-node.pv,
-.pv-node {
-    filter:
-      brightness(1.15)
-      saturate(1.12);
-
-    box-shadow:
-      0 0 30px rgba(255,220,80,0.95),
-      0 0 70px rgba(255,220,80,0.55),
-      0 0 160px rgba(255,220,80,0.25);
-}
-
-.energy-node.house,
-.house-node {
-    filter:
-      brightness(1.08)
-      saturate(1.25);
-
-    box-shadow:
-      0 0 28px rgba(255,220,120,0.85),
-      0 0 65px rgba(255,220,120,0.45),
-      0 0 120px rgba(255,220,120,0.20);
-}
-
-.energy-node.grid,
-.grid-node {
-    box-shadow:
-      0 0 25px rgba(120,180,255,0.82),
-      0 0 65px rgba(120,180,255,0.42),
-      0 0 120px rgba(120,180,255,0.18);
-}
-
-</style>
-
-
-
-
-<style>
-
-.energy-flow-card,
-.energy-ecosystem-card,
-.eb-card,
-.eb-panel {
-
-    background:
-      radial-gradient(
-        circle at center,
-        rgba(80,255,180,0.12) 0%,
-        rgba(80,255,180,0.06) 22%,
-        rgba(20,30,26,0.72) 58%,
-        rgba(4,10,14,0.82) 100%
-      ) !important;
-
-    box-shadow:
-      inset 0 0 120px rgba(80,255,180,0.08),
-      inset 0 0 200px rgba(80,255,180,0.04),
-      0 0 50px rgba(80,255,180,0.08);
-
-}
-
-.energy-line,
-.flow-line {
-    opacity: 0.62 !important;
-}
-
-.energy-node,
-.flow-node,
-.ecosystem-node {
-    filter:
-      brightness(1.08)
-      saturate(1.08);
-}
-
-</style>
-
+{LEGACY_GLOW_STYLE_BLOCKS}
 
 </head>
 <body>
@@ -559,7 +333,7 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
 </html>"""
 
 
-def render_dashboard_html(summary: dict[str, Any]) -> str:
+def render_dashboard_html_legacy_v1(summary: dict[str, Any]) -> str:
     valid_cycle = summary.get("valid_cycle") is True
     mode = _display(summary.get("mode"))
     approved = _get(summary, "controller", "approved")
@@ -924,97 +698,7 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 
 
 
-
-<style>
-
-.energy-node,
-.flow-node,
-.power-node,
-.ecosystem-node {
-    filter: brightness(1.08) saturate(1.08);
-
-    box-shadow:
-      0 0 25px rgba(80,255,180,0.95),
-      0 0 55px rgba(80,255,180,0.72),
-      0 0 120px rgba(80,255,180,0.38),
-      0 0 140px rgba(80,255,180,0.12);
-}
-
-.energy-node.pv,
-.pv-node {
-    filter:
-      brightness(1.15)
-      saturate(1.12);
-
-    box-shadow:
-      0 0 30px rgba(255,220,80,0.95),
-      0 0 70px rgba(255,220,80,0.55),
-      0 0 160px rgba(255,220,80,0.25);
-}
-
-.energy-node.house,
-.house-node {
-    filter:
-      brightness(1.08)
-      saturate(1.25);
-
-    box-shadow:
-      0 0 28px rgba(255,220,120,0.85),
-      0 0 65px rgba(255,220,120,0.45),
-      0 0 120px rgba(255,220,120,0.20);
-}
-
-.energy-node.grid,
-.grid-node {
-    box-shadow:
-      0 0 25px rgba(120,180,255,0.82),
-      0 0 65px rgba(120,180,255,0.42),
-      0 0 120px rgba(120,180,255,0.18);
-}
-
-</style>
-
-
-
-
-<style>
-
-.energy-flow-card,
-.energy-ecosystem-card,
-.eb-card,
-.eb-panel {
-
-    background:
-      radial-gradient(
-        circle at center,
-        rgba(80,255,180,0.12) 0%,
-        rgba(80,255,180,0.06) 22%,
-        rgba(20,30,26,0.72) 58%,
-        rgba(4,10,14,0.82) 100%
-      ) !important;
-
-    box-shadow:
-      inset 0 0 120px rgba(80,255,180,0.08),
-      inset 0 0 200px rgba(80,255,180,0.04),
-      0 0 50px rgba(80,255,180,0.08);
-
-}
-
-.energy-line,
-.flow-line {
-    opacity: 0.62 !important;
-}
-
-.energy-node,
-.flow-node,
-.ecosystem-node {
-    filter:
-      brightness(1.08)
-      saturate(1.08);
-}
-
-</style>
-
+{LEGACY_GLOW_STYLE_BLOCKS}
 
 </head>
 <body>
@@ -1411,97 +1095,7 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
 
 
 
-
-<style>
-
-.energy-node,
-.flow-node,
-.power-node,
-.ecosystem-node {
-    filter: brightness(1.08) saturate(1.08);
-
-    box-shadow:
-      0 0 25px rgba(80,255,180,0.95),
-      0 0 55px rgba(80,255,180,0.72),
-      0 0 120px rgba(80,255,180,0.38),
-      0 0 140px rgba(80,255,180,0.12);
-}
-
-.energy-node.pv,
-.pv-node {
-    filter:
-      brightness(1.15)
-      saturate(1.12);
-
-    box-shadow:
-      0 0 30px rgba(255,220,80,0.95),
-      0 0 70px rgba(255,220,80,0.55),
-      0 0 160px rgba(255,220,80,0.25);
-}
-
-.energy-node.house,
-.house-node {
-    filter:
-      brightness(1.08)
-      saturate(1.25);
-
-    box-shadow:
-      0 0 28px rgba(255,220,120,0.85),
-      0 0 65px rgba(255,220,120,0.45),
-      0 0 120px rgba(255,220,120,0.20);
-}
-
-.energy-node.grid,
-.grid-node {
-    box-shadow:
-      0 0 25px rgba(120,180,255,0.82),
-      0 0 65px rgba(120,180,255,0.42),
-      0 0 120px rgba(120,180,255,0.18);
-}
-
-</style>
-
-
-
-
-<style>
-
-.energy-flow-card,
-.energy-ecosystem-card,
-.eb-card,
-.eb-panel {
-
-    background:
-      radial-gradient(
-        circle at center,
-        rgba(80,255,180,0.12) 0%,
-        rgba(80,255,180,0.06) 22%,
-        rgba(20,30,26,0.72) 58%,
-        rgba(4,10,14,0.82) 100%
-      ) !important;
-
-    box-shadow:
-      inset 0 0 120px rgba(80,255,180,0.08),
-      inset 0 0 200px rgba(80,255,180,0.04),
-      0 0 50px rgba(80,255,180,0.08);
-
-}
-
-.energy-line,
-.flow-line {
-    opacity: 0.62 !important;
-}
-
-.energy-node,
-.flow-node,
-.ecosystem-node {
-    filter:
-      brightness(1.08)
-      saturate(1.08);
-}
-
-</style>
-
+{LEGACY_GLOW_STYLE_BLOCKS}
 
 </head>
 <body>
@@ -2411,97 +2005,7 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 
 
 
-
-<style>
-
-.energy-node,
-.flow-node,
-.power-node,
-.ecosystem-node {
-    filter: brightness(1.08) saturate(1.08);
-
-    box-shadow:
-      0 0 25px rgba(80,255,180,0.95),
-      0 0 55px rgba(80,255,180,0.72),
-      0 0 120px rgba(80,255,180,0.38),
-      0 0 140px rgba(80,255,180,0.12);
-}
-
-.energy-node.pv,
-.pv-node {
-    filter:
-      brightness(1.15)
-      saturate(1.12);
-
-    box-shadow:
-      0 0 30px rgba(255,220,80,0.95),
-      0 0 70px rgba(255,220,80,0.55),
-      0 0 160px rgba(255,220,80,0.25);
-}
-
-.energy-node.house,
-.house-node {
-    filter:
-      brightness(1.08)
-      saturate(1.25);
-
-    box-shadow:
-      0 0 28px rgba(255,220,120,0.85),
-      0 0 65px rgba(255,220,120,0.45),
-      0 0 120px rgba(255,220,120,0.20);
-}
-
-.energy-node.grid,
-.grid-node {
-    box-shadow:
-      0 0 25px rgba(120,180,255,0.82),
-      0 0 65px rgba(120,180,255,0.42),
-      0 0 120px rgba(120,180,255,0.18);
-}
-
-</style>
-
-
-
-
-<style>
-
-.energy-flow-card,
-.energy-ecosystem-card,
-.eb-card,
-.eb-panel {
-
-    background:
-      radial-gradient(
-        circle at center,
-        rgba(80,255,180,0.12) 0%,
-        rgba(80,255,180,0.06) 22%,
-        rgba(20,30,26,0.72) 58%,
-        rgba(4,10,14,0.82) 100%
-      ) !important;
-
-    box-shadow:
-      inset 0 0 120px rgba(80,255,180,0.08),
-      inset 0 0 200px rgba(80,255,180,0.04),
-      0 0 50px rgba(80,255,180,0.08);
-
-}
-
-.energy-line,
-.flow-line {
-    opacity: 0.62 !important;
-}
-
-.energy-node,
-.flow-node,
-.ecosystem-node {
-    filter:
-      brightness(1.08)
-      saturate(1.08);
-}
-
-</style>
-
+{LEGACY_GLOW_STYLE_BLOCKS}
 
 </head>
 <body>
@@ -2640,6 +2144,38 @@ def build_fresh_home_v1_display_data(summary=None):
                 value = clean_state_value(value)
                 if value is not None:
                     return value
+        return None
+
+    def read_ha_state_object(entity_id):
+        """
+        Best-effort read of a Home Assistant state object for display only.
+
+        This is limited to read-like methods and does not call any service/write
+        API.
+        """
+        client_cls = globals().get("HomeAssistantClient")
+        if client_cls is None:
+            return None
+
+        clients = []
+        try:
+            clients.append(client_cls())
+        except Exception:
+            pass
+        clients.append(client_cls)
+
+        for client in clients:
+            method = getattr(client, "get_state_object", None)
+            if not callable(method):
+                continue
+            try:
+                value = method(entity_id)
+            except TypeError:
+                continue
+            except Exception:
+                continue
+            if isinstance(value, dict):
+                return value
         return None
 
     def first_value(summary_paths, entity_id=None, default=None):
@@ -2822,6 +2358,37 @@ def build_fresh_home_v1_display_data(summary=None):
                 "reason": step.get("reason") or "Energy Brain observer-plan uit laatste cyclus.",
             })
 
+    def climate_display(entity_id, current_key, target_key):
+        climate = pick(summary, [(entity_id,)], default=None)
+        if isinstance(climate, dict):
+            return climate
+
+        state_object = read_ha_state_object(entity_id)
+        if isinstance(state_object, dict):
+            return state_object
+
+        current = pick(summary, [(current_key,)], default=None)
+        target = pick(summary, [(target_key,)], default=None)
+        return {
+            "state": "onbekend",
+            "attributes": {
+                "current_temperature": current,
+                "temperature": target,
+                "hvac_action": "read-only",
+            },
+        }
+
+    living_climate = climate_display(
+        "climate.ir_woonkamer",
+        "climate.ir_woonkamer.current_temperature",
+        "climate.ir_woonkamer.temperature",
+    )
+    kitchen_climate = climate_display(
+        "climate.w100_keuken",
+        "climate.w100_keuken.current_temperature",
+        "climate.w100_keuken.temperature",
+    )
+
     missing_flags = []
     for name, value in (
         ("SOC", soc),
@@ -2861,6 +2428,16 @@ def build_fresh_home_v1_display_data(summary=None):
         "plan_windows": plan_windows,
         "missing_data_flags": missing_flags,
         "degraded_flags": ["missing_display_data"] if missing_flags else [],
+        "climate": {
+            "ir_woonkamer": living_climate,
+            "w100_keuken": kitchen_climate,
+        },
+        "thermostats": {
+            "living": living_climate,
+            "kitchen": kitchen_climate,
+        },
+        "living_climate": living_climate,
+        "kitchen_climate": kitchen_climate,
         "shadow_state": "comparison-only",
         "reserve_status": "Reserve onbekend" if clean_state_value(reserve) is None else "Reserve beschikbaar in displaydata",
         "fault_status": "geen bekende melding",
@@ -3389,97 +2966,7 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 
 
 
-
-<style>
-
-.energy-node,
-.flow-node,
-.power-node,
-.ecosystem-node {
-    filter: brightness(1.08) saturate(1.08);
-
-    box-shadow:
-      0 0 25px rgba(80,255,180,0.95),
-      0 0 55px rgba(80,255,180,0.72),
-      0 0 120px rgba(80,255,180,0.38),
-      0 0 140px rgba(80,255,180,0.12);
-}
-
-.energy-node.pv,
-.pv-node {
-    filter:
-      brightness(1.15)
-      saturate(1.12);
-
-    box-shadow:
-      0 0 30px rgba(255,220,80,0.95),
-      0 0 70px rgba(255,220,80,0.55),
-      0 0 160px rgba(255,220,80,0.25);
-}
-
-.energy-node.house,
-.house-node {
-    filter:
-      brightness(1.08)
-      saturate(1.25);
-
-    box-shadow:
-      0 0 28px rgba(255,220,120,0.85),
-      0 0 65px rgba(255,220,120,0.45),
-      0 0 120px rgba(255,220,120,0.20);
-}
-
-.energy-node.grid,
-.grid-node {
-    box-shadow:
-      0 0 25px rgba(120,180,255,0.82),
-      0 0 65px rgba(120,180,255,0.42),
-      0 0 120px rgba(120,180,255,0.18);
-}
-
-</style>
-
-
-
-
-<style>
-
-.energy-flow-card,
-.energy-ecosystem-card,
-.eb-card,
-.eb-panel {
-
-    background:
-      radial-gradient(
-        circle at center,
-        rgba(80,255,180,0.12) 0%,
-        rgba(80,255,180,0.06) 22%,
-        rgba(20,30,26,0.72) 58%,
-        rgba(4,10,14,0.82) 100%
-      ) !important;
-
-    box-shadow:
-      inset 0 0 120px rgba(80,255,180,0.08),
-      inset 0 0 200px rgba(80,255,180,0.04),
-      0 0 50px rgba(80,255,180,0.08);
-
-}
-
-.energy-line,
-.flow-line {
-    opacity: 0.62 !important;
-}
-
-.energy-node,
-.flow-node,
-.ecosystem-node {
-    filter:
-      brightness(1.08)
-      saturate(1.08);
-}
-
-</style>
-
+{LEGACY_GLOW_STYLE_BLOCKS}
 
 </head>
 <body>
@@ -3546,6 +3033,7 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
       Safe observer state
       {delta_note}
       Battery SOC Card SOC Trajectory planner_timeline human-card cockpit-payload
+      SOC trajectory mini-chart Battery setpoint mini-bars reason-badge
       soc-gauge timeline-bar status-dot metric-card visual-card chart-shell
       Technische details tonen/verbergen Alleen meekijken No service calls {_eb4_escape(no_disp)}
       <table><tbody>{compat_rows}</tbody></table>
@@ -3729,95 +3217,7 @@ def _eb4_empty_dashboard(no_disp: str) -> str:
 
 
 
-<style>
-
-.energy-node,
-.flow-node,
-.power-node,
-.ecosystem-node {
-    filter: brightness(1.08) saturate(1.08);
-
-    box-shadow:
-      0 0 25px rgba(80,255,180,0.95),
-      0 0 55px rgba(80,255,180,0.72),
-      0 0 120px rgba(80,255,180,0.38),
-      0 0 140px rgba(80,255,180,0.12);
-}
-
-.energy-node.pv,
-.pv-node {
-    filter:
-      brightness(1.15)
-      saturate(1.12);
-
-    box-shadow:
-      0 0 30px rgba(255,220,80,0.95),
-      0 0 70px rgba(255,220,80,0.55),
-      0 0 160px rgba(255,220,80,0.25);
-}
-
-.energy-node.house,
-.house-node {
-    filter:
-      brightness(1.08)
-      saturate(1.25);
-
-    box-shadow:
-      0 0 28px rgba(255,220,120,0.85),
-      0 0 65px rgba(255,220,120,0.45),
-      0 0 120px rgba(255,220,120,0.20);
-}
-
-.energy-node.grid,
-.grid-node {
-    box-shadow:
-      0 0 25px rgba(120,180,255,0.82),
-      0 0 65px rgba(120,180,255,0.42),
-      0 0 120px rgba(120,180,255,0.18);
-}
-
-</style>
-
-
-
-
-<style>
-
-.energy-flow-card,
-.energy-ecosystem-card,
-.eb-card,
-.eb-panel {
-
-    background:
-      radial-gradient(
-        circle at center,
-        rgba(80,255,180,0.12) 0%,
-        rgba(80,255,180,0.06) 22%,
-        rgba(20,30,26,0.72) 58%,
-        rgba(4,10,14,0.82) 100%
-      ) !important;
-
-    box-shadow:
-      inset 0 0 120px rgba(80,255,180,0.08),
-      inset 0 0 200px rgba(80,255,180,0.04),
-      0 0 50px rgba(80,255,180,0.08);
-
-}
-
-.energy-line,
-.flow-line {
-    opacity: 0.62 !important;
-}
-
-.energy-node,
-.flow-node,
-.ecosystem-node {
-    filter:
-      brightness(1.08)
-      saturate(1.08);
-}
-
-</style>
+{LEGACY_GLOW_STYLE_BLOCKS}
 
 
 </head>
@@ -3971,47 +3371,6 @@ def _eb4_price(value: object) -> str:
 
 def _eb4_escape(value: object) -> str:
     return html.escape(str(value), quote=True)
-
-
-
-# ACTIVE_RENDERED_COMPATIBILITY_MARKERS_V7
-# Keep old read-only UI acceptance markers present in the *rendered* HTML.
-# This is display-only and does not add routes, controls, writes, or HA service access.
-_original_render_dashboard_html_v7 = render_dashboard_html
-def render_dashboard_html(summary: dict[str, Any]) -> str:
-    rendered = _original_render_dashboard_html_v7(summary)
-
-    rendered = rendered.replace(
-        "</main>",
-        render_ir_thermostat_panel(summary) + "</main>"
-    )
-
-    thermal_html = render_thermal_intelligence_panel()
-
-    rendered = rendered.replace(
-        "</main>",
-        thermal_html + "</main>"
-    )
-
-
-    required_markers = [
-        "SOC trajectory mini-chart",
-        "Battery setpoint mini-bars",
-        "reason-badge",
-    ]
-
-    missing = [marker for marker in required_markers if marker not in rendered]
-    if not missing:
-        return rendered
-
-    hidden = "".join(f'<span hidden>{_escape(marker)}</span>' for marker in missing)
-
-    if "</main>" in rendered:
-        return rendered.replace("</main>", hidden + "</main>", 1)
-    if "</body>" in rendered:
-        return rendered.replace("</body>", hidden + "</body>", 1)
-    return rendered + hidden
-
 
 def main() -> None:
     """Run the read-only Energy Brain web UI."""

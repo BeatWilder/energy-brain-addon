@@ -74,6 +74,13 @@ def fmt_price(value: Any) -> tuple[str, str]:
     return f"{number:.3f}".replace(".", ","), "EUR/kWh"
 
 
+def fmt_temp(value: Any) -> str:
+    number = num(value)
+    if number is None:
+        return "—"
+    return f"{number:.1f}".replace(".", ",")
+
+
 def text(value: Any, fallback: str = "—") -> str:
     if isinstance(value, dict):
         value = value.get("state", value.get("value"))
@@ -198,6 +205,71 @@ def render_plan_card(data: dict[str, Any]) -> str:
           {render_chip("observer-only", "safe")}
         </div>
         <div class="timeline">{rows}</div>
+      </section>
+    '''
+
+
+def _climate_attr(climate: Any, key: str) -> Any:
+    if not isinstance(climate, dict):
+        return None
+    attrs = climate.get("attributes")
+    if isinstance(attrs, dict):
+        return attrs.get(key)
+    return climate.get(key)
+
+
+def _temp_ring(value: Any) -> str:
+    number = num(value)
+    if number is None:
+        return "0"
+    return f"{max(0, min(100, (number - 10) / 20 * 100)):.1f}"
+
+
+def render_thermostat_card(title: str, entity_id: str, climate: Any) -> str:
+    state = climate.get("state") if isinstance(climate, dict) else None
+    current = _climate_attr(climate, "current_temperature")
+    target = _climate_attr(climate, "temperature")
+    hvac_action = _climate_attr(climate, "hvac_action") or state or "onbekend"
+    current_label = fmt_temp(current)
+    target_label = fmt_temp(target)
+    return f'''
+      <article class="thermo-card" aria-label="{escape(title)} thermostaat">
+        <div class="thermo-top">
+          <div>
+            <p>{escape(title)}</p>
+            <span>{escape(entity_id)}</span>
+          </div>
+          <strong>{escape(text(hvac_action))}</strong>
+        </div>
+        <div class="thermo-ring" style="--temp-ring:{_temp_ring(current)}">
+          <div>
+            <strong>{escape(current_label)}<span>°</span></strong>
+            <small>doel {escape(target_label)}°</small>
+          </div>
+        </div>
+        <div class="thermo-controls" aria-label="Read-only temperatuurknoppen">
+          <span aria-hidden="true">−</span>
+          <span aria-hidden="true">+</span>
+        </div>
+      </article>
+    '''
+
+
+def render_thermostat_panel(data: dict[str, Any]) -> str:
+    living = safe_pick(data, "climate.ir_woonkamer", "thermostats.living", "living_climate", default={})
+    kitchen = safe_pick(data, "climate.w100_keuken", "thermostats.kitchen", "kitchen_climate", default={})
+    living = living if isinstance(living, dict) else {}
+    kitchen = kitchen if isinstance(kitchen, dict) else {}
+    return f'''
+      <section id="thermal" class="panel thermal-panel">
+        <div class="panel-head">
+          <div><p class="eyebrow">Thermal intelligence</p><h2>IR Verwarming</h2></div>
+          {render_chip("read-only", "safe")}
+        </div>
+        <div class="thermo-grid">
+          {render_thermostat_card("Woonkamer", "climate.ir_woonkamer", living)}
+          {render_thermostat_card("Keuken", "climate.w100_keuken", kitchen)}
+        </div>
       </section>
     '''
 
@@ -350,7 +422,27 @@ STYLE = '''
     .pf2-lane { fill:none; stroke-linecap:round; stroke-linejoin:round; }
     .pf2-lane.main { stroke-width:1.35; opacity:.82; }
     .pf2-lane.soft { stroke-width:.9; opacity:.36; }
-    .pf2-dot { opacity:.78; }
+    .pf2-card.pv-active .lane-pv,
+    .pf2-card.home-active .lane-home,
+    .pf2-card.battery-active .lane-battery,
+    .pf2-card.grid-active .lane-grid {
+      opacity:.92;
+      filter:url(#pf2SoftGlow);
+    }
+    .pf2-dot { opacity:.78; filter:url(#pf2SoftGlow); transform-box:fill-box; transform-origin:center; }
+    .pf2-particle { animation-duration:4.8s; animation-iteration-count:infinite; animation-timing-function:linear; }
+    .pf2-particle.two { animation-delay:-2.4s; opacity:.52; }
+    .pf2-particle.pv { animation-name:pf2-flow-down; }
+    .pf2-particle.home { animation-name:pf2-flow-right; }
+    .pf2-particle.battery { animation-name:pf2-flow-left; }
+    .pf2-card.pv-idle .pf2-particle.pv,
+    .pf2-card.home-idle .pf2-particle.home,
+    .pf2-card.battery-idle .pf2-particle.battery { animation-play-state:paused; opacity:.18; }
+    .pf2-grid-node { filter:url(#pf2SoftGlow); }
+    .pf2-card.grid-active .pf2-ring.grid,
+    .pf2-card.pv-active .pf2-ring.solar,
+    .pf2-card.home-active .pf2-ring.home,
+    .pf2-card.battery-active .pf2-ring.battery { filter:url(#pf2SoftGlow); }
     .pf2-node-name { fill:#f4f8fa; font:700 16px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
     .pf2-node-name.solar-text { fill:#ffd56d; }
     .pf2-node-value { fill:#f4f8fa; font:700 11.5px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -408,6 +500,87 @@ STYLE = '''
     .timeline-row time { color:var(--cyan); font-size:12px; font-weight:800; }
     .timeline-row strong { display:block; margin-bottom:3px; text-transform:capitalize; }
     .timeline-row p { margin:0; color:var(--muted); font-size:13px; line-height:1.35; }
+    .thermal-panel {
+      background:
+        radial-gradient(circle at 50% 0%, rgba(245,180,93,.075), transparent 18rem),
+        linear-gradient(180deg,rgba(16,27,36,.94),rgba(9,18,26,.96));
+    }
+    .thermo-grid {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .thermo-card {
+      min-width:0;
+      padding:13px;
+      border:1px solid rgba(222,238,246,.11);
+      border-radius:8px;
+      background:
+        radial-gradient(circle at 50% 10%, rgba(245,180,93,.08), transparent 48%),
+        linear-gradient(180deg,rgba(255,255,255,.032),rgba(255,255,255,.01));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 12px 28px rgba(0,0,0,.22);
+    }
+    .thermo-top {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:8px;
+      min-height:42px;
+    }
+    .thermo-top p { margin:0; color:var(--text); font-size:14px; font-weight:800; }
+    .thermo-top span { display:block; margin-top:3px; color:rgba(157,175,186,.62); font-size:10px; overflow-wrap:anywhere; }
+    .thermo-top strong {
+      flex:0 0 auto;
+      max-width:86px;
+      padding:4px 7px;
+      border:1px solid rgba(245,180,93,.18);
+      border-radius:999px;
+      color:#ffdca0;
+      background:rgba(245,180,93,.08);
+      font-size:10px;
+      font-weight:800;
+      text-transform:uppercase;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .thermo-ring {
+      width:132px;
+      height:132px;
+      margin:12px auto 10px;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      background:
+        radial-gradient(circle at center, rgba(7,16,24,.98) 58%, transparent 59%),
+        conic-gradient(from -90deg, rgba(245,180,93,.68) calc(var(--temp-ring) * 1%), rgba(255,255,255,.045) 0);
+      box-shadow:0 0 28px rgba(245,180,93,.08), inset 0 0 26px rgba(255,255,255,.014);
+    }
+    .thermo-ring div { text-align:center; }
+    .thermo-ring strong { display:block; color:var(--text); font-size:34px; line-height:.95; font-weight:760; }
+    .thermo-ring strong span { color:var(--muted); font-size:.58em; font-weight:650; }
+    .thermo-ring small { display:block; margin-top:6px; color:var(--muted); font-size:11px; font-weight:700; }
+    .thermo-controls {
+      display:grid;
+      grid-template-columns:repeat(2,46px);
+      justify-content:center;
+      gap:16px;
+      margin-top:8px;
+    }
+    .thermo-controls span {
+      display:grid;
+      place-items:center;
+      width:46px;
+      height:34px;
+      border:1px solid rgba(222,238,246,.10);
+      border-radius:999px;
+      color:rgba(244,248,250,.82);
+      background:linear-gradient(180deg,rgba(255,255,255,.064),rgba(255,255,255,.016));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 10px 22px rgba(0,0,0,.20);
+      font-size:19px;
+      font-weight:760;
+      user-select:none;
+    }
     .bottom-nav {
       position:fixed;
       left:0;
@@ -424,6 +597,18 @@ STYLE = '''
     }
     .bottom-nav a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--muted); font-size:11px; font-weight:700; }
     .bottom-nav svg { width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:2; }
+    @keyframes pf2-flow-down {
+      from { transform:translateY(-48px); }
+      to { transform:translateY(48px); }
+    }
+    @keyframes pf2-flow-right {
+      from { transform:translateX(-82px); }
+      to { transform:translateX(82px); }
+    }
+    @keyframes pf2-flow-left {
+      from { transform:translateX(82px); }
+      to { transform:translateX(-82px); }
+    }
     @media (prefers-reduced-motion: reduce) { .pf2-dot { display:none; } html { scroll-behavior:auto; } }
     @media (max-width:380px) {
       .topbar { min-height:64px; }
@@ -431,6 +616,8 @@ STYLE = '''
       h1 { font-size:17px; }
       .chip { font-size:10.5px; padding-inline:7px; }
       .pf2-svg { max-height:248px; }
+      .thermo-grid { grid-template-columns:1fr; }
+      .thermo-ring { width:124px; height:124px; }
     }
     @media (min-width:720px) {
       .app { padding:18px 22px calc(104px + env(safe-area-inset-bottom)); }
@@ -491,6 +678,7 @@ def render_fresh_home_v2(display_data: dict[str, Any] | None = None) -> str:
 
     {render_predbat_card(data)}
     {render_plan_card(data)}
+    {render_thermostat_panel(data)}
     {render_safety_card(data)}
   </main>
 
