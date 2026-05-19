@@ -4,8 +4,8 @@ from energy_brain.ui.themes.tokens import css_vars
 
 
 def render_theme_css() -> str:
-    return f
-.flow-map::after{
+    return f"""
+.flow-map::after{{
 content:'ENERGY_BRAIN_RUNTIME_MARKER_991';
 position:absolute;
 left:8px;
@@ -14,13 +14,11 @@ font-size:10px;
 color:#ff0066;
 z-index:99999;
 pointer-events:none;
-}
-
-"""
+}}
     /* Tokens */
     :root {{
       color-scheme: dark;
-      {css_vars()}
+      {{css_vars()}}
       --bg: #04070a;
       --surface: rgba(8, 12, 17, 0.62);
       --surface-strong: rgba(12, 18, 25, 0.82);
@@ -675,37 +673,37 @@ pointer-events:none;
 
     /* ===== FINAL POWERFLOW POSITIONS ===== */
 
-    .flow-map .node-solar{
+    .flow-map .node-solar{{
       top:2% !important;
       left:50% !important;
       right:auto !important;
       bottom:auto !important;
       transform:translateX(-50%) !important;
-    }
+    }}
 
-    .flow-map .node-home{
+    .flow-map .node-home{{
       right:2% !important;
       top:50% !important;
       left:auto !important;
       bottom:auto !important;
       transform:translateY(-50%) !important;
-    }
+    }}
 
-    .flow-map .node-grid{
+    .flow-map .node-grid{{
       left:50% !important;
       bottom:2% !important;
       top:auto !important;
       right:auto !important;
       transform:translateX(-50%) !important;
-    }
+    }}
 
-    .flow-map .node-battery{
+    .flow-map .node-battery{{
       left:2% !important;
       top:50% !important;
       bottom:auto !important;
       right:auto !important;
       transform:translateY(-50%) !important;
-    }
+    }}
 
 .node-grid.state-exporting b {{ color: var(--export); }}
     .node-grid.state-importing b {{ color: var(--import); }}
@@ -1144,37 +1142,37 @@ pointer-events:none;
 
     /* ===== HARD POWERFLOW OVERRIDE ===== */
 
-    .flow-map .node-solar{
+    .flow-map .node-solar{{
       top:2% !important;
       left:50% !important;
       right:auto !important;
       bottom:auto !important;
       transform:translateX(-50%) !important;
-    }
+    }}
 
-    .flow-map .node-home{
+    .flow-map .node-home{{
       right:2% !important;
       top:50% !important;
       left:auto !important;
       bottom:auto !important;
       transform:translateY(-50%) !important;
-    }
+    }}
 
-    .flow-map .node-battery{
+    .flow-map .node-battery{{
       bottom:2% !important;
       left:50% !important;
       top:auto !important;
       right:auto !important;
       transform:translateX(-50%) !important;
-    }
+    }}
 
-    .flow-map .node-grid{
+    .flow-map .node-grid{{
       left:50% !important;
       bottom:2% !important;
       top:auto !important;
       right:auto !important;
       transform:translateX(-50%) !important;
-    }
+    }}
 
 
 body[data-viewport="desktop"] .node-grid:hover {{ transform: translateX(-50%) scale(1.014); }}
@@ -1210,36 +1208,36 @@ body[data-viewport="desktop"] .node-grid:hover {{ transform: translateX(-50%) sc
 
 /* ===== HARDE FINAL POWERFLOW OVERRIDE ===== */
 
-.flow-map .node-solar{
+.flow-map .node-solar{{
   top:2% !important;
   left:50% !important;
   right:auto !important;
   bottom:auto !important;
   transform:translateX(-50%) !important;
-}
+}}
 
-.flow-map .node-home{
+.flow-map .node-home{{
   right:2% !important;
   top:50% !important;
   left:auto !important;
   bottom:auto !important;
   transform:translateY(-50%) !important;
-}
+}}
 
-.flow-map .node-grid{
+.flow-map .node-grid{{
   left:2% !important;
   top:50% !important;
   right:auto !important;
   bottom:auto !important;
   transform:translateY(-50%) !important;
-}
+}}
 
-.flow-map .node-battery{
+.flow-map .node-battery{{
   left:50% !important;
   bottom:2% !important;
   top:auto !important;
   right:auto !important;
   transform:translateX(-50%) !important;
-}
+}}
 
 """

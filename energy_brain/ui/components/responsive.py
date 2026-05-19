@@ -4,6 +4,7 @@ import html
 from typing import Any
 
 from energy_brain.ui.powerflow import build_powerflow_scene
+from energy_brain.ui.powerflow_v2.renderer import render_powerflow_v2
 
 
 def esc(value: Any) -> str:
