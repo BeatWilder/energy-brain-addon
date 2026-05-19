@@ -1,5 +1,5 @@
-from energy_brain.ui.layout_router import resolve_layout_profile
 from __future__ import annotations
+from energy_brain.ui.layout_router import resolve_layout_profile
 
 import logging
 import os
