@@ -1,7 +1,7 @@
 name: Energy Brain EMS
 slug: energy_brain
 description: Deterministisch, fysisch bewust energiemanagementsysteem voor Home Assistant
-version: "0.8.68"
+version: "0.8.69"
 arch:
   - amd64
   - aarch64
@@ -12,57 +12,63 @@ init: false
 homeassistant_api: true
 hassio_api: true
 
+
+
 options:
   mode: observer
+
   cycle_seconds: 900
   horizon_steps: 96
-  ui_profile: "tablet"
 
+  ui_profile: tablet
 
   battery_soc_entity: ""
   pv_power_entity: ""
   grid_price_entity: ""
   household_load_entity: ""
 
-  battery_capacity_kwh: 10.0
-  soc_min_percent: 10.0
-  soc_max_percent: 95.0
-  reserve_percent: 20.0
+  battery_capacity_kwh: 10
 
-  max_charge_kw: 5.0
-  max_discharge_kw: 5.0
+  soc_min_percent: 10
+  soc_max_percent: 95
+  reserve_percent: 20
 
-  charge_efficiency: 0.95
-  discharge_efficiency: 0.95
+  max_charge_kw: 5
+  max_discharge_kw: 5
+
+  charge_efficiency: 95
+  discharge_efficiency: 95
 
   command_service_domain: ""
   command_service: ""
   command_value_field: ""
 
-  hillview_controls_enabled: false
+  hillview_controls_enabled: true
 
 schema:
   mode: list(observer|shadow|active)
-  cycle_seconds: int(60,3600)
-  horizon_steps: int(1,192)
-  ui_profile: str
 
+  cycle_seconds: int
+  horizon_steps: int
+
+  ui_profile: str
 
   battery_soc_entity: str
   pv_power_entity: str
   grid_price_entity: str
   household_load_entity: str
 
-  battery_capacity_kwh: float
-  soc_min_percent: float
-  soc_max_percent: float
-  reserve_percent: float
+  battery_capacity_kwh: int
 
-  max_charge_kw: float
-  max_discharge_kw: float
+  soc_min_percent: int
+  soc_max_percent: int
+  reserve_percent: int
 
-  charge_efficiency: float
-  discharge_efficiency: float
+  max_charge_kw: int
+  max_discharge_kw: int
+
+  charge_efficiency: int
+  discharge_efficiency: int
 
   command_service_domain: str
   command_service: str
