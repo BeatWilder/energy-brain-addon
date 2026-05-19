@@ -1,7 +1,7 @@
 name: Energy Brain EMS
 slug: energy_brain
 description: Deterministisch, fysisch bewust energiemanagementsysteem voor Home Assistant
-version: "0.8.61"
+version: "0.8.62"
 arch:
   - amd64
   - aarch64
@@ -45,8 +45,8 @@ schema:
   mode: list(observer|shadow|active)
   cycle_seconds: int(60,3600)
   horizon_steps: int(1,192)
+  ui_profile: str
 
-  ui_profile: list(mobile|tablet|workstation)
 
   battery_soc_entity: str
   pv_power_entity: str
