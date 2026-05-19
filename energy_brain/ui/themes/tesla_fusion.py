@@ -314,16 +314,17 @@ def render_theme_css() -> str:
       margin: var(--flow-margin, 0);
       aspect-ratio: 1;
       isolation: isolate;
+      transform: translateZ(0);
     }}
     .flow-map:before {{
       content: "";
       position: absolute;
-      inset: 7%;
+      inset: 8%;
       border-radius: 50%;
       background:
         radial-gradient(circle, transparent 47%, rgba(255,255,255,0.045) 48%, transparent 49%),
         conic-gradient(from 25deg, rgba(88,232,182,0.10), rgba(255,209,102,0.07), rgba(127,199,255,0.09), rgba(88,232,182,0.10));
-      opacity: calc(0.040 + var(--scene-intensity) * 0.052);
+      opacity: calc(0.055 + var(--scene-intensity) * 0.045);
       pointer-events: none;
     }}
     .hero[data-energy-state="scarcity"] .flow-map:before {{ opacity: 0.18; }}
@@ -345,8 +346,9 @@ def render_theme_css() -> str:
       stroke: rgba(255,255,255,0.050);
       stroke-width: calc(var(--lane-width) * 1px);
       stroke-linecap: round;
-      opacity: calc(0.10 + var(--flow-intensity) * 0.22);
-      filter: drop-shadow(0 0 calc(1px + var(--flow-intensity) * 5px) rgba(88,232,182,var(--energy-glow)));
+      stroke-linejoin: round;
+      opacity: calc(0.14 + var(--flow-intensity) * 0.20);
+      filter: drop-shadow(0 0 calc(1px + var(--flow-intensity) * 3px) rgba(88,232,182,var(--energy-glow)));
       transition: stroke var(--motion-base), stroke-width var(--motion-base), opacity var(--motion-base), filter var(--motion-base);
     }}
     .flow-lane.tone-solar, .flow-pulse.tone-solar {{ stroke: url(#solar-flow); }}
@@ -358,11 +360,12 @@ def render_theme_css() -> str:
     .flow-lane.state-idle {{ stroke: rgba(255,255,255,0.052); filter: none; opacity: 0.22; }}
     .flow-pulse {{
       fill: none;
-      stroke-width: calc((var(--lane-width) * 0.30) * 1px);
+      stroke-width: calc((var(--lane-width) * 0.24) * 1px);
       stroke-linecap: round;
-      stroke-dasharray: calc(8px + var(--flow-intensity) * 12px) calc(44px - var(--flow-intensity) * 6px);
+      stroke-linejoin: round;
+      stroke-dasharray: calc(10px + var(--flow-intensity) * 8px) calc(50px - var(--flow-intensity) * 5px);
       animation: flowTravel var(--flow-speed) cubic-bezier(0.28, 0.70, 0.28, 1) infinite, flowPresence var(--flow-speed) ease-in-out infinite;
-      opacity: calc(var(--flow-intensity) * 0.20);
+      opacity: calc(var(--flow-intensity) * 0.18);
       mix-blend-mode: screen;
     }}
     .flow-pulse.state-idle {{ opacity: 0; }}
@@ -379,7 +382,7 @@ def render_theme_css() -> str:
     .flow-dot.tone-grid.state-exporting {{ fill: #ffe58f; filter: drop-shadow(0 0 3px rgba(255,209,102,0.25)) drop-shadow(0 0 6px rgba(255,209,102,0.08)); }}
     .junction-aura {{
       fill: url(#junction-glow);
-      opacity: calc(0.052 + var(--scene-intensity) * 0.09);
+      opacity: calc(0.070 + var(--scene-intensity) * 0.075);
       transform-origin: 210px 210px;
       animation: junctionBreath 10.5s ease-in-out infinite;
     }}
@@ -404,7 +407,7 @@ def render_theme_css() -> str:
         radial-gradient(circle, rgba(13,18,24,0.99) 52%, rgba(88,232,182,0.052) 78%, rgba(127,199,255,0.020));
       box-shadow:
         0 18px 40px rgba(0,0,0,0.25),
-        0 0 calc(10px + var(--scene-intensity) * 18px) rgba(88,232,182,0.060),
+        0 0 calc(12px + var(--scene-intensity) * 18px) rgba(88,232,182,0.070),
         inset 0 1px 0 rgba(255,255,255,0.085),
         inset 0 -20px 36px rgba(0,0,0,0.18);
       animation: orbPulse 24s ease-in-out infinite;
@@ -548,7 +551,7 @@ def render_theme_css() -> str:
       background:
         radial-gradient(circle at 50% 30%, rgba(127,199,255,0.135), transparent 32%),
         radial-gradient(circle at 50% 58%, rgba(8,17,25,0.90), rgba(8,12,17,0.48) 65%, rgba(127,199,255,0.038));
-      box-shadow: 0 10px 23px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.036), 0 0 calc(4px + var(--node-intensity) * 10px) rgba(127,199,255,0.060);
+      box-shadow: 0 10px 23px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.040), 0 0 calc(9px + var(--node-intensity) * 11px) rgba(127,199,255,0.095);
     }}
     .node:before {{
       content: "";
@@ -766,6 +769,58 @@ def render_theme_css() -> str:
         radial-gradient(circle at 88% 8%, rgba(255,209,102,0.026), transparent 16rem),
         linear-gradient(180deg, rgba(255,255,255,0.010), rgba(255,255,255,0.001));
     }}
+    .thermostat-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin: 12px 0;
+    }}
+    .thermostat-preview {{
+      min-width: 0;
+      border: 1px solid rgba(255,255,255,0.040);
+      border-radius: var(--radius-md);
+      background: radial-gradient(circle at 50% 18%, rgba(255,209,102,0.040), transparent 55%), rgba(255,255,255,0.012);
+      padding: 10px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.024), 0 10px 26px rgba(0,0,0,0.10);
+    }}
+    .thermostat-top {{ display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }}
+    .thermostat-top span, .thermostat-meta span {{
+      display:block;
+      color:rgba(152,165,178,0.64);
+      font-size:9px;
+      font-weight:720;
+      text-transform:uppercase;
+      letter-spacing:0.07em;
+    }}
+    .thermostat-top b {{ display:block; margin-top:3px; color:rgba(245,248,251,0.86); font-size:10px; font-weight:620; overflow-wrap:anywhere; }}
+    .thermostat-top em {{
+      border:1px solid rgba(255,209,102,0.14);
+      border-radius:var(--radius-round);
+      color:rgba(255,209,102,0.84);
+      background:rgba(255,209,102,0.035);
+      padding:4px 7px;
+      font-size:9px;
+      font-style:normal;
+      font-weight:760;
+      white-space:nowrap;
+    }}
+    .thermostat-dial {{
+      width:104px;
+      height:104px;
+      margin:12px auto 10px;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      background: radial-gradient(circle at 50% 50%, rgba(5,8,12,0.98) 58%, transparent 59%), conic-gradient(from -90deg, rgba(255,209,102,0.70) calc(var(--temp-ring) * 1%), rgba(255,255,255,0.040) 0);
+      box-shadow:0 0 22px rgba(255,209,102,0.075), inset 0 0 18px rgba(255,255,255,0.018);
+    }}
+    .thermostat-dial strong {{ font-size:24px; line-height:1; font-weight:700; }}
+    .thermostat-dial span {{ color:rgba(152,165,178,0.62); font-size:10px; }}
+    .thermostat-meta {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }}
+    .thermostat-meta div {{ border:1px solid rgba(255,255,255,0.028); border-radius:12px; padding:7px; background:rgba(255,255,255,0.010); }}
+    .thermostat-meta b {{ display:block; margin-top:3px; color:var(--text); font-size:11px; line-height:1.15; overflow-wrap:anywhere; }}
+    .thermostat-controls {{ display:grid; grid-template-columns:repeat(2,1fr); gap:7px; margin-top:9px; }}
+    .thermostat-controls span {{ display:grid; place-items:center; min-height:30px; border:1px solid rgba(255,255,255,0.040); border-radius:999px; color:rgba(245,248,251,0.72); background:rgba(255,255,255,0.018); font-size:18px; font-weight:700; }}
     .controls-panel {{
       background:
         radial-gradient(circle at 8% 0%, rgba(127,199,255,0.020), transparent 15rem),

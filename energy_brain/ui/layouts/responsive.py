@@ -327,6 +327,8 @@ def build_layout_view(
                 "thermal_strategy": _text_value(semantic.get("thermal_strategy"), "Thermiek onbekend"),
                 "living_state": _text_value(payload.get("climate_living"), "onbekend"),
                 "kitchen_state": _text_value(payload.get("climate_kitchen"), "onbekend"),
+                "living_climate": payload.get("climate_living_object"),
+                "kitchen_climate": payload.get("climate_kitchen_object"),
                 "presence_living": _text_value(payload.get("presence_living"), "onbekend"),
                 "presence_kitchen": _text_value(payload.get("presence_kitchen"), "onbekend"),
                 "override_living": _text_value(payload.get("ir_override_living"), "onbekend"),

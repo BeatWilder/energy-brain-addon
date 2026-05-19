@@ -409,7 +409,56 @@ def _state_row(label: str, value: Any) -> str:
     return f'<div class="comfort-row"><span>{esc(label)}</span><b>{esc(display)}</b></div>'
 
 
+def _climate_attr(climate: Any, key: str) -> Any:
+    if not isinstance(climate, dict):
+        return None
+    attrs = climate.get("attributes")
+    if isinstance(attrs, dict):
+        return attrs.get(key)
+    return None
+
+
+def _temp_label(value: Any) -> str:
+    number = _num(value)
+    if number is None:
+        return "Niet beschikbaar"
+    return f"{number:.1f}°"
+
+
+def _thermostat_preview(title: str, entity_id: str, climate: Any) -> str:
+    state = climate.get("state") if isinstance(climate, dict) else None
+    current = _climate_attr(climate, "current_temperature")
+    target = _climate_attr(climate, "temperature")
+    hvac_action = _climate_attr(climate, "hvac_action") or state
+    current_number = _num(current)
+    ring = 0 if current_number is None else max(0, min(100, (current_number - 5) / 25 * 100))
+    return f"""
+      <article class="thermostat-preview" aria-label="{esc(title)} thermostaat preview">
+        <div class="thermostat-top">
+          <div><span>{esc(title)}</span><b>{esc(entity_id)}</b></div>
+          <em>{esc(state or "onbekend")}</em>
+        </div>
+        <div class="thermostat-dial" style="--temp-ring:{ring:.1f}">
+          <strong>{esc(_temp_label(current))}</strong>
+          <span>nu</span>
+        </div>
+        <div class="thermostat-meta">
+          <div><span>Target</span><b>{esc(_temp_label(target))}</b></div>
+          <div><span>HVAC</span><b>{esc(hvac_action or "onbekend")}</b></div>
+          <div><span>Status</span><b>{esc(state or "onbekend")}</b></div>
+        </div>
+        <div class="thermostat-controls" aria-hidden="true">
+          <span>−</span><span>+</span>
+        </div>
+      </article>
+    """
+
+
 def render_comfort_panel(section: dict[str, Any]) -> str:
+    thermostats = (
+        _thermostat_preview("Woonkamer", "climate.ir_woonkamer", section.get("living_climate"))
+        + _thermostat_preview("Keuken", "climate.w100_keuken", section.get("kitchen_climate"))
+    )
     rows = "".join(
         [
             _state_row("Woonkamer", section.get("living_state")),
@@ -434,6 +483,7 @@ def render_comfort_panel(section: dict[str, Any]) -> str:
       </div>
       <h2>{esc(comfort_mode)}</h2>
       <p>{esc(thermal_strategy)}</p>
+      <div class="thermostat-grid">{thermostats}</div>
       <div class="comfort-grid">{rows}</div>
     </section>
     """

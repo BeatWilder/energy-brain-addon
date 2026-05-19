@@ -3614,39 +3614,13 @@ def render_ir_thermostat_card(
 
       <div class="eb-thermo-controls">
 
-        <button
-          class="eb-thermo-btn"
-          onclick="
-            fetch('/api/services/climate/set_temperature', {{
-              method:'POST',
-              headers: {{
-                'Content-Type':'application/json'
-              }},
-              body: JSON.stringify({{
-                entity_id:'{entity_id}',
-                temperature: Number({target_temp}) - 0.5
-              }})
-            }})
-          ">
+        <span class="eb-thermo-btn" aria-hidden="true">
           −
-        </button>
+        </span>
 
-        <button
-          class="eb-thermo-btn"
-          onclick="
-            fetch('/api/services/climate/set_temperature', {{
-              method:'POST',
-              headers: {{
-                'Content-Type':'application/json'
-              }},
-              body: JSON.stringify({{
-                entity_id:'{entity_id}',
-                temperature: Number({target_temp}) + 0.5
-              }})
-            }})
-          ">
+        <span class="eb-thermo-btn" aria-hidden="true">
           +
-        </button>
+        </span>
 
       </div>
     </div>
@@ -4004,53 +3978,6 @@ def _eb4_escape(value: object) -> str:
 # Keep old read-only UI acceptance markers present in the *rendered* HTML.
 # This is display-only and does not add routes, controls, writes, or HA service access.
 _original_render_dashboard_html_v7 = render_dashboard_html
-
-
-
-
-THERMOSTAT_PANEL = """
-<section class="card energybrain-thermostat-panel">
-  <div class="section-title">
-    Thermal Intelligence
-  </div>
-
-  <div class="thermostat-grid">
-
-    <ha-card class="thermo-card">
-      <div class="thermo-title">
-        Woonkamer
-      </div>
-
-      <hui-thermostat-card
-        .hass="hass"
-        .config='{
-          "type":"thermostat",
-          "entity":"climate.ir_woonkamer",
-          "name":"IR Woonkamer"
-        }'>
-      </hui-thermostat-card>
-    </ha-card>
-
-    <ha-card class="thermo-card">
-      <div class="thermo-title">
-        Keuken
-      </div>
-
-      <hui-thermostat-card
-        .hass="hass"
-        .config='{
-          "type":"thermostat",
-          "entity":"climate.w100_keuken",
-          "name":"IR Keuken"
-        }'>
-      </hui-thermostat-card>
-    </ha-card>
-
-  </div>
-</section>
-"""
-
-
 def render_dashboard_html(summary: dict[str, Any]) -> str:
     rendered = _original_render_dashboard_html_v7(summary)
 
@@ -4058,13 +3985,6 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
         "</main>",
         render_ir_thermostat_panel(summary) + "</main>"
     )
-
-
-    rendered = rendered.replace(
-        "</main>",
-        THERMOSTAT_PANEL + "</main>"
-    )
-
 
     thermal_html = render_thermal_intelligence_panel()
 

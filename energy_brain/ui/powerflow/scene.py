@@ -169,7 +169,7 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
             _lane(
                 lane_id="solar-home",
                 path_id="pf-path-solar-home",
-                path="M 210 58 C 250 88, 318 136, 352 210",
+                path="M 210 58 C 272 76, 344 138, 352 210",
                 kw=transfers["solar_house"],
                 state="transferring" if transfers["solar_house"] > 0.05 else "idle",
                 tone="solar",
@@ -177,7 +177,7 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
             _lane(
                 lane_id="solar-battery",
                 path_id="pf-path-solar-battery",
-                path="M 210 58 C 168 92, 106 140, 72 210",
+                path="M 210 58 C 148 76, 76 138, 72 210",
                 kw=transfers["solar_battery"],
                 state="transferring" if transfers["solar_battery"] > 0.05 else "idle",
                 tone="solar",
@@ -185,7 +185,7 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
             _lane(
                 lane_id="solar-grid",
                 path_id="pf-path-solar-grid",
-                path="M 210 58 C 252 148, 252 278, 210 360",
+                path="M 210 58 C 246 142, 246 276, 210 360",
                 kw=transfers["solar_grid"],
                 state="exporting" if transfers["solar_grid"] > 0.05 else "idle",
                 tone="export",
@@ -193,7 +193,7 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
             _lane(
                 lane_id="grid-battery",
                 path_id="pf-path-grid-battery",
-                path="M 210 360 C 156 326, 96 278, 72 210",
+                path="M 210 360 C 148 344, 76 282, 72 210",
                 kw=transfers["grid_battery"],
                 state="importing" if transfers["grid_battery"] > 0.05 else "idle",
                 tone="grid",
@@ -201,7 +201,7 @@ def build_powerflow_scene(section: dict[str, Any]) -> dict[str, Any]:
             _lane(
                 lane_id="grid-home",
                 path_id="pf-path-grid-home",
-                path="M 210 360 C 268 326, 326 278, 352 210",
+                path="M 210 360 C 272 344, 344 282, 352 210",
                 kw=transfers["grid_house"],
                 state="importing" if transfers["grid_house"] > 0.05 else "idle",
                 tone="grid",

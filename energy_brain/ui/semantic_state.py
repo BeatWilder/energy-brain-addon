@@ -107,6 +107,11 @@ def canonical_values_from_entities(entity_states: dict[str, Any]) -> dict[str, A
 
 def merge_entity_values(payload: dict[str, Any], entity_states: dict[str, Any]) -> dict[str, Any]:
     mapped = canonical_values_from_entities(entity_states)
+    object_values = {
+        key: entity_states[entity_id]
+        for key, entity_id in CANONICAL_ENTITIES.items()
+        if key in {"climate_living", "climate_kitchen"} and isinstance(entity_states.get(entity_id), dict)
+    }
     merged = dict(payload)
     for key, value in mapped.items():
         merged[key] = value
@@ -120,6 +125,7 @@ def merge_entity_values(payload: dict[str, Any], entity_states: dict[str, Any]) 
         merged["price_now"] = mapped["grid_price"]
     merged["canonical_entities"] = dict(CANONICAL_ENTITIES)
     merged["canonical_entity_values"] = mapped
+    merged["canonical_entity_objects"] = object_values
     return merged
 
 

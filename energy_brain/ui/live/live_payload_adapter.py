@@ -115,6 +115,7 @@ def build_live_payload(
     execution = _dict(raw.get("execution"))
     energy_flow = _dict(raw.get("energy_flow"))
     data_quality = _dict(raw.get("data_quality"))
+    entity_objects = _dict(raw.get("canonical_entity_objects"))
 
     soc = _pick(raw, ("battery_soc_percent",), ("soc_percent",), ("battery", "soc_percent")) or _pick(snapshot, ("battery_soc_percent",))
     pv = _pick(raw, ("pv_power_kw",), ("pv_now_kw",), ("solar_kw",)) or _pick(snapshot, ("pv_power_kw",)) or _pick(energy_flow, ("pv_kw",), ("pv_power_kw",))
@@ -207,6 +208,8 @@ def build_live_payload(
         "dispatch_mode": raw.get("dispatch_mode"),
         "climate_living": raw.get("climate_living"),
         "climate_kitchen": raw.get("climate_kitchen"),
+        "climate_living_object": entity_objects.get("climate_living"),
+        "climate_kitchen_object": entity_objects.get("climate_kitchen"),
         "ir_override_living": raw.get("ir_override_living"),
         "ir_override_kitchen": raw.get("ir_override_kitchen"),
         "ir_gate": raw.get("ir_gate"),
@@ -221,6 +224,7 @@ def build_live_payload(
         "charge_window_active": raw.get("charge_window_active"),
         "canonical_entities": raw.get("canonical_entities", {}),
         "canonical_entity_values": raw.get("canonical_entity_values", {}),
+        "canonical_entity_objects": raw.get("canonical_entity_objects", {}),
         "dispatch_allowed": False,
         "ha_writes_allowed": False,
         "service_calls_allowed": False,
