@@ -2418,16 +2418,10 @@ class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
             return
 
         
+        
         if path in ("", "/", "/home", "/index.html"):
             path = "/new-ui"
 
-
-        if path == "/legacy-ui":
-            cycle = read_latest_cycle()
-            summary = summarize_cycle(cycle)
-            html = energybrain_fresh_home_v2_html(build_fresh_home_v1_display_data(summary))
-            self._send_response(200, html.encode("utf-8"), "text/html; charset=utf-8")
-            return
 
         self._send_json({"status": "not_found", "read_only": True}, status=404)
 
