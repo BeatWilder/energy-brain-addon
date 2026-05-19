@@ -319,6 +319,42 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
     font-size: 14px;
 }
 
+
+
+.energybrain-thermostat-panel {
+    margin-top: 24px;
+    padding: 22px;
+    border-radius: 32px;
+    background:
+        radial-gradient(circle at top left,
+        rgba(90,255,180,0.22),
+        rgba(16,20,24,0.96));
+    box-shadow:
+        0 0 40px rgba(90,255,180,0.22),
+        0 0 120px rgba(90,255,180,0.12);
+}
+
+.thermostat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(320px,1fr));
+    gap: 20px;
+}
+
+.thermo-card {
+    border-radius: 28px;
+    padding: 18px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(90,255,180,0.18);
+    box-shadow:
+        0 0 24px rgba(90,255,180,0.18);
+}
+
+.thermo-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
 </style>
 
 
@@ -3782,8 +3818,59 @@ def _eb4_escape(value: object) -> str:
 _original_render_dashboard_html_v7 = render_dashboard_html
 
 
+
+
+THERMOSTAT_PANEL = """
+<section class="card energybrain-thermostat-panel">
+  <div class="section-title">
+    Thermal Intelligence
+  </div>
+
+  <div class="thermostat-grid">
+
+    <ha-card class="thermo-card">
+      <div class="thermo-title">
+        Woonkamer
+      </div>
+
+      <hui-thermostat-card
+        .hass="hass"
+        .config='{
+          "type":"thermostat",
+          "entity":"climate.ir_woonkamer",
+          "name":"IR Woonkamer"
+        }'>
+      </hui-thermostat-card>
+    </ha-card>
+
+    <ha-card class="thermo-card">
+      <div class="thermo-title">
+        Keuken
+      </div>
+
+      <hui-thermostat-card
+        .hass="hass"
+        .config='{
+          "type":"thermostat",
+          "entity":"climate.w100_keuken",
+          "name":"IR Keuken"
+        }'>
+      </hui-thermostat-card>
+    </ha-card>
+
+  </div>
+</section>
+"""
+
+
 def render_dashboard_html(summary: dict[str, Any]) -> str:
     rendered = _original_render_dashboard_html_v7(summary)
+
+    rendered = rendered.replace(
+        "</main>",
+        THERMOSTAT_PANEL + "</main>"
+    )
+
 
     thermal_html = render_thermal_intelligence_panel()
 
