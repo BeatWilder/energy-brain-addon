@@ -1,0 +1,108 @@
+{
+  "summary": {
+    "total_entities": 73
+  },
+  "groups": {
+    "powerflow": [
+      "input_number.alphaess_helper_dispatch_power",
+      "input_number.alphaess_helper_force_charging_power",
+      "input_number.alphaess_helper_force_discharging_power",
+      "input_number.alphaess_helper_force_export_power",
+      "sensor.alphaess_active_power_pv_meter",
+      "sensor.alphaess_current_house_load",
+      "sensor.alphaess_dispatch_active_power",
+      "sensor.alphaess_excess_power",
+      "sensor.alphaess_power_battery",
+      "sensor.alphaess_power_grid",
+      "sensor.alphaess_power_phase_a_grid",
+      "sensor.alphaess_power_phase_b_grid",
+      "sensor.alphaess_power_phase_c_grid",
+      "sensor.alphaess_pv1_power",
+      "sensor.alphaess_pv2_power",
+      "sensor.alphaess_pv3_power",
+      "sensor.alphaess_pv4_power",
+      "sensor.solcast_pv_forecast_power_in_1_hour",
+      "sensor.solcast_pv_forecast_power_in_30_minutes",
+      "sensor.solcast_pv_forecast_power_now"
+    ],
+    "battery": [
+      "binary_sensor.battery_charge_window_active_clean",
+      "input_number.alphaess_helper_dispatch_cutoff_soc",
+      "input_number.alphaess_helper_force_charging_cutoff_soc",
+      "input_number.alphaess_helper_force_discharging_cutoff_soc",
+      "input_number.alphaess_helper_force_export_cutoff_soc",
+      "sensor.alphaess_dispatch_soc",
+      "sensor.alphaess_power_battery",
+      "sensor.alphaess_soc_battery",
+      "sensor.energybrain_battery_gate",
+      "sensor.energybrain_required_reserve_soc"
+    ],
+    "solar": [
+      "sensor.alphaess_active_power_pv_meter",
+      "sensor.alphaess_current_pv_production",
+      "sensor.alphaess_pv1_current",
+      "sensor.alphaess_pv1_power",
+      "sensor.alphaess_pv1_voltage",
+      "sensor.alphaess_pv2_current",
+      "sensor.alphaess_pv2_power",
+      "sensor.alphaess_pv2_voltage",
+      "sensor.alphaess_pv3_current",
+      "sensor.alphaess_pv3_power",
+      "sensor.alphaess_pv3_voltage",
+      "sensor.alphaess_pv4_current",
+      "sensor.alphaess_pv4_power",
+      "sensor.alphaess_pv4_voltage",
+      "sensor.solcast_pv_forecast_forecast_today",
+      "sensor.solcast_pv_forecast_forecast_tomorrow",
+      "sensor.solcast_pv_forecast_power_in_1_hour",
+      "sensor.solcast_pv_forecast_power_in_30_minutes",
+      "sensor.solcast_pv_forecast_power_now"
+    ],
+    "grid": [
+      "input_number.alphaess_helper_max_feed_to_grid",
+      "sensor.alphaess_ct_rate_grid_meter",
+      "sensor.alphaess_inverter_grid_frequency",
+      "sensor.alphaess_max_feed_to_grid",
+      "sensor.alphaess_power_grid",
+      "sensor.alphaess_power_phase_a_grid",
+      "sensor.alphaess_power_phase_b_grid",
+      "sensor.alphaess_power_phase_c_grid",
+      "sensor.alphaess_voltage_phase_a_grid",
+      "sensor.alphaess_voltage_phase_b_grid",
+      "sensor.alphaess_voltage_phase_c_grid"
+    ],
+    "comfort": [
+      "climate.ir_woonkamer",
+      "climate.w100_keuken",
+      "input_boolean.ai_ir_override_keuken",
+      "input_boolean.ai_ir_override_woonkamer",
+      "sensor.energybrain_ir_gate"
+    ],
+    "presence": [
+      "binary_sensor.aanwezigheidssensor_woonkamer_occupancy",
+      "binary_sensor.iemand_thuis_app",
+      "binary_sensor.iemand_thuis_ping"
+    ],
+    "dispatch": [
+      "input_boolean.alphaess_helper_dispatch",
+      "input_number.alphaess_helper_dispatch_cutoff_soc",
+      "input_number.alphaess_helper_dispatch_duration",
+      "input_number.alphaess_helper_dispatch_power",
+      "sensor.alphaess_dispatch_active_power",
+      "sensor.alphaess_dispatch_mode",
+      "sensor.alphaess_dispatch_soc",
+      "sensor.alphaess_dispatch_time"
+    ],
+    "forecast": [
+      "sensor.energybrain_prices_forecast",
+      "sensor.solcast_pv_forecast_forecast_today",
+      "sensor.solcast_pv_forecast_forecast_tomorrow",
+      "sensor.solcast_pv_forecast_power_in_1_hour",
+      "sensor.solcast_pv_forecast_power_in_30_minutes",
+      "sensor.solcast_pv_forecast_power_now"
+    ],
+    "prices": [
+      "sensor.energybrain_prices_forecast"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "energy_mode": "Zonne-overschot benutten",
+  "battery_state": "Batterij laadt actief",
+  "grid_state": "Export naar net",
+  "solar_state": "Sterke zonneproductie",
+  "comfort_state": "Woning actief gebruikt",
+  "planner_state": "Planner bewaakt goedkoop venster",
+  "confidence": "Hoog",
+  "glow_intensity": "high",
+  "timeline_hint": "Goedkoop laadmoment verwacht"
+}
