@@ -17,6 +17,8 @@ options:
   cycle_seconds: 900
   horizon_steps: 96
 
+  ui_profile: "tablet"
+
   battery_soc_entity: ""
   pv_power_entity: ""
   grid_price_entity: ""
@@ -43,6 +45,8 @@ schema:
   mode: list(observer|shadow|active)
   cycle_seconds: int(60,3600)
   horizon_steps: int(1,192)
+
+  ui_profile: list(mobile|tablet|workstation)
 
   battery_soc_entity: str
   pv_power_entity: str
