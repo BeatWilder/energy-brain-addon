@@ -12,13 +12,16 @@ from energy_brain.ui.components.responsive import (
     render_safety_panel,
 )
 from energy_brain.ui.layout_router import build_layout_view
-from energy_brain.ui.state.layout_state import effective_layout_mode, select_layout_mode
+from energy_brain.ui.state.layout_state import select_layout_mode
 from energy_brain.ui.themes.tesla_fusion import render_theme_css
+from energy_brain.ui.viewport import build_viewport_state
+from energy_brain.ui.viewport.viewport_runtime import render_viewport_runtime
 
 
 def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
     preference = select_layout_mode({"layout": layout_mode})
-    mode = effective_layout_mode(preference)
+    viewport = build_viewport_state(preference)
+    mode = viewport.mode
     layout = build_layout_view(payload, preference)
     sections = layout.get("sections", [])
     right_sections = [
@@ -49,7 +52,8 @@ def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         "<title>Energy Brain</title>",
         f"<style>{render_theme_css()}</style>",
-        f'</head><body class="layout-{html.escape(mode, quote=True)} preference-{html.escape(preference, quote=True)}" data-layout-preference="{html.escape(preference, quote=True)}">',
+        f'</head><body class="{html.escape(viewport.css_class, quote=True)} preference-{html.escape(preference, quote=True)}" data-layout-preference="{html.escape(preference, quote=True)}" data-viewport="{html.escape(mode, quote=True)}" data-viewport-density="{html.escape(viewport.density, quote=True)}">',
+        f"<script>{render_viewport_runtime()}</script>",
         '<main class="shell">',
         '<header class="topline">',
         '<div class="brand-block"><div class="brand">Energy Brain</div><div class="eyebrow">Autonoom energiecentrum</div></div>',
@@ -79,48 +83,11 @@ def render_layout(layout_mode: str, payload: dict[str, Any]) -> str:
             "</div>",
             "</div>",
             "</main>",
-            f"<script>{_layout_script()}</script>",
             "</body></html>",
         ]
     )
 
     return "".join(html_parts)
-
-
-def _layout_script() -> str:
-    return """
-(() => {
-  const key = "energy-brain.layout";
-  const allowed = new Set(["auto", "mobile", "tablet", "desktop"]);
-  const params = new URLSearchParams(window.location.search);
-  const query = params.get("layout");
-  if (allowed.has(query)) localStorage.setItem(key, query);
-
-  const stored = localStorage.getItem(key);
-  const preference = allowed.has(query) ? query : (allowed.has(stored) ? stored : document.body.dataset.layoutPreference || "auto");
-  document.body.dataset.layoutPreference = preference;
-
-  function viewportLayout() {
-    const width = window.innerWidth || document.documentElement.clientWidth || 0;
-    if (width >= 1200) return "desktop";
-    if (width >= 768) return "tablet";
-    return "mobile";
-  }
-
-  function applyLayout() {
-    const effective = preference === "auto" ? viewportLayout() : preference;
-    document.body.classList.remove("layout-auto", "layout-mobile", "layout-tablet", "layout-desktop");
-    document.body.classList.add(`layout-${effective}`);
-    document.body.dataset.effectiveLayout = effective;
-    document.querySelectorAll("[data-layout-option]").forEach((item) => {
-      item.classList.toggle("active", item.dataset.layoutOption === preference);
-    });
-  }
-
-  applyLayout();
-  window.addEventListener("resize", applyLayout, {passive: true});
-})();
-"""
 
 
 def render_error_page(message: str = "Nieuwe UI niet beschikbaar") -> str:

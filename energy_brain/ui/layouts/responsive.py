@@ -113,15 +113,15 @@ def _display_power(payload: dict[str, Any], *keys: str, pv_generation: bool = Fa
     return sanitize_power_kw(None)
 
 
-def _timeline_entries(payload: dict[str, Any]) -> list[dict[str, str]]:
+def _timeline_entries(payload: dict[str, Any]) -> list[dict[str, Any]]:
     windows = payload.get("plan_windows")
     if not isinstance(windows, list):
         windows = payload.get("timeline")
     if not isinstance(windows, list):
         windows = []
 
-    entries: list[dict[str, str]] = []
-    for index, item in enumerate(windows[:8]):
+    normalized: list[dict[str, Any]] = []
+    for index, item in enumerate(windows[:96]):
         if not isinstance(item, dict):
             continue
         action = _text_value(item.get("kind") or item.get("action"), "hold")
@@ -136,23 +136,50 @@ def _timeline_entries(payload: dict[str, Any]) -> list[dict[str, str]]:
             tone = "expensive"
         else:
             tone = "hold"
-        entries.append(
+        start = _text_value(item.get("start") or item.get("time"), f"{index:02d}:00")
+        end = _text_value(item.get("end") or item.get("until"), "")
+        normalized.append(
             {
-                "time": _text_value(item.get("start") or item.get("time"), "nu"),
+                "start": start,
+                "end": end,
+                "time": start,
                 "action": _action_text(action),
                 "reason": _reason_text(
                     item.get("reason"),
                     "Laatste plancyclus bewaakt deze keuze.",
                 ),
                 "tone": tone,
-                "width": str(12 + (index % 3) * 4),
+                "source_count": 1,
+                "exact_indices": [index],
             }
         )
-    if entries:
-        return entries
+    if normalized:
+        merged: list[dict[str, Any]] = []
+        for entry in normalized:
+            previous = merged[-1] if merged else None
+            if (
+                previous
+                and previous["action"] == entry["action"]
+                and previous["tone"] == entry["tone"]
+                and previous["reason"] == entry["reason"]
+            ):
+                previous["end"] = entry.get("end") or entry.get("start") or previous.get("end")
+                previous["source_count"] += 1
+                previous["exact_indices"].extend(entry["exact_indices"])
+                continue
+            merged.append(dict(entry))
+
+        total = max(1, sum(int(item["source_count"]) for item in merged))
+        for item in merged:
+            end = item.get("end")
+            item["time"] = f'{item["start"]} -> {end}' if end else item["start"]
+            item["width"] = str(max(10, round(int(item["source_count"]) / total * 100, 1)))
+        return merged[:12]
     return [
         {
             "time": "nu",
+            "start": "nu",
+            "end": "",
             "action": _action_text(payload.get("decision")),
             "reason": _reason_text(
                 payload.get("decision_reason"),
@@ -160,6 +187,8 @@ def _timeline_entries(payload: dict[str, Any]) -> list[dict[str, str]]:
             ),
             "tone": "hold",
             "width": "18",
+            "source_count": 1,
+            "exact_indices": [],
         }
     ]
 
@@ -228,6 +257,15 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
         "layout_preference": layout_mode if layout_mode in {"auto", "mobile", "tablet", "desktop"} else "auto",
         "observer_only": True,
         "density": "compact" if compact else "balanced" if tablet else "wide",
+        "viewport": {
+            "mobile_first": True,
+            "breakpoints": {
+                "mobile_max": 767,
+                "tablet_min": 768,
+                "tablet_max": 1199,
+                "desktop_min": 1200,
+            },
+        },
         "responsive": {
             "mobile_first": True,
             "breakpoints": {
@@ -300,6 +338,7 @@ def build_layout_view(payload: dict[str, Any], layout_mode: str) -> dict[str, An
                 ),
                 "next_action_time": timeline[0]["time"] if timeline else "volgende cyclus",
                 "entries": timeline,
+                "source_entry_count": len(payload.get("plan_windows") or payload.get("timeline") or []),
             },
             {
                 "type": "explainability",

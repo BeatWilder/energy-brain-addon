@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
-from energy_brain.ui.state.display_values import power_intensity
+from energy_brain.ui.powerflow import build_powerflow_scene
 
 
 def esc(value: Any) -> str:
@@ -78,6 +78,85 @@ def flow_class(value: Any, positive: str = "active", negative: str = "reverse") 
     return "idle"
 
 
+def _css_vars(values: dict[str, Any]) -> str:
+    return ";".join(f"--{esc(key)}:{esc(value)}" for key, value in values.items())
+
+
+def _lane_vars(lane: dict[str, Any]) -> str:
+    values = lane.get("vars") if isinstance(lane.get("vars"), dict) else {}
+    return _css_vars(
+        {
+            "flow-intensity": values.get("intensity", "0"),
+            "flow-speed": values.get("speed", "5.2s"),
+            "particle-density": values.get("density", "0"),
+            "energy-glow": values.get("glow", "0.14"),
+            "lane-width": values.get("thickness", "5"),
+        }
+    )
+
+
+def _node_vars(node: dict[str, Any]) -> str:
+    return _css_vars(
+        {
+            "node-intensity": f'{float(node.get("intensity") or 0):.3f}',
+            "node-ring": node.get("ring", "rgba(255,255,255,0.16)"),
+            "soc": f'{float(node.get("soc") or 0):.1f}',
+        }
+    )
+
+
+def _lane_particles(lane: dict[str, Any]) -> str:
+    values = lane.get("vars") if isinstance(lane.get("vars"), dict) else {}
+    density = int(values.get("density") or 0)
+    if not lane.get("active") or density <= 0:
+        return ""
+    state = str(lane.get("state") or "idle")
+    reverse_attrs = (
+        ' calcMode="linear" keyPoints="1;0" keyTimes="0;1"'
+        if state in {"discharging", "exporting"}
+        else ""
+    )
+    speed = str(values.get("speed", "5s"))
+    try:
+        seconds = float(speed.rstrip("s"))
+    except ValueError:
+        seconds = 5.0
+    dots = []
+    for index in range(density):
+        delay = -(index * (seconds / density))
+        dots.append(
+            f'<circle class="flow-dot tone-{esc(lane.get("tone", "home"))} state-{esc(state)}" r="4.6" style="{_lane_vars(lane)}">'
+            f'<animateMotion dur="{esc(speed)}" begin="{delay:.2f}s" repeatCount="indefinite"{reverse_attrs}>'
+            f'<mpath href="#{esc(lane.get("path_id"))}"/></animateMotion></circle>'
+        )
+    return "".join(dots)
+
+
+def _render_lane_defs(scene: dict[str, Any]) -> str:
+    return "".join(
+        f'<path id="{esc(lane["path_id"])}" d="{esc(lane["path"])}" />'
+        for lane in scene.get("lanes", [])
+        if isinstance(lane, dict)
+    )
+
+
+def _render_lanes(scene: dict[str, Any], layer: str) -> str:
+    class_name = "flow-lane" if layer == "backbone" else "flow-pulse"
+    return "".join(
+        f'<use href="#{esc(lane["path_id"])}" class="{class_name} tone-{esc(lane.get("tone", "home"))} state-{esc(lane.get("state", "idle"))}" style="{_lane_vars(lane)}" />'
+        for lane in scene.get("lanes", [])
+        if isinstance(lane, dict)
+    )
+
+
+def _render_particles(scene: dict[str, Any]) -> str:
+    return "".join(
+        _lane_particles(lane)
+        for lane in scene.get("lanes", [])
+        if isinstance(lane, dict)
+    )
+
+
 def quality_note(section: dict[str, Any]) -> str:
     quality = section.get("data_quality")
     if not isinstance(quality, dict):
@@ -117,17 +196,11 @@ def _primary_reason(entries: list[dict[str, Any]]) -> str:
 
 
 def render_powerflow_hero(section: dict[str, Any]) -> str:
-    solar = section.get("solar_kw")
-    house = section.get("house_kw")
-    battery = section.get("battery_kw")
-    grid = section.get("grid_kw")
     soc = section.get("soc_percent")
-    battery_flow = flow_class(battery, "charging", "discharging")
-    grid_flow = flow_class(grid, "importing", "exporting")
-    solar_intensity = power_intensity(solar)
-    house_intensity = power_intensity(house)
-    battery_intensity = power_intensity(battery)
-    grid_intensity = power_intensity(grid)
+    scene = build_powerflow_scene(section)
+    nodes = scene["nodes"]
+    battery_flow = scene["battery_state"]
+    grid_flow = scene["grid_state"]
     return f"""
     <section class="hero powerflow-hero" aria-label="Realtime energiestromen">
       <div class="hero-head">
@@ -140,9 +213,15 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
           <strong>{esc(section.get("soc_label") or format_percent(soc))}</strong>
         </div>
       </div>
-      <div class="flow-map" data-grid-flow="{esc(grid_flow)}" data-battery-flow="{esc(battery_flow)}">
+      <div class="flow-map" data-grid-flow="{esc(grid_flow)}" data-battery-flow="{esc(battery_flow)}" style="--scene-intensity:{esc(scene["scene_intensity"])}">
         <svg class="flow-svg" viewBox="0 0 420 420" role="img" aria-label="Zon, huis, batterij en netstroom">
           <defs>
+            {_render_lane_defs(scene)}
+            <radialGradient id="junction-glow">
+              <stop offset="0%" stop-color="#f8fff9" stop-opacity="0.95"/>
+              <stop offset="42%" stop-color="#65f0a7" stop-opacity="0.44"/>
+              <stop offset="100%" stop-color="#65f0a7" stop-opacity="0"/>
+            </radialGradient>
             <linearGradient id="solar-flow" x1="0" x2="1">
               <stop offset="0%" stop-color="#ffd166"/>
               <stop offset="100%" stop-color="#58e8b6"/>
@@ -160,17 +239,21 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
               <stop offset="100%" stop-color="#fff1a8"/>
             </linearGradient>
           </defs>
-          <path class="flow-lane lane-solar {flow_class(solar)}" style="--flow:{solar_intensity}" d="M210 66 C210 134 210 145 210 184" />
-          <path class="flow-lane lane-home {flow_class(house)}" style="--flow:{house_intensity}" d="M236 210 C286 210 304 210 352 210" />
-          <path class="flow-lane lane-battery {battery_flow}" style="--flow:{battery_intensity}" d="M184 210 C132 210 116 210 68 210" />
-          <path class="flow-lane lane-grid {grid_flow}" style="--flow:{grid_intensity}" d="M210 236 C210 286 210 304 210 352" />
-          <path class="flow-pulse pulse-solar {flow_class(solar)}" style="--flow:{solar_intensity}" d="M210 66 C210 134 210 145 210 184" />
-          <path class="flow-pulse pulse-home {flow_class(house)}" style="--flow:{house_intensity}" d="M236 210 C286 210 304 210 352 210" />
-          <path class="flow-pulse pulse-battery {battery_flow}" style="--flow:{battery_intensity}" d="M184 210 C132 210 116 210 68 210" />
-          <path class="flow-pulse pulse-grid {grid_flow}" style="--flow:{grid_intensity}" d="M210 236 C210 286 210 304 210 352" />
+          <g class="flow-backbone">
+            {_render_lanes(scene, "backbone")}
+          </g>
+          <g class="flow-ribbons">
+            {_render_lanes(scene, "pulse")}
+          </g>
+          <circle class="junction-aura" cx="210" cy="210" r="52" />
+          <circle class="junction-core" cx="210" cy="210" r="7" />
+          <g class="flow-particles" aria-hidden="true">
+            {_render_particles(scene)}
+          </g>
         </svg>
-        <div class="orb" style="--soc: {esc(soc or 0)}">
+        <div class="orb" style="--soc: {esc(soc or 0)}; --scene-intensity:{esc(scene["scene_intensity"])}">
           <div class="orb-ring"></div>
+          <div class="orb-soc-ring"></div>
           <div class="reserve-band"></div>
           <div class="orb-core">
             <span>Lading</span>
@@ -178,14 +261,10 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
             <em>{format_price(section.get("price"))}</em>
           </div>
         </div>
-        <span class="particle particle-a"></span>
-        <span class="particle particle-b"></span>
-        <span class="particle particle-c"></span>
-        <span class="particle particle-d"></span>
-        <div class="node node-solar {_node_state(section, "solar_known")}"><span>Zon</span><b>{display_label(section, "solar_label", "solar_kw")}</b></div>
-        <div class="node node-home {_node_state(section, "house_known")}"><span>Huis</span><b>{display_label(section, "house_label", "house_kw")}</b></div>
-        <div class="node node-battery {esc(battery_flow)} {_node_state(section, "battery_known")}"><span>{_flow_label(battery_flow)}</span><b>{display_label(section, "battery_label", "battery_kw")}</b></div>
-        <div class="node node-grid {esc(grid_flow)} {_node_state(section, "grid_known")}"><span>{_flow_label(grid_flow)}</span><b>{display_label(section, "grid_label", "grid_kw")}</b></div>
+        <div class="node node-solar state-{esc(nodes["solar"]["state"])} {_node_state(section, "solar_known")}" style="{_node_vars(nodes["solar"])}"><i></i><span>Zon</span><b>{display_label(section, "solar_label", "solar_kw")}</b></div>
+        <div class="node node-home state-{esc(nodes["home"]["state"])} {_node_state(section, "house_known")}" style="{_node_vars(nodes["home"])}"><i></i><span>Huis</span><b>{display_label(section, "house_label", "house_kw")}</b></div>
+        <div class="node node-battery state-{esc(battery_flow)} {_node_state(section, "battery_known")}" style="{_node_vars(nodes["battery"])}"><i></i><span>{_flow_label(battery_flow)}</span><b>{display_label(section, "battery_label", "battery_kw")}</b></div>
+        <div class="node node-grid state-{esc(grid_flow)} {_node_state(section, "grid_known")}" style="{_node_vars(nodes["grid"])}"><i></i><span>{_flow_label(grid_flow)}</span><b>{display_label(section, "grid_label", "grid_kw")}</b></div>
       </div>
       <div class="hero-foot">
         <span class="chip">{esc(section.get("status", "Observer actief"))}</span>
@@ -296,11 +375,25 @@ def render_safety_panel(section: dict[str, Any]) -> str:
         f'<div class="health-pill"><span>{esc(label)}</span><b>{esc(value)}</b></div>'
         for label, value in rows
     )
+    diagnostics = f"""
+      <details class="diagnostic-overlay">
+        <summary>Geavanceerde observerdiagnose</summary>
+        <div class="diagnostic-grid">
+          <span>SOC traject<b>{esc(section.get("reserve_status", "Reserve beschermd"))}</b></span>
+          <span>Reservegrens<b>{esc(section.get("reserve_status", "Reserve beschermd"))}</b></span>
+          <span>Prognosevertrouwen<b>{esc(section.get("forecast_valid", "Prognose geldig"))}</b></span>
+          <span>Observermodus<b>{esc(section.get("observer_state", "Observer actief"))}</b></span>
+          <span>Aansturing<b>{esc(section.get("blocked_reason", "Geblokkeerd"))}</b></span>
+          <span>Actieve constraints<b>{esc(section.get("fault_status", "Geen storingen"))}</b></span>
+        </div>
+      </details>
+    """
     return f"""
     <section class="panel health-panel" aria-label="Systeemstatus">
       <h2>{esc(section.get("title", "Systeemstatus"))}</h2>
       <div class="health-row">{row_html}</div>
       <p>{esc(section.get("blocked_reason", "Aansturing beveiligd. Deze cockpit is alleen-lezen."))}</p>
+      {diagnostics}
     </section>
     """
 
