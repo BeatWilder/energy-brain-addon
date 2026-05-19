@@ -271,6 +271,58 @@ def render_energy_brain_cockpit_html(payload: dict[str, Any]) -> str:
 
 
 
+
+
+<style>
+
+.energy-node,
+.flow-node,
+.power-node,
+.ecosystem-node {
+    filter: brightness(1.35) saturate(1.35);
+
+    box-shadow:
+      0 0 25px rgba(80,255,180,0.95),
+      0 0 55px rgba(80,255,180,0.72),
+      0 0 120px rgba(80,255,180,0.38),
+      0 0 240px rgba(80,255,180,0.18);
+}
+
+.energy-node.pv,
+.pv-node {
+    filter:
+      brightness(1.45)
+      saturate(1.55);
+
+    box-shadow:
+      0 0 30px rgba(255,220,80,0.95),
+      0 0 70px rgba(255,220,80,0.55),
+      0 0 160px rgba(255,220,80,0.25);
+}
+
+.energy-node.house,
+.house-node {
+    filter:
+      brightness(1.35)
+      saturate(1.25);
+
+    box-shadow:
+      0 0 28px rgba(255,220,120,0.85),
+      0 0 65px rgba(255,220,120,0.45),
+      0 0 120px rgba(255,220,120,0.20);
+}
+
+.energy-node.grid,
+.grid-node {
+    box-shadow:
+      0 0 25px rgba(120,180,255,0.82),
+      0 0 65px rgba(120,180,255,0.42),
+      0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
 </head>
 <body>
   <main>
@@ -672,6 +724,58 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 
 
 
+
+
+<style>
+
+.energy-node,
+.flow-node,
+.power-node,
+.ecosystem-node {
+    filter: brightness(1.35) saturate(1.35);
+
+    box-shadow:
+      0 0 25px rgba(80,255,180,0.95),
+      0 0 55px rgba(80,255,180,0.72),
+      0 0 120px rgba(80,255,180,0.38),
+      0 0 240px rgba(80,255,180,0.18);
+}
+
+.energy-node.pv,
+.pv-node {
+    filter:
+      brightness(1.45)
+      saturate(1.55);
+
+    box-shadow:
+      0 0 30px rgba(255,220,80,0.95),
+      0 0 70px rgba(255,220,80,0.55),
+      0 0 160px rgba(255,220,80,0.25);
+}
+
+.energy-node.house,
+.house-node {
+    filter:
+      brightness(1.35)
+      saturate(1.25);
+
+    box-shadow:
+      0 0 28px rgba(255,220,120,0.85),
+      0 0 65px rgba(255,220,120,0.45),
+      0 0 120px rgba(255,220,120,0.20);
+}
+
+.energy-node.grid,
+.grid-node {
+    box-shadow:
+      0 0 25px rgba(120,180,255,0.82),
+      0 0 65px rgba(120,180,255,0.42),
+      0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
 </head>
 <body>
   <main>
@@ -1064,6 +1168,58 @@ def render_energy_brain_cockpit_html_v2(payload: dict[str, Any]) -> str:
     }}
   </style>
 
+
+
+
+
+<style>
+
+.energy-node,
+.flow-node,
+.power-node,
+.ecosystem-node {
+    filter: brightness(1.35) saturate(1.35);
+
+    box-shadow:
+      0 0 25px rgba(80,255,180,0.95),
+      0 0 55px rgba(80,255,180,0.72),
+      0 0 120px rgba(80,255,180,0.38),
+      0 0 240px rgba(80,255,180,0.18);
+}
+
+.energy-node.pv,
+.pv-node {
+    filter:
+      brightness(1.45)
+      saturate(1.55);
+
+    box-shadow:
+      0 0 30px rgba(255,220,80,0.95),
+      0 0 70px rgba(255,220,80,0.55),
+      0 0 160px rgba(255,220,80,0.25);
+}
+
+.energy-node.house,
+.house-node {
+    filter:
+      brightness(1.35)
+      saturate(1.25);
+
+    box-shadow:
+      0 0 28px rgba(255,220,120,0.85),
+      0 0 65px rgba(255,220,120,0.45),
+      0 0 120px rgba(255,220,120,0.20);
+}
+
+.energy-node.grid,
+.grid-node {
+    box-shadow:
+      0 0 25px rgba(120,180,255,0.82),
+      0 0 65px rgba(120,180,255,0.42),
+      0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
 
 
 </head>
@@ -1973,6 +2129,58 @@ input, select {{ width:100%; border:1px solid rgba(255,255,255,.14); background:
 
 
 
+
+
+<style>
+
+.energy-node,
+.flow-node,
+.power-node,
+.ecosystem-node {
+    filter: brightness(1.35) saturate(1.35);
+
+    box-shadow:
+      0 0 25px rgba(80,255,180,0.95),
+      0 0 55px rgba(80,255,180,0.72),
+      0 0 120px rgba(80,255,180,0.38),
+      0 0 240px rgba(80,255,180,0.18);
+}
+
+.energy-node.pv,
+.pv-node {
+    filter:
+      brightness(1.45)
+      saturate(1.55);
+
+    box-shadow:
+      0 0 30px rgba(255,220,80,0.95),
+      0 0 70px rgba(255,220,80,0.55),
+      0 0 160px rgba(255,220,80,0.25);
+}
+
+.energy-node.house,
+.house-node {
+    filter:
+      brightness(1.35)
+      saturate(1.25);
+
+    box-shadow:
+      0 0 28px rgba(255,220,120,0.85),
+      0 0 65px rgba(255,220,120,0.45),
+      0 0 120px rgba(255,220,120,0.20);
+}
+
+.energy-node.grid,
+.grid-node {
+    box-shadow:
+      0 0 25px rgba(120,180,255,0.82),
+      0 0 65px rgba(120,180,255,0.42),
+      0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
 </head>
 <body>
   <main>
@@ -2858,6 +3066,58 @@ def render_dashboard_html(summary: dict[str, Any]) -> str:
 
 
 
+
+
+<style>
+
+.energy-node,
+.flow-node,
+.power-node,
+.ecosystem-node {
+    filter: brightness(1.35) saturate(1.35);
+
+    box-shadow:
+      0 0 25px rgba(80,255,180,0.95),
+      0 0 55px rgba(80,255,180,0.72),
+      0 0 120px rgba(80,255,180,0.38),
+      0 0 240px rgba(80,255,180,0.18);
+}
+
+.energy-node.pv,
+.pv-node {
+    filter:
+      brightness(1.45)
+      saturate(1.55);
+
+    box-shadow:
+      0 0 30px rgba(255,220,80,0.95),
+      0 0 70px rgba(255,220,80,0.55),
+      0 0 160px rgba(255,220,80,0.25);
+}
+
+.energy-node.house,
+.house-node {
+    filter:
+      brightness(1.35)
+      saturate(1.25);
+
+    box-shadow:
+      0 0 28px rgba(255,220,120,0.85),
+      0 0 65px rgba(255,220,120,0.45),
+      0 0 120px rgba(255,220,120,0.20);
+}
+
+.energy-node.grid,
+.grid-node {
+    box-shadow:
+      0 0 25px rgba(120,180,255,0.82),
+      0 0 65px rgba(120,180,255,0.42),
+      0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
+
+
 </head>
 <body>
   <main>
@@ -2977,6 +3237,58 @@ def _eb4_empty_dashboard(no_disp: str) -> str:
     .compat {{ display: none; }}
   </style>
 
+
+
+
+
+<style>
+
+.energy-node,
+.flow-node,
+.power-node,
+.ecosystem-node {
+    filter: brightness(1.35) saturate(1.35);
+
+    box-shadow:
+      0 0 25px rgba(80,255,180,0.95),
+      0 0 55px rgba(80,255,180,0.72),
+      0 0 120px rgba(80,255,180,0.38),
+      0 0 240px rgba(80,255,180,0.18);
+}
+
+.energy-node.pv,
+.pv-node {
+    filter:
+      brightness(1.45)
+      saturate(1.55);
+
+    box-shadow:
+      0 0 30px rgba(255,220,80,0.95),
+      0 0 70px rgba(255,220,80,0.55),
+      0 0 160px rgba(255,220,80,0.25);
+}
+
+.energy-node.house,
+.house-node {
+    filter:
+      brightness(1.35)
+      saturate(1.25);
+
+    box-shadow:
+      0 0 28px rgba(255,220,120,0.85),
+      0 0 65px rgba(255,220,120,0.45),
+      0 0 120px rgba(255,220,120,0.20);
+}
+
+.energy-node.grid,
+.grid-node {
+    box-shadow:
+      0 0 25px rgba(120,180,255,0.82),
+      0 0 65px rgba(120,180,255,0.42),
+      0 0 120px rgba(120,180,255,0.18);
+}
+
+</style>
 
 
 </head>
