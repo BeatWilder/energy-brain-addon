@@ -435,18 +435,16 @@ def _thermostat_preview(title: str, entity_id: str, climate: Any) -> str:
     return f"""
       <article class="thermostat-preview" aria-label="{esc(title)} thermostaat preview">
         <div class="thermostat-top">
-          <div><span>{esc(title)}</span><b>{esc(entity_id)}</b></div>
-          <em>{esc(state or "onbekend")}</em>
+          <span>{esc(title)}</span>
         </div>
         <div class="thermostat-dial" style="--temp-ring:{ring:.1f}">
-          <strong>{esc(_temp_label(current))}</strong>
-          <span>nu</span>
+          <div>
+            <strong>{esc(_temp_label(current))}</strong>
+            <span>doel {esc(_temp_label(target))}</span>
+            <em>{esc(hvac_action or "onbekend")}</em>
+          </div>
         </div>
-        <div class="thermostat-meta">
-          <div><span>Target</span><b>{esc(_temp_label(target))}</b></div>
-          <div><span>HVAC</span><b>{esc(hvac_action or "onbekend")}</b></div>
-          <div><span>Status</span><b>{esc(state or "onbekend")}</b></div>
-        </div>
+        <div class="thermostat-entity">{esc(entity_id)}</div>
         <div class="thermostat-controls" aria-hidden="true">
           <span>−</span><span>+</span>
         </div>

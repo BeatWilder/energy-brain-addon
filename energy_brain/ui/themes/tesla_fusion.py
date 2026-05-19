@@ -772,55 +772,50 @@ def render_theme_css() -> str:
     .thermostat-grid {{
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin: 12px 0;
+      gap: 10px;
+      margin: 14px 0 12px;
     }}
     .thermostat-preview {{
       min-width: 0;
-      border: 1px solid rgba(255,255,255,0.040);
-      border-radius: var(--radius-md);
-      background: radial-gradient(circle at 50% 18%, rgba(255,209,102,0.040), transparent 55%), rgba(255,255,255,0.012);
-      padding: 10px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.024), 0 10px 26px rgba(0,0,0,0.10);
+      border: 1px solid rgba(255,255,255,0.018);
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 50% 12%, rgba(255,214,136,0.050), transparent 44%),
+        linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0.006)),
+        rgba(4,8,12,0.18);
+      padding: 14px 12px 12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.030), 0 18px 42px rgba(0,0,0,0.18);
+      backdrop-filter: blur(18px) saturate(1.08);
+      -webkit-backdrop-filter: blur(18px) saturate(1.08);
     }}
-    .thermostat-top {{ display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }}
-    .thermostat-top span, .thermostat-meta span {{
+    .thermostat-top {{ display:grid; place-items:center; min-height:16px; }}
+    .thermostat-top span {{
       display:block;
-      color:rgba(152,165,178,0.64);
-      font-size:9px;
-      font-weight:720;
+      color:rgba(245,248,251,0.68);
+      font-size:10px;
+      font-weight:680;
       text-transform:uppercase;
-      letter-spacing:0.07em;
-    }}
-    .thermostat-top b {{ display:block; margin-top:3px; color:rgba(245,248,251,0.86); font-size:10px; font-weight:620; overflow-wrap:anywhere; }}
-    .thermostat-top em {{
-      border:1px solid rgba(255,209,102,0.14);
-      border-radius:var(--radius-round);
-      color:rgba(255,209,102,0.84);
-      background:rgba(255,209,102,0.035);
-      padding:4px 7px;
-      font-size:9px;
-      font-style:normal;
-      font-weight:760;
-      white-space:nowrap;
+      letter-spacing:0.10em;
     }}
     .thermostat-dial {{
-      width:104px;
-      height:104px;
-      margin:12px auto 10px;
+      width:132px;
+      height:132px;
+      margin:10px auto 8px;
       border-radius:50%;
       display:grid;
       place-items:center;
-      background: radial-gradient(circle at 50% 50%, rgba(5,8,12,0.98) 58%, transparent 59%), conic-gradient(from -90deg, rgba(255,209,102,0.70) calc(var(--temp-ring) * 1%), rgba(255,255,255,0.040) 0);
-      box-shadow:0 0 22px rgba(255,209,102,0.075), inset 0 0 18px rgba(255,255,255,0.018);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(5,8,12,0.99) 62%, transparent 63%),
+        conic-gradient(from -90deg, rgba(255,213,132,0.44) calc(var(--temp-ring) * 1%), rgba(255,255,255,0.030) 0);
+      box-shadow:0 0 24px rgba(255,213,132,0.055), inset 0 0 24px rgba(255,255,255,0.014);
     }}
-    .thermostat-dial strong {{ font-size:24px; line-height:1; font-weight:700; }}
-    .thermostat-dial span {{ color:rgba(152,165,178,0.62); font-size:10px; }}
-    .thermostat-meta {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }}
-    .thermostat-meta div {{ border:1px solid rgba(255,255,255,0.028); border-radius:12px; padding:7px; background:rgba(255,255,255,0.010); }}
-    .thermostat-meta b {{ display:block; margin-top:3px; color:var(--text); font-size:11px; line-height:1.15; overflow-wrap:anywhere; }}
-    .thermostat-controls {{ display:grid; grid-template-columns:repeat(2,1fr); gap:7px; margin-top:9px; }}
-    .thermostat-controls span {{ display:grid; place-items:center; min-height:30px; border:1px solid rgba(255,255,255,0.040); border-radius:999px; color:rgba(245,248,251,0.72); background:rgba(255,255,255,0.018); font-size:18px; font-weight:700; }}
+    .thermostat-dial div {{ text-align:center; }}
+    .thermostat-dial strong {{ display:block; color:var(--text); font-size:34px; line-height:.96; font-weight:660; }}
+    .thermostat-dial span, .thermostat-dial em {{ display:block; margin-top:6px; color:rgba(152,165,178,0.62); font-size:11px; font-style:normal; font-weight:560; }}
+    .thermostat-dial em {{ margin-top:3px; color:rgba(255,213,132,0.52); font-size:10px; }}
+    .thermostat-entity {{ color:rgba(152,165,178,0.36); font-size:9px; text-align:center; overflow-wrap:anywhere; }}
+    .thermostat-controls {{ display:grid; grid-template-columns:repeat(2,44px); justify-content:center; gap:18px; margin-top:12px; }}
+    .thermostat-controls span {{ display:grid; place-items:center; width:44px; height:34px; border:0; border-radius:999px; color:rgba(245,248,251,0.78); background:linear-gradient(180deg, rgba(255,255,255,0.054), rgba(255,255,255,0.016)); box-shadow:inset 0 1px 0 rgba(255,255,255,0.055), 0 0 22px rgba(255,213,132,0.040), 0 10px 24px rgba(0,0,0,0.16); font-size:18px; font-weight:640; }}
     .controls-panel {{
       background:
         radial-gradient(circle at 8% 0%, rgba(127,199,255,0.020), transparent 15rem),
