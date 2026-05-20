@@ -451,7 +451,7 @@ def _climate_attr(climate: Any, key: str) -> Any:
 def _temp_label(value: Any) -> str:
     number = _num(value)
     if number is None:
-        return "Niet beschikbaar"
+        return "—"
     return f"{number:.1f}°"
 
 
@@ -461,24 +461,112 @@ def _thermostat_preview(title: str, entity_id: str, climate: Any) -> str:
     target = _climate_attr(climate, "temperature")
     hvac_action = _climate_attr(climate, "hvac_action") or state
     current_number = _num(current)
+    target_number = _num(target)
     ring = 0 if current_number is None else max(0, min(100, (current_number - 5) / 25 * 100))
+    disabled = target_number is None
+    disabled_attr = " disabled aria-disabled=\"true\"" if disabled else ""
+    disabled_class = " disabled" if disabled else ""
+    target_value = "" if target_number is None else f"{target_number:.1f}"
+    hvac_label = "Stand-by" if hvac_action in (None, "", "unknown", "unavailable", "onbekend") else hvac_action
     return f"""
-      <article class="thermostat-preview" aria-label="{esc(title)} thermostaat preview">
+      <article class="thermostat-preview{disabled_class}" aria-label="{esc(title)} thermostaat preview" data-thermostat-card data-entity-id="{esc(entity_id)}" data-target-temperature="{esc(target_value)}">
         <div class="thermostat-top">
           <span>{esc(title)}</span>
+          <b>{esc(hvac_label)}</b>
         </div>
         <div class="thermostat-dial" style="--temp-ring:{ring:.1f}">
           <div>
             <strong>{esc(_temp_label(current))}</strong>
-            <span>doel {esc(_temp_label(target))}</span>
-            <em>{esc(hvac_action or "onbekend")}</em>
+            <span>Doel <b data-thermostat-target>{esc(_temp_label(target))}</b></span>
+            <em>Comfort zone</em>
           </div>
         </div>
-        <div class="thermostat-entity">{esc(entity_id)}</div>
-        <div class="thermostat-controls" aria-hidden="true">
-          <span>−</span><span>+</span>
+        <div class="thermostat-controls" aria-label="{esc(title)} temperatuur aanpassen">
+          <button type="button" data-thermostat-step="-0.5" aria-label="{esc(title)} doeltemperatuur lager"{disabled_attr}>−</button>
+          <button type="button" data-thermostat-step="0.5" aria-label="{esc(title)} doeltemperatuur hoger"{disabled_attr}>+</button>
         </div>
+        <div class="thermostat-feedback" data-thermostat-feedback>{esc(entity_id)}</div>
       </article>
+    """
+
+
+def _thermostat_runtime_script() -> str:
+    return """
+      <script>
+        (function () {
+          const cards = document.querySelectorAll("[data-thermostat-card]");
+          if (!cards.length || !window.fetch) {
+            return;
+          }
+
+          function setFeedback(card, text, state) {
+            const feedback = card.querySelector("[data-thermostat-feedback]");
+            if (!feedback) return;
+            feedback.textContent = text;
+            feedback.dataset.state = state || "";
+          }
+
+          function formatTemp(value) {
+            return value.toFixed(1) + "°";
+          }
+
+          cards.forEach((card) => {
+            const buttons = card.querySelectorAll("[data-thermostat-step]");
+            const target = card.querySelector("[data-thermostat-target]");
+            buttons.forEach((button) => {
+              button.addEventListener("click", async () => {
+                if (button.disabled || card.classList.contains("is-pending")) {
+                  return;
+                }
+
+                const entityId = card.dataset.entityId || "";
+                const delta = Number(button.dataset.thermostatStep || 0);
+                const currentTarget = Number(card.dataset.targetTemperature || NaN);
+                if (!entityId || !Number.isFinite(delta) || !Number.isFinite(currentTarget)) {
+                  setFeedback(card, "Bediening niet beschikbaar", "blocked");
+                  return;
+                }
+
+                const nextTarget = Math.round((currentTarget + delta) * 10) / 10;
+                const previousText = target ? target.textContent : "";
+                card.classList.add("is-pending");
+                buttons.forEach((item) => item.disabled = true);
+                if (target) target.textContent = formatTemp(nextTarget);
+                setFeedback(card, "Aanpassen...", "pending");
+
+                try {
+                  const response = await fetch("api/climate/temperature", {
+                    method: "POST",
+                    body: new URLSearchParams({entity_id: entityId, delta: String(delta)}),
+                    headers: {
+                      "Accept": "application/json",
+                      "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                  });
+                  const result = await response.json();
+                  if (!response.ok || !result.ok) {
+                    if (target) target.textContent = previousText;
+                    setFeedback(card, "Geblokkeerd", "blocked");
+                    return;
+                  }
+                  const confirmed = Number(result.temperature);
+                  if (Number.isFinite(confirmed)) {
+                    card.dataset.targetTemperature = confirmed.toFixed(1);
+                    if (target) target.textContent = formatTemp(confirmed);
+                  }
+                  setFeedback(card, "Opgeslagen", "ok");
+                } catch (error) {
+                  if (target) target.textContent = previousText;
+                  setFeedback(card, "Geen verbinding", "blocked");
+                } finally {
+                  card.classList.remove("is-pending");
+                  buttons.forEach((item) => item.disabled = false);
+                }
+              });
+            });
+          });
+        })();
+      </script>
     """
 
 
@@ -514,6 +602,7 @@ def render_comfort_panel(section: dict[str, Any]) -> str:
       <div class="thermostat-grid">{thermostats}</div>
       <div class="comfort-grid">{rows}</div>
     </section>
+    {_thermostat_runtime_script()}
     """
 
 

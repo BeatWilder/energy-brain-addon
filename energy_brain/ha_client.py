@@ -99,6 +99,8 @@ class HomeAssistantClient:
             ("input_number", "set_value", "input_number.alphaess_helper_dispatch_duration"),
             ("input_number", "set_value", "input_number.alphaess_helper_dispatch_power"),
             ("input_number", "set_value", "input_number.alphaess_helper_dispatch_cutoff_soc"),
+            ("climate", "set_temperature", "climate.ir_woonkamer"),
+            ("climate", "set_temperature", "climate.w100_keuken"),
         }
 
         if (domain, service, entity_id) not in allowed:
@@ -197,6 +199,38 @@ class HomeAssistantClient:
                     "reason": "value_outside_bounds",
                     "entity_id": entity_id,
                     "value": value,
+                    "min": minimum,
+                    "max": maximum,
+                }
+
+            return {"ok": True}
+
+        if domain == "climate" and service == "set_temperature":
+            try:
+                temperature = float(payload.get("temperature"))
+            except (TypeError, ValueError):
+                return {
+                    "ok": False,
+                    "reason": "invalid_temperature",
+                    "entity_id": entity_id,
+                    "temperature": payload.get("temperature"),
+                }
+
+            minimum = self._float_or_none(attrs.get("min_temp"))
+            maximum = self._float_or_none(attrs.get("max_temp"))
+            if minimum is None or maximum is None:
+                return {
+                    "ok": False,
+                    "reason": "climate_temperature_bounds_missing",
+                    "entity_id": entity_id,
+                }
+
+            if temperature < minimum or temperature > maximum:
+                return {
+                    "ok": False,
+                    "reason": "temperature_outside_bounds",
+                    "entity_id": entity_id,
+                    "temperature": temperature,
                     "min": minimum,
                     "max": maximum,
                 }

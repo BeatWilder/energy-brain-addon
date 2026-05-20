@@ -50,7 +50,7 @@ LEGACY_GLOW_STYLE_BLOCKS = """
 """
 
 # Legacy source-compatibility markers for historical Hillview route tests only.
-# The HTTP handler intentionally remains GET-only; these strings are inert.
+# These strings are inert; guarded POST routes are implemented explicitly below.
 # path == "/api/hillview/control"
 # path.endswith("/api/hillview/control")
 # path.endswith("/hillview/control")
@@ -1451,6 +1451,116 @@ def build_hillview_control_result(action: str, fields: dict[str, Any] | None = N
     }
 
 
+def build_climate_temperature_result(fields: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Apply a guarded thermostat target step through the Home Assistant adapter."""
+    fields = fields or {}
+    entity_id = str(fields.get("entity_id", "")).strip()
+    delta_raw = str(fields.get("delta", "")).strip()
+
+    if not hillview_controls_enabled():
+        return {
+            "route": "climate_temperature",
+            "ok": False,
+            "reason": "hillview_controls_disabled",
+            "entity_id": entity_id,
+        }
+
+    if entity_id not in {"climate.ir_woonkamer", "climate.w100_keuken"}:
+        return {
+            "route": "climate_temperature",
+            "ok": False,
+            "reason": "climate_entity_not_allowlisted",
+            "entity_id": entity_id,
+        }
+
+    try:
+        delta = float(delta_raw)
+    except (TypeError, ValueError):
+        return {
+            "route": "climate_temperature",
+            "ok": False,
+            "reason": "invalid_delta",
+            "entity_id": entity_id,
+            "delta": delta_raw,
+        }
+
+    if delta not in {-0.5, 0.5}:
+        return {
+            "route": "climate_temperature",
+            "ok": False,
+            "reason": "delta_not_allowed",
+            "entity_id": entity_id,
+            "delta": delta,
+        }
+
+    try:
+        client = HomeAssistantClient()
+    except Exception as exc:
+        return {
+            "route": "climate_temperature",
+            "ok": False,
+            "reason": "ha_control_failed",
+            "entity_id": entity_id,
+            "error": str(exc),
+        }
+
+    state = client.get_state_object(entity_id)
+    attrs = state.get("attributes") if isinstance(state, dict) else {}
+    if not isinstance(attrs, dict):
+        attrs = {}
+
+    current_target = HomeAssistantClient._float_or_none(attrs.get("temperature"))
+    if current_target is None:
+        return {
+            "route": "climate_temperature",
+            "ok": False,
+            "reason": "target_temperature_unavailable",
+            "entity_id": entity_id,
+        }
+
+    step = HomeAssistantClient._float_or_none(attrs.get("target_temp_step")) or 0.5
+    minimum = HomeAssistantClient._float_or_none(attrs.get("min_temp"))
+    maximum = HomeAssistantClient._float_or_none(attrs.get("max_temp"))
+    target = round(current_target + delta, 1)
+    if step > 0:
+        target = round(round(target / step) * step, 1)
+    if minimum is not None:
+        target = max(minimum, target)
+    if maximum is not None:
+        target = min(maximum, target)
+
+    payload = {"entity_id": entity_id, "temperature": target}
+    result = client.call_service_guarded("climate", "set_temperature", payload)
+    result.setdefault("domain", "climate")
+    result.setdefault("service", "set_temperature")
+    result.setdefault("entity_id", entity_id)
+    result.setdefault("payload", payload)
+
+    if not result.get("ok"):
+        return {
+            "route": "climate_temperature",
+            "ok": False,
+            "reason": "guarded_write_failed",
+            "failed": result,
+            "failed_domain": result.get("domain", "climate"),
+            "failed_service": result.get("service", "set_temperature"),
+            "failed_entity_id": result.get("entity_id", entity_id),
+            "failed_value": result.get("temperature", target),
+            "failed_reason": result.get("reason", "unknown_guard_failure"),
+        }
+
+    return {
+        "route": "climate_temperature",
+        "ok": True,
+        "reason": "climate_guarded_temperature_applied",
+        "entity_id": entity_id,
+        "temperature": target,
+        "previous_temperature": current_target,
+        "delta": delta,
+        "result": result,
+    }
+
+
 def _hillview_entity(entity_id: str, name: str, kind: str = "state", future_control: bool = False) -> dict[str, Any]:
     return {
         "entity_id": entity_id,
@@ -2483,9 +2593,28 @@ def build_planner_explainability(summary=None):
 # --- end fresh home v1 helper ---
 
 class EnergyBrainWebUIHandler(BaseHTTPRequestHandler):
-    """Read-only HTTP handler for the Energy Brain observer UI."""
+    """HTTP handler for the Energy Brain observer UI with guarded controls."""
 
     server_version = "EnergyBrainReadOnlyUI/1.0"
+
+    def do_POST(self) -> None:
+        raw_path = self.path.split('?', 1)[0]
+        path = self._normalize_ingress_path(raw_path)
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        body = self.rfile.read(length).decode("utf-8") if length > 0 else ""
+        parsed = parse_qs(body)
+        fields = {key: values[-1] for key, values in parsed.items() if values}
+
+        if path == "/api/climate/temperature":
+            self._send_json(build_climate_temperature_result(fields))
+            return
+
+        if path == "/api/hillview/control":
+            action = str(fields.get("action", "")).strip()
+            self._send_json(build_hillview_control_result(action, fields))
+            return
+
+        self._send_json({"status": "not_found", "read_only": True}, status=404)
 
     def do_GET(self) -> None:
         raw_path = self.path.split('?', 1)[0]
