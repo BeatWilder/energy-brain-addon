@@ -3,8 +3,8 @@ def render_powerflow_v2_css() -> str:
 .pf-v2{
   position:relative;
   width:100%;
-  height:clamp(338px, 68vw, 430px);
-  min-height:338px;
+  height:clamp(322px, 64vw, 406px);
+  min-height:322px;
   overflow:hidden;
   isolation:isolate;
   border-radius:var(--radius-lg, 8px);
@@ -20,9 +20,9 @@ def render_powerflow_v2_css() -> str:
   --pf-active-grid:.28;
   --pf-active-battery:.24;
   background:
-    radial-gradient(circle at 50% 48%, rgba(105,227,154,.12), transparent 25%),
-    radial-gradient(circle at 50% 14%, rgba(244,201,109,.10), transparent 24%),
-    radial-gradient(circle at 10% 48%, rgba(125,196,255,.10), transparent 26%),
+    radial-gradient(circle at 50% 48%, rgba(105,227,154,.105), transparent 23%),
+    radial-gradient(circle at 50% 15%, rgba(244,201,109,.085), transparent 22%),
+    radial-gradient(circle at 10% 48%, rgba(125,196,255,.075), transparent 24%),
     linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012) 42%, rgba(0,0,0,.15)),
     var(--pf-bg);
   border:1px solid rgba(255,255,255,.085);
@@ -44,18 +44,18 @@ def render_powerflow_v2_css() -> str:
   z-index:0;
   left:50%;
   top:50%;
-  width:clamp(96px, 25vw, 138px);
-  height:clamp(156px, 41vw, 210px);
+  width:clamp(110px, 29vw, 154px);
+  height:clamp(174px, 45vw, 224px);
   transform:translate(-50%, -50%);
   border-radius:22px;
   background:
-    linear-gradient(180deg, transparent 0 36%, rgba(105,227,154,.18) 36% 100%),
+    linear-gradient(180deg, transparent 0 34%, rgba(105,227,154,.15) 34% 100%),
     linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.018)),
     linear-gradient(180deg, rgba(20,32,39,.80), rgba(6,11,15,.92));
   border:1px solid rgba(216,226,236,.20);
   box-shadow:
     0 22px 58px rgba(0,0,0,.38),
-    0 0 34px rgba(105,227,154,var(--pf-active-battery)),
+    0 0 30px rgba(105,227,154,var(--pf-active-battery)),
     inset 0 1px 0 rgba(255,255,255,.12),
     inset 0 -24px 34px rgba(37,160,95,.18);
 }
@@ -64,10 +64,10 @@ def render_powerflow_v2_css() -> str:
   z-index:0;
   inset:0;
   background:
-    radial-gradient(circle at 50% 50%, rgba(245,250,255,.42) 0 3px, transparent 4px),
-    linear-gradient(180deg, transparent 18%, rgba(244,201,109,.70) 18% 42%, transparent 42%),
-    linear-gradient(90deg, transparent 16%, rgba(125,196,255,.50) 16% 42%, transparent 42%),
-    linear-gradient(90deg, transparent 58%, rgba(255,204,122,.56) 58% 84%, transparent 84%),
+    radial-gradient(circle at 50% 50%, rgba(245,250,255,.46) 0 2px, transparent 3px),
+    linear-gradient(180deg, transparent 18%, rgba(244,201,109,.58) 18% 41%, transparent 41%),
+    linear-gradient(90deg, transparent 17%, rgba(125,196,255,.42) 17% 41%, transparent 41%),
+    linear-gradient(90deg, transparent 59%, rgba(255,204,122,.46) 59% 83%, transparent 83%),
     radial-gradient(circle at 50% 19%, rgba(244,201,109,.82) 0 3px, transparent 4px),
     radial-gradient(circle at 18% 50%, rgba(125,196,255,.74) 0 3px, transparent 4px),
     radial-gradient(circle at 82% 50%, rgba(255,204,122,.74) 0 3px, transparent 4px);
@@ -81,14 +81,14 @@ def render_powerflow_v2_css() -> str:
     100% 100%;
   background-position:center;
   background-repeat:no-repeat;
-  opacity:.72;
+  opacity:.64;
 }
 
 .pf-caption{
   position:absolute;
   z-index:3;
   left:clamp(16px, 5vw, 24px);
-  top:12px;
+  top:11px;
   color:rgba(245,248,251,.82);
   font-size:12px;
   line-height:1;
@@ -100,8 +100,8 @@ def render_powerflow_v2_css() -> str:
 .pf-node{
   position:absolute;
   z-index:2;
-  width:clamp(76px, 19vw, 98px);
-  min-height:clamp(76px, 19vw, 98px);
+  width:clamp(78px, 20vw, 102px);
+  min-height:clamp(78px, 20vw, 102px);
   height:auto;
   aspect-ratio:1;
   border-radius:999px;
@@ -109,15 +109,15 @@ def render_powerflow_v2_css() -> str:
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:3px;
+  gap:4px;
   background:
     radial-gradient(circle at 50% 16%, rgba(255,255,255,.10), transparent 35%),
     linear-gradient(180deg, rgba(19,27,35,.86), rgba(8,13,18,.94));
   border:1px solid rgba(255,255,255,.13);
   color:var(--pf-text);
   box-shadow:
-    0 14px 28px rgba(0,0,0,.25),
-    0 0 22px var(--pf-node-glow),
+    0 13px 26px rgba(0,0,0,.28),
+    0 0 18px var(--pf-node-glow),
     inset 0 1px 0 rgba(255,255,255,.09);
   backdrop-filter:blur(16px) saturate(1.05);
   -webkit-backdrop-filter:blur(16px) saturate(1.05);
@@ -126,7 +126,7 @@ def render_powerflow_v2_css() -> str:
 .pf-node::before{
   content:"";
   position:absolute;
-  inset:-3px;
+  inset:-2px;
   border-radius:inherit;
   border:1px solid var(--pf-node-line);
   box-shadow:0 0 12px var(--pf-node-glow);
@@ -136,10 +136,10 @@ def render_powerflow_v2_css() -> str:
 .pf-node::after{
   content:"";
   position:absolute;
-  width:7px;
-  height:7px;
+  width:6px;
+  height:6px;
   left:50%;
-  top:15px;
+  top:14px;
   transform:translateX(-50%);
   border-radius:inherit;
   background:var(--pf-node-color);
@@ -153,9 +153,9 @@ def render_powerflow_v2_css() -> str:
   max-width:90%;
   overflow-wrap:anywhere;
   color:var(--pf-text);
-  font-size:clamp(11px, 2.45vw, 13px);
-  line-height:1.1;
-  font-weight:670;
+  font-size:clamp(11px, 2.35vw, 13px);
+  line-height:1.05;
+  font-weight:690;
   letter-spacing:0;
   text-align:center;
   text-shadow:0 1px 8px rgba(0,0,0,.32);
@@ -165,17 +165,17 @@ def render_powerflow_v2_css() -> str:
   position:relative;
   z-index:1;
   color:var(--pf-node-color);
-  font-size:clamp(10px, 2.25vw, 12px);
+  font-size:clamp(11px, 2.45vw, 13px);
   line-height:1.08;
   font-style:normal;
-  font-weight:620;
+  font-weight:720;
   text-align:center;
   opacity:.94;
 }
 
 .pf-solar{
   left:50%;
-  top:10%;
+  top:8.5%;
   transform:translateX(-50%);
   --pf-node-color:var(--pf-solar);
   --pf-node-line:rgba(244,201,109,.38);
@@ -183,7 +183,7 @@ def render_powerflow_v2_css() -> str:
 }
 
 .pf-home{
-  right:5%;
+  right:4%;
   top:50%;
   transform:translateY(-50%);
   --pf-node-color:var(--pf-home);
@@ -192,7 +192,7 @@ def render_powerflow_v2_css() -> str:
 }
 
 .pf-grid{
-  left:5%;
+  left:4%;
   top:50%;
   transform:translateY(-50%);
   --pf-node-color:var(--pf-grid);
@@ -203,11 +203,11 @@ def render_powerflow_v2_css() -> str:
 .pf-battery{
   left:50%;
   top:50%;
-  width:clamp(112px, 30vw, 148px);
-  min-height:clamp(174px, 44vw, 220px);
+  width:clamp(128px, 34vw, 164px);
+  min-height:clamp(188px, 48vw, 236px);
   aspect-ratio:auto;
-  padding:clamp(18px, 4vw, 24px) 10px 14px;
-  border-radius:24px;
+  padding:clamp(17px, 4vw, 23px) 11px 13px;
+  border-radius:25px;
   transform:translate(-50%, -50%);
   --pf-node-color:var(--pf-battery);
   --pf-node-line:rgba(105,227,154,.38);
@@ -219,39 +219,60 @@ def render_powerflow_v2_css() -> str:
 }
 
 .pf-battery span{
-  margin-top:5px;
-  font-size:clamp(12px, 2.5vw, 14px);
+  margin-top:3px;
+  color:rgba(245,248,251,.88);
+  font-size:clamp(11px, 2.3vw, 13px);
+  font-weight:650;
 }
 
 .pf-battery em{
   color:rgba(105,227,154,.98);
+  font-size:clamp(11px, 2.45vw, 13px);
+  font-weight:730;
+}
+
+.pf-battery strong{
+  position:relative;
+  z-index:1;
+  display:block;
+  margin-top:7px;
+  color:rgba(135,245,169,.98);
+  font-size:clamp(30px, 8vw, 42px);
+  line-height:.92;
+  font-weight:760;
+  letter-spacing:0;
+  text-shadow:
+    0 0 18px rgba(105,227,154,.28),
+    0 1px 10px rgba(0,0,0,.42);
 }
 
 .pf-battery-shell{
   position:relative;
   z-index:1;
   display:block;
-  width:clamp(50px, 13vw, 68px);
-  height:clamp(94px, 24vw, 126px);
-  border-radius:13px;
-  border:1px solid rgba(216,226,236,.26);
+  width:clamp(56px, 15vw, 74px);
+  height:clamp(98px, 25vw, 132px);
+  border-radius:14px;
+  border:1px solid rgba(216,226,236,.30);
   background:
-    linear-gradient(180deg, rgba(255,255,255,.10), transparent 20%),
+    linear-gradient(90deg, rgba(255,255,255,.10), transparent 22%, rgba(255,255,255,.035) 60%, rgba(255,255,255,.09)),
+    linear-gradient(180deg, rgba(255,255,255,.12), transparent 20%),
     linear-gradient(180deg, rgba(13,24,29,.72), rgba(5,10,13,.78));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.14),
-    inset 0 -18px 28px rgba(10,22,18,.55),
-    0 0 26px rgba(105,227,154,.17);
+    inset 0 -18px 30px rgba(10,22,18,.58),
+    inset 10px 0 18px rgba(255,255,255,.035),
+    0 0 24px rgba(105,227,154,.15);
   overflow:hidden;
 }
 
 .pf-battery-shell::before{
   content:"";
   position:absolute;
-  left:36%;
-  right:36%;
+  left:34%;
+  right:34%;
   top:-1px;
-  height:8px;
+  height:7px;
   border-radius:0 0 3px 3px;
   background:rgba(216,226,236,.24);
 }
@@ -259,29 +280,43 @@ def render_powerflow_v2_css() -> str:
 .pf-battery-shell::after{
   content:"";
   position:absolute;
-  left:11px;
-  top:18px;
-  width:14px;
+  left:10px;
+  top:17px;
+  width:15px;
   height:3px;
   border-radius:999px;
   background:rgba(255,255,255,.12);
-  box-shadow:0 10px 0 rgba(255,255,255,.08);
+  box-shadow:
+    0 9px 0 rgba(255,255,255,.075),
+    0 18px 0 rgba(255,255,255,.045);
 }
 
 .pf-battery-shell b{
   position:absolute;
-  left:9px;
-  right:9px;
-  bottom:9px;
-  height:58%;
-  border-radius:9px;
+  left:8px;
+  right:8px;
+  bottom:8px;
+  height:56%;
+  border-radius:10px;
   background:
-    linear-gradient(180deg, rgba(145,255,180,.95), rgba(42,194,106,.74)),
-    linear-gradient(90deg, rgba(255,255,255,.12), transparent 48%);
+    linear-gradient(180deg, rgba(170,255,195,.98), rgba(67,218,125,.86) 45%, rgba(29,137,78,.78)),
+    linear-gradient(90deg, rgba(255,255,255,.18), transparent 45%, rgba(255,255,255,.06));
   box-shadow:
-    0 0 24px rgba(105,227,154,.30),
+    0 0 22px rgba(105,227,154,.28),
     inset 0 1px 0 rgba(255,255,255,.23);
   animation:pf-battery-breathe 4.8s ease-in-out infinite;
+}
+
+.pf-battery-shell b::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  height:42%;
+  border-radius:inherit;
+  background:linear-gradient(180deg, rgba(255,255,255,.20), transparent);
+  opacity:.75;
 }
 
 .pf-v2[data-battery-flow="charging"]{
@@ -299,7 +334,7 @@ def render_powerflow_v2_css() -> str:
 
 .pf-v2[data-grid-flow="idle"] .pf-grid,
 .pf-v2[data-battery-flow="idle"] .pf-battery{
-  opacity:.78;
+  opacity:.74;
 }
 
 .pf-v2[data-grid-flow="importing"] .pf-grid,
@@ -309,15 +344,15 @@ def render_powerflow_v2_css() -> str:
 .pf-v2[data-battery-flow="discharging"] .pf-battery,
 .pf-v2[data-battery-flow="discharging"] .pf-home{
   box-shadow:
-    0 14px 28px rgba(0,0,0,.25),
-    0 0 28px var(--pf-node-glow),
+    0 14px 28px rgba(0,0,0,.28),
+    0 0 23px var(--pf-node-glow),
     inset 0 1px 0 rgba(255,255,255,.10);
 }
 
 .pf-v2 .pf-solar::before,
 .pf-v2 .pf-grid::before,
 .pf-v2 .pf-home::before{
-  opacity:.62;
+  opacity:.54;
 }
 
 .pf-v2[data-battery-flow="charging"] .pf-solar::before,
@@ -326,7 +361,7 @@ def render_powerflow_v2_css() -> str:
 .pf-v2[data-battery-flow="discharging"] .pf-home::before,
 .pf-v2[data-grid-flow="importing"] .pf-grid::before,
 .pf-v2[data-grid-flow="exporting"] .pf-grid::before{
-  opacity:.88;
+  opacity:.84;
 }
 
 .pf-v2 .pf-solar span::after,
@@ -336,57 +371,57 @@ def render_powerflow_v2_css() -> str:
   position:absolute;
   display:block;
   pointer-events:none;
-  opacity:.56;
+  opacity:.46;
 }
 
 .pf-v2 .pf-solar span::after{
   left:50%;
-  top:calc(100% + 24px);
-  width:4px;
-  height:clamp(66px, 15vw, 92px);
+  top:calc(100% + 17px);
+  width:3px;
+  height:clamp(50px, 12vw, 72px);
   border-radius:999px;
   transform:translateX(-50%);
   background:
-    radial-gradient(circle, var(--pf-solar) 0 2px, transparent 3px) 0 0/4px 18px repeat-y;
-  filter:drop-shadow(0 0 7px rgba(244,201,109,.58));
-  animation:pf-flow-down 1.55s linear infinite;
+    radial-gradient(circle, var(--pf-solar) 0 1.5px, transparent 2.4px) 0 0/3px 16px repeat-y;
+  filter:drop-shadow(0 0 5px rgba(244,201,109,.46));
+  animation:pf-flow-down 1.9s linear infinite;
 }
 
 .pf-v2 .pf-grid span::after{
-  right:calc(-1 * clamp(82px, 22vw, 126px));
+  right:calc(-1 * clamp(62px, 17vw, 94px));
   top:50%;
-  width:clamp(82px, 22vw, 126px);
-  height:4px;
+  width:clamp(62px, 17vw, 94px);
+  height:3px;
   transform:translateY(-50%);
   border-radius:999px;
   background:
-    radial-gradient(circle, var(--pf-grid) 0 2px, transparent 3px) 0 0/18px 4px repeat-x;
-  filter:drop-shadow(0 0 7px rgba(125,196,255,.55));
-  animation:pf-flow-right 1.75s linear infinite;
+    radial-gradient(circle, var(--pf-grid) 0 1.5px, transparent 2.4px) 0 0/16px 3px repeat-x;
+  filter:drop-shadow(0 0 5px rgba(125,196,255,.44));
+  animation:pf-flow-right 2.05s linear infinite;
 }
 
 .pf-v2 .pf-home span::after{
-  left:calc(-1 * clamp(82px, 22vw, 126px));
+  left:calc(-1 * clamp(62px, 17vw, 94px));
   top:50%;
-  width:clamp(82px, 22vw, 126px);
-  height:4px;
+  width:clamp(62px, 17vw, 94px);
+  height:3px;
   transform:translateY(-50%);
   border-radius:999px;
   background:
-    radial-gradient(circle, var(--pf-home) 0 2px, transparent 3px) 0 0/18px 4px repeat-x;
-  filter:drop-shadow(0 0 7px rgba(255,204,122,.52));
-  animation:pf-flow-right 1.65s linear infinite;
+    radial-gradient(circle, var(--pf-home) 0 1.5px, transparent 2.4px) 0 0/16px 3px repeat-x;
+  filter:drop-shadow(0 0 5px rgba(255,204,122,.42));
+  animation:pf-flow-right 1.95s linear infinite;
 }
 
 .pf-v2[data-battery-flow="idle"] .pf-solar span::after,
 .pf-v2[data-grid-flow="idle"] .pf-grid span::after{
-  opacity:.18;
-  animation-duration:3.8s;
+  opacity:.14;
+  animation-duration:4.2s;
 }
 
 .pf-v2[data-battery-flow="idle"] .pf-home span::after{
-  opacity:.24;
-  animation-duration:3.3s;
+  opacity:.18;
+  animation-duration:3.8s;
 }
 
 .pf-v2[data-grid-flow="exporting"] .pf-grid span::after{
@@ -394,28 +429,30 @@ def render_powerflow_v2_css() -> str:
 }
 
 .pf-v2[data-battery-flow="charging"] .pf-home span::after{
-  opacity:.28;
+  opacity:.22;
 }
 
 .pf-v2[data-battery-flow="discharging"] .pf-solar span::after{
-  opacity:.24;
+  opacity:.18;
 }
 
 .pf-v2[data-battery-flow="discharging"] .pf-home span::after{
-  opacity:.82;
+  opacity:.76;
 }
 
 .pf-v2[data-battery-flow="charging"] .pf-solar span::after{
-  opacity:.88;
+  opacity:.78;
 }
 
 .pf-v2[data-battery-flow="charging"] .pf-battery-shell b{
-  height:62%;
+  height:63%;
 }
 
 .pf-v2[data-battery-flow="discharging"] .pf-battery-shell b{
-  height:46%;
-  background:linear-gradient(180deg, rgba(125,196,255,.95), rgba(105,227,154,.74));
+  height:47%;
+  background:
+    linear-gradient(180deg, rgba(125,196,255,.95), rgba(105,227,154,.80) 48%, rgba(38,142,94,.78)),
+    linear-gradient(90deg, rgba(255,255,255,.16), transparent 45%, rgba(255,255,255,.05));
 }
 
 @keyframes pf-v2-flow{
@@ -424,18 +461,18 @@ def render_powerflow_v2_css() -> str:
 }
 
 @keyframes pf-flow-down{
-  from{ background-position:0 -18px; }
-  to{ background-position:0 18px; }
+  from{ background-position:0 -16px; }
+  to{ background-position:0 16px; }
 }
 
 @keyframes pf-flow-right{
-  from{ background-position:-18px 0; }
-  to{ background-position:18px 0; }
+  from{ background-position:-16px 0; }
+  to{ background-position:16px 0; }
 }
 
 @keyframes pf-flow-left{
-  from{ background-position:18px 0; }
-  to{ background-position:-18px 0; }
+  from{ background-position:16px 0; }
+  to{ background-position:-16px 0; }
 }
 
 @keyframes pf-battery-breathe{
@@ -445,14 +482,14 @@ def render_powerflow_v2_css() -> str:
 
 @media (max-width: 620px){
   .pf-v2{
-    height:354px;
-    min-height:354px;
+    height:336px;
+    min-height:336px;
     border-radius:var(--radius-lg, 8px);
   }
 
   .pf-home{ right:3%; }
   .pf-grid{ left:3%; }
-  .pf-solar{ top:9%; }
+  .pf-solar{ top:8%; }
 
   .pf-caption{
     left:14px;
@@ -463,18 +500,18 @@ def render_powerflow_v2_css() -> str:
 
 @media (max-width: 390px){
   .pf-v2{
-    height:340px;
-    min-height:340px;
+    height:326px;
+    min-height:326px;
   }
 
   .pf-node{
-    width:72px;
-    min-height:72px;
+    width:74px;
+    min-height:74px;
   }
 
   .pf-battery{
-    width:106px;
-    min-height:166px;
+    width:118px;
+    min-height:178px;
   }
 
   .pf-node span{

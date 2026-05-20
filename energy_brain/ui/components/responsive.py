@@ -244,6 +244,18 @@ def _grid_micro_label(section: dict[str, Any]) -> str:
     return "Geen netverbruik"
 
 
+def _battery_micro_label(section: dict[str, Any], battery_flow: str) -> str:
+    if section.get("battery_known") is False:
+        return ""
+    battery = _num(section.get("battery_kw")) or 0.0
+    power = format_kw(abs(battery))
+    if battery_flow == "charging":
+        return f"Laden {power}"
+    if battery_flow == "discharging":
+        return f"Levert {power}"
+    return "Stand-by"
+
+
 def _micro_telemetry(section: dict[str, Any]) -> str:
     items = [
         ("PV", visible_power_label(section, "solar_known", "solar_label", "solar_kw")),
@@ -271,7 +283,15 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
     abundance = "scarcity" if soc_number is not None and float(section.get("soc_percent") or 0) <= 25 else "abundance"
     price_number = _num(section.get("price"))
     price_state = "cheap" if price_number is not None and price_number <= 0.08 else "expensive" if price_number is not None and price_number >= 0.32 else "balanced"
-    return render_powerflow_v2(grid_flow=grid_flow, battery_flow=battery_flow)
+    return render_powerflow_v2(
+        grid_flow=grid_flow,
+        battery_flow=battery_flow,
+        solar_label=visible_power_label(section, "solar_known", "solar_label", "solar_kw") or "Stand-by",
+        home_label=visible_power_label(section, "house_known", "house_label", "house_kw") or "Stand-by",
+        grid_label=_grid_micro_label(section) or "Stand-by",
+        battery_label=_battery_micro_label(section, battery_flow) or "Stand-by",
+        soc_label=soc_label,
+    )
 
     # old renderer disabled
 
