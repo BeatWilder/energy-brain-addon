@@ -271,7 +271,7 @@ def render_powerflow_hero(section: dict[str, Any]) -> str:
     abundance = "scarcity" if soc_number is not None and float(section.get("soc_percent") or 0) <= 25 else "abundance"
     price_number = _num(section.get("price"))
     price_state = "cheap" if price_number is not None and price_number <= 0.08 else "expensive" if price_number is not None and price_number >= 0.32 else "balanced"
-    return render_powerflow_v2()
+    return render_powerflow_v2(grid_flow=grid_flow, battery_flow=battery_flow)
 
     # old renderer disabled
 
